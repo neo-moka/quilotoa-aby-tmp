@@ -213,7 +213,10 @@ jobs:
           echo "digest=${merged_digest}" >> "$GITHUB_OUTPUT"
 
       - name: Attest provenance for the merged image
-        # Verify with: gh attestation verify oci://ghcr.io/block/buzz-sprig:<tag> --owner block
+        # Verify with:
+        #   gh attestation verify oci://$IMAGE_NAME:<tag> --owner <repository owner>
+        # Both default to block upstream; a fork that sets GHCR_SPRIG_IMAGE has to
+        # substitute its own namespace and owner in that command.
         uses: actions/attest-build-provenance@0f67c3f4856b2e3261c31976d6725780e5e4c373  # v4.1.1
         with:
           subject-name: ${{ env.IMAGE_NAME }}
