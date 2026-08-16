@@ -17,7 +17,10 @@ on:
       - ".github/workflows/push-gateway-helm-chart.yml"
 permissions: {}
 env:
-  CHART_REPO: oci://ghcr.io/block/buzz/charts
+  # Same GHCR_CHART_REPO override helm-chart.yml already honours — both charts
+  # publish under one charts repo, so they read one variable. Without it a fork
+  # pushes this chart to ghcr.io/block and fails with a 403.
+  CHART_REPO: ${{ vars.GHCR_CHART_REPO != '' && vars.GHCR_CHART_REPO || 'oci://ghcr.io/block/buzz/charts' }}
 jobs:
   validate:
     runs-on: ubuntu-latest
