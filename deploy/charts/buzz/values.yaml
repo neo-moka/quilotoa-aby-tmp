@@ -23,8 +23,13 @@ quickstart: false
 
 # ── Image ────────────────────────────────────────────────────────────────────
 image:
-  repository: ghcr.io/block/buzz
-  tag: ""                        # empty → .Chart.AppVersion
+  repository: ghcr.io/neo-moka/quilotoa-aby
+  # Empty would fall back to .Chart.AppVersion (0.1.0), and this fork has not
+  # cut a release tag — the relay lane publishes only `main` and `sha-*`, so
+  # that fallback resolves to an image that does not exist. Pin `main` (same
+  # choice the push-gateway chart already makes) until a release tag exists;
+  # switch back to "" once the registry carries a tag matching appVersion.
+  tag: main
   pullPolicy: IfNotPresent
   pullSecrets: []
 
