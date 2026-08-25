@@ -264,6 +264,36 @@ pub async fn cmd_create_issue(
     Ok(())
 }
 
+/// Publish a kind:1 comment on an issue root (same event shape the Desktop
+/// app writes: `e` root + `a` repo + `p` repo owner and extra mentions).
+pub async fn cmd_comment_issue(
+    client: &BuzzClient,
+    issue: &str,
+    repo_owner: &str,
+    repo_id: &str,
+    content: &str,
+    mentions: &[String],
+) -> Result<(), CliError> {
+    validate_hex64(repo_owner)?;
+    validate_repo_id(repo_id)?;
+    let body = read_or_stdin(content)?;
+
+    let repo = GitRepoCoord {
+        owner: repo_owner.to_string(),
+        id: repo_id.to_string(),
+    };
+
+    let builder = with_git_provenance(
+        buzz_sdk::build_git_issue_comment(&repo, issue, &body, mentions).map_err(sdk_err)?,
+    )?;
+    let event = client.sign_event(builder)?;
+    let resp = client.submit_event(event).await?;
+    // Link to the issue thread the comment lands on.
+    let link = crate::links::issue_link(issue, repo_owner, repo_id);
+    crate::client::print_create_response(&resp, "link", &link);
+    Ok(())
+}
+
 /// Publish an issue assignment: a kind:1 comment on the issue whose `p`
 /// tags are the assignees, labeled `t: assignment` (same event shape the
 /// Desktop app writes). Clients trust it when signed by the issue author
@@ -566,6 +596,13 @@ pub async fn dispatch(cmd: crate::IssuesCmd, client: &BuzzClient) -> Result<(), 
             label,
             to,
         } => cmd_create_issue(client, &repo_owner, &repo_id, &title, &content, &label, &to).await,
+        IssuesCmd::Comment {
+            issue,
+            repo_owner,
+            repo_id,
+            content,
+            mention,
+        } => cmd_comment_issue(client, &issue, &repo_owner, &repo_id, &content, &mention).await,
         IssuesCmd::Get { event } => cmd_get_issue(client, &event).await,
         IssuesCmd::List {
             repo_owner,

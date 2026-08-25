@@ -1652,6 +1652,25 @@ pub enum IssuesCmd {
         #[arg(long = "to")]
         to: Vec<String>,
     },
+    /// Comment on an issue (kind:1 threaded reply on the issue root)
+    Comment {
+        /// Issue event id (64-char hex)
+        #[arg(long)]
+        issue: String,
+        /// Repo owner pubkey (64-char hex)
+        #[arg(long)]
+        repo_owner: String,
+        /// Repo identifier (d-tag)
+        #[arg(long)]
+        repo_id: String,
+        /// Comment body, markdown. Use '-' to read from stdin.
+        #[arg(long)]
+        content: String,
+        /// Extra mention pubkey(s) to notify besides the repo owner —
+        /// can be specified multiple times
+        #[arg(long = "mention")]
+        mention: Vec<String>,
+    },
     /// Get an issue by event id
     Get {
         /// Issue event id (64-char hex)
@@ -2379,7 +2398,7 @@ mod tests {
         );
         assert_eq!(
             names(&cmd, "issues"),
-            vec!["assign", "create", "get", "list", "status", "unassign"]
+            vec!["assign", "comment", "create", "get", "list", "status", "unassign"]
         );
         assert_eq!(names(&cmd, "media"), vec!["get"]);
         assert_eq!(names(&cmd, "upload"), vec!["file"]);
@@ -2408,7 +2427,7 @@ mod tests {
             ("dms", 4),
             ("emoji", 5),
             ("feed", 1),
-            ("issues", 6),
+            ("issues", 7),
             ("media", 1),
             ("messages", 8),
             ("pack", 2),

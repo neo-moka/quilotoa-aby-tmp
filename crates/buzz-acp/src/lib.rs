@@ -2023,6 +2023,14 @@ async fn tokio_main() -> Result<()> {
         .map_err(|e| anyhow::anyhow!("membership notification subscribe error: {e}"))?;
     tracing::info!("subscribed to membership notifications");
 
+    if config.issues_watch {
+        relay
+            .subscribe_issue_notifications()
+            .await
+            .map_err(|e| anyhow::anyhow!("issues subscribe error: {e}"))?;
+        tracing::info!("subscribed to NIP-34 issue notifications (issues=watch)");
+    }
+
     let presence_publisher = relay.event_publisher();
     let presence_keys = config.keys.clone();
 
@@ -2870,8 +2878,15 @@ async fn tokio_main() -> Result<()> {
                                 // DM hardening: resolve channel type (fail-closed
                                 // to DM) so allowlist/anyone modes cannot be
                                 // exercised by non-owner authors inside DMs.
-                                let is_dm =
-                                    is_dm_channel(buzz_event.channel_id, &ctx.channel_info).await;
+                                // Issue events carry a synthetic scope that no
+                                // resolver knows — skip the lookup (fail-closed
+                                // would misclassify every issue as a DM) and
+                                // apply the normal channel-mode gate instead.
+                                let is_dm = if buzz_event.is_issue {
+                                    false
+                                } else {
+                                    is_dm_channel(buzz_event.channel_id, &ctx.channel_info).await
+                                };
                                 let allowed = author_allowed(
                                     &config.respond_to,
                                     &config.respond_to_allowlist,
@@ -2893,12 +2908,19 @@ async fn tokio_main() -> Result<()> {
                                 }
                             }
 
-                            let matched = filter::match_event(&buzz_event.event, buzz_event.channel_id, &rules, &pubkey_hex).await;
-                            let prompt_tag = match matched {
-                                Some(m) => m.prompt_tag,
-                                None => {
-                                    tracing::debug!(channel_id = %buzz_event.channel_id, kind = buzz_event.event.kind.as_u16(), "event matched no rule — dropping");
-                                    continue;
+                            // Issue events bypass subscription rules: those are
+                            // channel-scoped, and the issues REQ already gates on
+                            // a `#p` mention of this agent.
+                            let prompt_tag = if buzz_event.is_issue {
+                                "issues".to_string()
+                            } else {
+                                let matched = filter::match_event(&buzz_event.event, buzz_event.channel_id, &rules, &pubkey_hex).await;
+                                match matched {
+                                    Some(m) => m.prompt_tag,
+                                    None => {
+                                        tracing::debug!(channel_id = %buzz_event.channel_id, kind = buzz_event.event.kind.as_u16(), "event matched no rule — dropping");
+                                        continue;
+                                    }
                                 }
                             };
                             // Capture author pubkey before queue.push() moves
@@ -2917,18 +2939,22 @@ async fn tokio_main() -> Result<()> {
                             // backed payload) so the cost is negligible.
                             let event_for_steer = buzz_event.event.clone();
                             let prompt_tag_for_steer = prompt_tag.clone();
+                            let is_issue_event = buzz_event.is_issue;
                             let accepted = queue.push(QueuedEvent {
                                 channel_id: buzz_event.channel_id,
                                 event: buzz_event.event,
                                 received_at: std::time::Instant::now(),
                                 prompt_tag,
+                                is_issue: is_issue_event,
                             });
                             // 👀 — immediate "seen" reaction, only if the event
                             // was actually queued (not dropped by DedupMode::Drop).
                             // Fire-and-forget: on rare fast-failure paths the
                             // guard's cleanup may race with this add, leaving a
                             // cosmetic stale 👀. Acceptable — see ReactionGuard docs.
-                            if accepted {
+                            // Skipped for issue events: reactions target channel
+                            // messages; issue comments live outside channels.
+                            if accepted && !is_issue_event {
                                 let rc = ctx.rest_client.clone();
                                 let eid = event_id_hex.clone();
                                 tokio::spawn(async move {
@@ -2968,6 +2994,7 @@ async fn tokio_main() -> Result<()> {
                                             buzz_event.channel_id,
                                             event_for_steer,
                                             prompt_tag_for_steer,
+                                            is_issue_event,
                                             &steer_ack_tx,
                                         );
                                     if !native_attempted {
@@ -3638,6 +3665,7 @@ fn try_native_steer(
     channel_id: uuid::Uuid,
     event: nostr::Event,
     prompt_tag: String,
+    is_issue: bool,
     steer_ack_tx: &mpsc::UnboundedSender<SteerAckEvent>,
 ) -> bool {
     // Build the steer body: framing strings come from
@@ -3659,6 +3687,7 @@ fn try_native_steer(
         event,
         prompt_tag: prompt_tag.clone(),
         received_at: std::time::Instant::now(),
+        is_issue,
     };
     let event_block = queue::format_event_block(channel_id, None, &be, None);
     let body = format!("{header}\n\n[Buzz event: {prompt_tag}]\n{event_block}\n\n{closing}");
@@ -3736,6 +3765,10 @@ fn dispatch_pending(
             .last()
             .map(|event| queue::parse_thread_tags(&event.event))
             .unwrap_or_default();
+        // Issue batches run under a synthetic scope — publishing typing
+        // indicators against it would emit events for a channel that does
+        // not exist, so their turns stay out of the typing set.
+        let batch_is_issue = batch.events.last().is_some_and(|be| be.is_issue);
         let affinity_hit = pool.has_session_for(channel_id);
         let mut agent = match pool.try_claim(Some(channel_id)) {
             Some(a) => a,
@@ -3802,7 +3835,9 @@ fn dispatch_pending(
                 successful_steer_deliveries: HashSet::new(),
             },
         );
-        dispatched_channels.push((channel_id, typing_scope));
+        if !batch_is_issue {
+            dispatched_channels.push((channel_id, typing_scope));
+        }
         *last_activity = tokio::time::Instant::now();
     }
     tracing::debug!(
@@ -3851,6 +3886,15 @@ fn spawn_failure_notice(
     batch: &FlushBatch,
     content: String,
 ) {
+    if batch.events.last().is_some_and(|be| be.is_issue) {
+        // Issue turns have no real channel to post into — the synthetic scope
+        // would produce an event for a nonexistent channel. Log instead.
+        tracing::warn!(
+            scope = %batch.channel_id,
+            "issue turn dead-lettered — failure notice suppressed (no channel): {content}"
+        );
+        return;
+    }
     if let Some(rest) = rest_client {
         let thread_tags = batch
             .events
@@ -6792,6 +6836,7 @@ mod build_mcp_servers_tests {
             persona_env_vars: vec![],
             has_generated_codex_config: false,
             relay_observer: false,
+            issues_watch: false,
             exit_after_inactivity_secs: 0,
             lazy_pool: false,
             idle_pool_sleep_secs: 0,
@@ -7016,6 +7061,7 @@ mod error_outcome_emission_tests {
             persona_env_vars: vec![],
             has_generated_codex_config: false,
             relay_observer: false,
+            issues_watch: false,
             exit_after_inactivity_secs: 0,
             lazy_pool: false,
             idle_pool_sleep_secs: 0,
@@ -7583,6 +7629,7 @@ mod error_outcome_emission_tests {
                     event,
                     prompt_tag: "test".into(),
                     received_at: std::time::Instant::now(),
+                    is_issue: false,
                 }],
                 cancelled_events: vec![],
                 cancel_reason: None,
@@ -7690,6 +7737,7 @@ mod error_outcome_emission_tests {
                     event,
                     prompt_tag: "test".into(),
                     received_at: std::time::Instant::now(),
+                    is_issue: false,
                 }],
                 cancelled_events: vec![],
                 cancel_reason: None,
@@ -7810,6 +7858,7 @@ mod error_outcome_emission_tests {
                     .unwrap(),
                 prompt_tag: "test".into(),
                 received_at: std::time::Instant::now(),
+                is_issue: false,
             }],
             cancelled_events: vec![],
             cancel_reason: None,
@@ -7904,6 +7953,7 @@ mod error_outcome_emission_tests {
                     .unwrap(),
                 prompt_tag: "test".into(),
                 received_at: std::time::Instant::now(),
+                is_issue: false,
             }],
             cancelled_events: vec![],
             cancel_reason: None,
@@ -7982,6 +8032,7 @@ mod error_outcome_emission_tests {
                 event: original_event.clone(),
                 prompt_tag: "test".into(),
                 received_at: std::time::Instant::now(),
+                is_issue: false,
             }],
             cancelled_events: vec![],
             cancel_reason: Some(CancelReason::Steer),
@@ -8012,6 +8063,7 @@ mod error_outcome_emission_tests {
             event: new_event.clone(),
             received_at: std::time::Instant::now(),
             prompt_tag: "test".into(),
+            is_issue: false,
         });
         let config = test_config();
         let mut heartbeat_in_flight = false;
@@ -8305,6 +8357,7 @@ mod error_outcome_emission_tests {
                 event,
                 prompt_tag: "test".into(),
                 received_at: std::time::Instant::now(),
+                is_issue: false,
             }],
             cancelled_events: vec![],
             cancel_reason: None,
@@ -8391,6 +8444,7 @@ mod error_outcome_emission_tests {
                 event,
                 prompt_tag: "test".into(),
                 received_at: std::time::Instant::now(),
+                is_issue: false,
             }],
             cancelled_events: vec![],
             cancel_reason: None,

@@ -42,8 +42,8 @@ reqwest = { workspace = true }
 serde = { workspace = true }
 serde_json = { workspace = true }
 
-# IDs
-uuid = { workspace = true }
+# IDs — v5 for deterministic per-repo issue scopes (issue_scope_uuid)
+uuid = { workspace = true, features = ["v5"] }
 chrono = { workspace = true }
 
 # URL parsing

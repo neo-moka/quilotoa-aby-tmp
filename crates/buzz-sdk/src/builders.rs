@@ -1121,6 +1121,41 @@ pub fn build_git_issue(
     Ok(EventBuilder::new(Kind::Custom(KIND_GIT_ISSUE as u16), content).tags(tags))
 }
 
+/// Build an issue comment (kind:1) — a threaded reply on an issue root,
+/// mirroring the Desktop app's comment events.
+///
+/// Tag layout: `["e", <issue>, "", "root"]`, `["a", <repo>]`, a `["p", ..]`
+/// for the repo owner (comment notifications follow the repo), plus one
+/// `["p", ..]` per extra mention. Duplicate pubkeys collapse to one tag.
+pub fn build_git_issue_comment(
+    repo: &GitRepoCoord,
+    issue_id: &str,
+    content: &str,
+    mentions: &[String],
+) -> Result<EventBuilder, SdkError> {
+    if content.is_empty() {
+        return Err(SdkError::InvalidInput("comment must not be empty".into()));
+    }
+    check_content(content, 64 * 1024)?;
+    let issue = check_hex_exact(issue_id, 64, "issue")?;
+    let a_value = repo.to_a_tag_value()?;
+    let owner = check_pubkey_hex(&repo.owner, "repo owner")?;
+
+    let mut recipients = vec![owner];
+    for mention in mentions {
+        recipients.push(check_pubkey_hex(mention, "mention")?);
+    }
+    recipients.sort();
+    recipients.dedup();
+
+    let mut tags = vec![tag(&["e", &issue, "", "root"])?, tag(&["a", &a_value])?];
+    for pk in &recipients {
+        tags.push(tag(&["p", pk])?);
+    }
+
+    Ok(EventBuilder::new(Kind::Custom(1), content).tags(tags))
+}
+
 /// Build an issue assignment note (kind:1) — a labeled comment whose `p`
 /// tags are the assignees, mirroring the Desktop app's assignment events.
 ///
@@ -3605,6 +3640,50 @@ mod tests {
             id: "repo".to_string(),
         };
         let err = build_git_issue(&repo, "", "body", &GitIssueMeta::default()).unwrap_err();
+        assert!(matches!(err, SdkError::InvalidInput(_)));
+    }
+
+    #[test]
+    fn git_issue_comment_happy_path() {
+        let owner = "a".repeat(64);
+        let repo = GitRepoCoord {
+            owner: owner.clone(),
+            id: "repo".to_string(),
+        };
+        let issue = "b".repeat(64);
+        // The repo owner is always p-tagged; duplicate mentions (including a
+        // repeat of the owner) collapse to a single tag each.
+        let mentions = vec!["c".repeat(64), "C".repeat(64), owner.clone()];
+        let ev = sign(build_git_issue_comment(&repo, &issue, "on it", &mentions).unwrap());
+        assert_eq!(ev.kind.as_u16(), 1);
+        assert_eq!(ev.content, "on it");
+        assert!(has_tag(&ev, "e", &issue));
+        assert!(has_tag(&ev, "a", &format!("30617:{owner}:repo")));
+        assert!(has_tag(&ev, "p", &owner));
+        assert!(has_tag(&ev, "p", &"c".repeat(64)));
+        let p_count = ev
+            .tags
+            .iter()
+            .filter(|tag| tag.as_slice().first().map(String::as_str) == Some("p"))
+            .count();
+        assert_eq!(p_count, 2);
+    }
+
+    #[test]
+    fn git_issue_comment_rejects_bad_input() {
+        let repo = GitRepoCoord {
+            owner: "a".repeat(64),
+            id: "repo".to_string(),
+        };
+        let issue = "b".repeat(64);
+        // Empty body.
+        let err = build_git_issue_comment(&repo, &issue, "", &[]).unwrap_err();
+        assert!(matches!(err, SdkError::InvalidInput(_)));
+        // Malformed issue id.
+        let err = build_git_issue_comment(&repo, "short", "x", &[]).unwrap_err();
+        assert!(matches!(err, SdkError::InvalidInput(_)));
+        // Malformed mention pubkey.
+        let err = build_git_issue_comment(&repo, &issue, "x", &["nope".to_string()]).unwrap_err();
         assert!(matches!(err, SdkError::InvalidInput(_)));
     }
 
