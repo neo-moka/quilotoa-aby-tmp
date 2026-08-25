@@ -568,7 +568,32 @@ pub async fn dispatch(
             };
             cmd_set_status(client, text, emoji).await
         }
+        UsersCmd::MintAuthTag { agent, conditions } => {
+            cmd_mint_auth_tag(client, &agent, &conditions)
+        }
     }
+}
+
+/// Mint a NIP-OA `auth` tag for `agent`, signed offline by the CLI identity.
+///
+/// No relay call is made: the output's `auth_tag` field is the JSON tag ready
+/// for the agent's `BUZZ_AUTH_TAG` environment variable.
+fn cmd_mint_auth_tag(client: &BuzzClient, agent: &str, conditions: &str) -> Result<(), CliError> {
+    validate_hex64(agent)?;
+    let agent_pk = PublicKey::from_hex(agent)
+        .map_err(|e| CliError::Usage(format!("invalid agent pubkey: {e}")))?;
+    let auth_tag = buzz_sdk::nip_oa::compute_auth_tag(client.keys(), &agent_pk, conditions)
+        .map_err(|e| CliError::Usage(format!("mint failed: {e}")))?;
+    println!(
+        "{}",
+        serde_json::json!({
+            "agent": agent_pk.to_hex(),
+            "owner": client.keys().public_key().to_hex(),
+            "conditions": conditions,
+            "auth_tag": auth_tag,
+        })
+    );
+    Ok(())
 }
 
 #[cfg(test)]
