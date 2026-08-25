@@ -49,6 +49,8 @@ pub struct QueuedEvent {
     pub received_at: Instant,
     /// Tag identifying which rule (or mode) matched this event.
     pub prompt_tag: String,
+    /// True for NIP-34 issue events routed under a synthetic per-repo scope.
+    pub is_issue: bool,
 }
 
 /// A single event inside a [`FlushBatch`].
@@ -57,6 +59,8 @@ pub struct BatchEvent {
     pub event: Event,
     pub prompt_tag: String,
     pub received_at: Instant,
+    /// True for NIP-34 issue events routed under a synthetic per-repo scope.
+    pub is_issue: bool,
 }
 
 /// Why a batch's prior turn was cancelled — controls how `format_prompt`
@@ -341,6 +345,7 @@ impl EventQueue {
                 event: qe.event,
                 prompt_tag: qe.prompt_tag,
                 received_at: qe.received_at,
+                is_issue: qe.is_issue,
             })
             .collect();
         // Relay replay delivers stored events newest-first (`ORDER BY
@@ -480,6 +485,7 @@ impl EventQueue {
                 event: be.event,
                 prompt_tag: be.prompt_tag,
                 received_at: be.received_at, // preserve original timestamp (#46)
+                is_issue: be.is_issue,
             });
         }
         // Enforce per-channel cap: trim oldest (back) events if requeue pushed
@@ -515,6 +521,7 @@ impl EventQueue {
                 event: be.event,
                 prompt_tag: be.prompt_tag,
                 received_at: be.received_at,
+                is_issue: be.is_issue,
             });
         }
         // Enforce per-channel cap: trim newest (back) events if over limit.
@@ -1291,6 +1298,61 @@ fn append_channel_description(s: &mut String, channel_info: Option<&PromptChanne
     s.push_str(&format!("\nDescription: {truncated}"));
 }
 
+/// Format the `[Context]` section for a NIP-34 issue turn.
+///
+/// Issue events carry no channel: the scope names the repo and the issue
+/// root, and the reply instruction routes the response back onto the issue
+/// via `buzz issues comment` — never into a channel.
+fn format_issue_context_hints(be: &BatchEvent) -> String {
+    let repo_coord = crate::relay::extract_issue_repo_coord(&be.event);
+    let (owner, repo_id) = repo_coord
+        .as_deref()
+        .and_then(|coord| {
+            let mut parts = coord.splitn(3, ':');
+            let _kind = parts.next()?;
+            Some((parts.next()?.to_string(), parts.next()?.to_string()))
+        })
+        .unwrap_or_default();
+    // Kind 1621 IS the issue root; a kind-1 comment e-tags it as "root".
+    // NIP-10 `resolve()` treats a lone "root" marker as top-level, so read
+    // the `e` tag directly instead of going through parse_thread_tags.
+    let issue_root = if be.event.kind.as_u16() as u32 == buzz_core::kind::KIND_GIT_ISSUE {
+        be.event.id.to_hex()
+    } else {
+        let e_tag_id = |marker_required: bool| {
+            be.event.tags.iter().find_map(|tag| {
+                let s = tag.as_slice();
+                let is_e = s.first().map(|k| k.as_str()) == Some("e");
+                let valid_id = s
+                    .get(1)
+                    .is_some_and(|v| v.len() == 64 && v.chars().all(|c| c.is_ascii_hexdigit()));
+                let marker_ok = !marker_required || s.get(3).map(|m| m.as_str()) == Some("root");
+                (is_e && valid_id && marker_ok).then(|| s[1].clone())
+            })
+        };
+        e_tag_id(true)
+            .or_else(|| e_tag_id(false))
+            .unwrap_or_else(|| be.event.id.to_hex())
+    };
+
+    let mut s = format!(
+        "[Context]\n\
+         Scope: issue\n\
+         Issue root: {issue_root}"
+    );
+    if !owner.is_empty() {
+        s.push_str(&format!("\nRepo owner: {owner}\nRepo id: {repo_id}"));
+    }
+    s.push_str(&format!(
+        "\nThis is a NIP-34 issue notification — there is no channel. Read the \
+         issue with `buzz issues get --event {issue_root}`.\n\
+         Reply by commenting ON THE ISSUE, not in any channel:\n\
+         `buzz issues comment --issue {issue_root} --repo-owner {owner} \
+         --repo-id {repo_id} --content -` (pass the body via stdin)."
+    ));
+    s
+}
+
 /// Format a `[Context]` hints section based on event scope.
 ///
 /// `reply_anchor` is the pre-resolved `--reply-to` target for this turn (see
@@ -1595,28 +1657,34 @@ pub fn format_prompt(batch: &FlushBatch, args: &FormatPromptArgs<'_>) -> Vec<Str
     // Agent↔agent turns get no forced anchor — deep nesting is intentional
     // there. DMs are always 1:1 with a human, so they always anchor.
     let sender_pubkey = last_event.event.pubkey.to_hex();
-    let reply_anchor = if is_dm {
-        thread_tags
-            .root_event_id
-            .is_some()
-            .then(|| last_event.event.id.to_hex())
+    if last_event.is_issue {
+        // Issue turns replace the channel-scope hints entirely: there is no
+        // channel, no typing scope, and the reply goes onto the issue.
+        sections.push(format_issue_context_hints(last_event));
     } else {
-        resolve_reply_anchor(
-            &sender_pubkey,
+        let reply_anchor = if is_dm {
+            thread_tags
+                .root_event_id
+                .is_some()
+                .then(|| last_event.event.id.to_hex())
+        } else {
+            resolve_reply_anchor(
+                &sender_pubkey,
+                &thread_tags,
+                &last_event.event.id.to_hex(),
+                args.profile_lookup,
+            )
+        };
+        sections.push(format_context_hints(
+            batch.channel_id,
+            args.channel_info,
             &thread_tags,
-            &last_event.event.id.to_hex(),
-            args.profile_lookup,
-        )
-    };
-    sections.push(format_context_hints(
-        batch.channel_id,
-        args.channel_info,
-        &thread_tags,
-        is_dm,
-        args.conversation_context.is_some(),
-        args.conversation_context_had_delivered_events,
-        reply_anchor.as_deref(),
-    ));
+            is_dm,
+            args.conversation_context.is_some(),
+            args.conversation_context_had_delivered_events,
+            reply_anchor.as_deref(),
+        ));
+    }
 
     // 3. Conversation context (thread or DM).
     if let Some(ctx) = args.conversation_context {
@@ -1771,6 +1839,47 @@ mod tests {
             .unwrap()
     }
 
+    #[test]
+    fn issue_context_hints_route_reply_to_issue_comment() {
+        let keys = Keys::generate();
+        let root = "c".repeat(64);
+        let comment = EventBuilder::new(Kind::Custom(1), "@agent can you look at this?")
+            .tags([
+                nostr::Tag::parse(["e", &root, "", "root"]).unwrap(),
+                nostr::Tag::parse(["a", "30617:owner-hex:my-repo"]).unwrap(),
+            ])
+            .sign_with_keys(&keys)
+            .unwrap();
+        let be = BatchEvent {
+            event: comment,
+            prompt_tag: "issues".into(),
+            received_at: Instant::now(),
+            is_issue: true,
+        };
+        let s = format_issue_context_hints(&be);
+        assert!(s.contains("Scope: issue"), "{s}");
+        assert!(s.contains(&format!("Issue root: {root}")), "{s}");
+        assert!(s.contains("Repo owner: owner-hex"), "{s}");
+        assert!(s.contains("Repo id: my-repo"), "{s}");
+        assert!(s.contains("buzz issues comment"), "{s}");
+        assert!(!s.contains("Scope: channel"), "{s}");
+
+        // A kind-1621 root event anchors on its own id.
+        let issue = EventBuilder::new(Kind::Custom(1621), "the bug")
+            .tags([nostr::Tag::parse(["a", "30617:owner-hex:my-repo"]).unwrap()])
+            .sign_with_keys(&keys)
+            .unwrap();
+        let own_id = issue.id.to_hex();
+        let be = BatchEvent {
+            event: issue,
+            prompt_tag: "issues".into(),
+            received_at: Instant::now(),
+            is_issue: true,
+        };
+        let s = format_issue_context_hints(&be);
+        assert!(s.contains(&format!("Issue root: {own_id}")), "{s}");
+    }
+
     /// Build a QueuedEvent for the given channel.
     fn make_queued(channel_id: Uuid, content: &str) -> QueuedEvent {
         QueuedEvent {
@@ -1778,6 +1887,7 @@ mod tests {
             event: make_event(content),
             received_at: Instant::now(),
             prompt_tag: "test".into(),
+            is_issue: false,
         }
     }
 
@@ -1788,6 +1898,7 @@ mod tests {
             event: make_event(content),
             received_at: Instant::now() - age,
             prompt_tag: "test".into(),
+            is_issue: false,
         }
     }
 
@@ -1808,6 +1919,7 @@ mod tests {
             event,
             received_at: Instant::now(),
             prompt_tag: "test".into(),
+            is_issue: false,
         }
     }
 
@@ -2003,6 +2115,7 @@ mod tests {
                 event,
                 prompt_tag: "@mention".into(),
                 received_at: Instant::now(),
+                is_issue: false,
             }],
             cancelled_events: vec![],
             cancel_reason: None,
@@ -2033,11 +2146,13 @@ mod tests {
                 event: make_event("the new message"),
                 prompt_tag: "@mention".into(),
                 received_at: Instant::now(),
+                is_issue: false,
             }],
             cancelled_events: vec![BatchEvent {
                 event: make_event("the original task"),
                 prompt_tag: "@mention".into(),
                 received_at: Instant::now(),
+                is_issue: false,
             }],
             cancel_reason: reason,
         }
@@ -2165,17 +2280,20 @@ mod tests {
                     event: make_event("new one"),
                     prompt_tag: "@mention".into(),
                     received_at: Instant::now(),
+                    is_issue: false,
                 },
                 BatchEvent {
                     event: make_event("new two"),
                     prompt_tag: "@mention".into(),
                     received_at: Instant::now(),
+                    is_issue: false,
                 },
             ],
             cancelled_events: vec![BatchEvent {
                 event: make_event("original"),
                 prompt_tag: "@mention".into(),
                 received_at: Instant::now(),
+                is_issue: false,
             }],
             cancel_reason: Some(CancelReason::Steer),
         };
@@ -2221,11 +2339,13 @@ mod tests {
                 event: steering,
                 prompt_tag: "@mention".into(),
                 received_at: Instant::now(),
+                is_issue: false,
             }],
             cancelled_events: vec![BatchEvent {
                 event: original,
                 prompt_tag: "@mention".into(),
                 received_at: Instant::now(),
+                is_issue: false,
             }],
             cancel_reason: Some(CancelReason::Steer),
         };
@@ -2393,16 +2513,19 @@ mod tests {
                     event: e1,
                     prompt_tag: "tag-a".into(),
                     received_at: Instant::now(),
+                    is_issue: false,
                 },
                 BatchEvent {
                     event: e2,
                     prompt_tag: "tag-b".into(),
                     received_at: Instant::now(),
+                    is_issue: false,
                 },
                 BatchEvent {
                     event: e3,
                     prompt_tag: "tag-c".into(),
                     received_at: Instant::now(),
+                    is_issue: false,
                 },
             ],
             cancelled_events: vec![],
@@ -2432,6 +2555,7 @@ mod tests {
                 event,
                 prompt_tag: "test".into(),
                 received_at: Instant::now(),
+                is_issue: false,
             }],
             cancelled_events: vec![],
             cancel_reason: None,
@@ -2455,6 +2579,7 @@ mod tests {
                 event,
                 prompt_tag: "test".into(),
                 received_at: Instant::now(),
+                is_issue: false,
             }],
             cancelled_events: vec![],
             cancel_reason: None,
@@ -2487,6 +2612,7 @@ mod tests {
                 event,
                 prompt_tag: "test".into(),
                 received_at: Instant::now(),
+                is_issue: false,
             }],
             cancelled_events: vec![],
             cancel_reason: None,
@@ -2517,6 +2643,7 @@ mod tests {
                 event,
                 prompt_tag: "test".into(),
                 received_at: Instant::now(),
+                is_issue: false,
             }],
             cancelled_events: vec![],
             cancel_reason: None,
@@ -2544,6 +2671,7 @@ mod tests {
                 event,
                 prompt_tag: "test".into(),
                 received_at: Instant::now(),
+                is_issue: false,
             }],
             cancelled_events: vec![],
             cancel_reason: None,
@@ -2568,6 +2696,7 @@ mod tests {
                 event,
                 prompt_tag: "test".into(),
                 received_at: Instant::now(),
+                is_issue: false,
             }],
             cancelled_events: vec![],
             cancel_reason: None,
@@ -2629,6 +2758,7 @@ mod tests {
                 event: make_event("hello"),
                 prompt_tag: "test".into(),
                 received_at: Instant::now(),
+                is_issue: false,
             }],
             cancelled_events: vec![],
             cancel_reason: None,
@@ -2682,6 +2812,7 @@ mod tests {
                 event,
                 prompt_tag: "test".into(),
                 received_at: Instant::now(),
+                is_issue: false,
             }],
             cancelled_events: vec![],
             cancel_reason: None,
@@ -2720,6 +2851,7 @@ mod tests {
                 event,
                 prompt_tag: "test".into(),
                 received_at: Instant::now(),
+                is_issue: false,
             }],
             cancelled_events: vec![],
             cancel_reason: None,
@@ -2950,6 +3082,7 @@ mod tests {
             event: make_event("old-msg"),
             received_at: old_time,
             prompt_tag: "test".into(),
+            is_issue: false,
         });
 
         let batch = q.flush_next().expect("flush");
@@ -3262,6 +3395,7 @@ mod tests {
                 event,
                 prompt_tag: "test".into(),
                 received_at: Instant::now(),
+                is_issue: false,
             }],
             cancelled_events: vec![],
             cancel_reason: None,
@@ -3294,6 +3428,7 @@ mod tests {
                 event,
                 prompt_tag: "dm".into(),
                 received_at: Instant::now(),
+                is_issue: false,
             }],
             cancelled_events: vec![],
             cancel_reason: None,
@@ -3333,6 +3468,7 @@ mod tests {
                 event,
                 prompt_tag: "@mention".into(),
                 received_at: Instant::now(),
+                is_issue: false,
             }],
             cancelled_events: vec![],
             cancel_reason: None,
@@ -3363,6 +3499,7 @@ mod tests {
                 event,
                 prompt_tag: "@mention".into(),
                 received_at: Instant::now(),
+                is_issue: false,
             }],
             cancelled_events: vec![],
             cancel_reason: None,
@@ -3409,6 +3546,7 @@ mod tests {
                 event,
                 prompt_tag: "dm".into(),
                 received_at: Instant::now(),
+                is_issue: false,
             }],
             cancelled_events: vec![],
             cancel_reason: None,
@@ -3460,6 +3598,7 @@ mod tests {
                 event,
                 prompt_tag: "@mention".into(),
                 received_at: Instant::now(),
+                is_issue: false,
             }],
             cancelled_events: vec![],
             cancel_reason: None,
@@ -3668,6 +3807,7 @@ mod tests {
                 event,
                 prompt_tag: "dm".into(),
                 received_at: Instant::now(),
+                is_issue: false,
             }],
             cancelled_events: vec![],
             cancel_reason: None,
@@ -3737,6 +3877,7 @@ mod tests {
                 event,
                 prompt_tag: "test".into(),
                 received_at: Instant::now(),
+                is_issue: false,
             }],
             cancelled_events: vec![],
             cancel_reason: None,
@@ -3770,6 +3911,7 @@ mod tests {
                 event: make_event("follow up"),
                 prompt_tag: "dm".into(),
                 received_at: Instant::now(),
+                is_issue: false,
             }],
             cancelled_events: vec![],
             cancel_reason: None,
@@ -3819,6 +3961,7 @@ mod tests {
                 event,
                 prompt_tag: "dm".into(),
                 received_at: Instant::now(),
+                is_issue: false,
             }],
             cancelled_events: vec![],
             cancel_reason: None,
@@ -3860,6 +4003,7 @@ mod tests {
                 event,
                 prompt_tag: "test".into(),
                 received_at: Instant::now(),
+                is_issue: false,
             }],
             cancelled_events: vec![],
             cancel_reason: None,
@@ -3884,6 +4028,7 @@ mod tests {
                 event,
                 prompt_tag: "test".into(),
                 received_at: Instant::now(),
+                is_issue: false,
             }],
             cancelled_events: vec![],
             cancel_reason: None,
@@ -3907,6 +4052,7 @@ mod tests {
                 event,
                 prompt_tag: "test".into(),
                 received_at: Instant::now(),
+                is_issue: false,
             }],
             cancelled_events: vec![],
             cancel_reason: None,
@@ -4273,6 +4419,7 @@ mod tests {
                 event,
                 prompt_tag: "@mention".into(),
                 received_at: Instant::now(),
+                is_issue: false,
             }],
             cancelled_events: vec![],
             cancel_reason: None,
@@ -4315,6 +4462,7 @@ mod tests {
                 event,
                 prompt_tag: "@mention".into(),
                 received_at: Instant::now(),
+                is_issue: false,
             }],
             cancelled_events: vec![],
             cancel_reason: None,
@@ -4350,6 +4498,7 @@ mod tests {
                 event,
                 prompt_tag: "test".into(),
                 received_at: Instant::now(),
+                is_issue: false,
             }],
             cancelled_events: vec![],
             cancel_reason: None,
@@ -4379,6 +4528,7 @@ mod tests {
                 event,
                 prompt_tag: "test".into(),
                 received_at: Instant::now(),
+                is_issue: false,
             }],
             cancelled_events: vec![],
             cancel_reason: None,
@@ -4422,6 +4572,7 @@ mod tests {
                 event,
                 prompt_tag: "@mention".into(),
                 received_at: Instant::now(),
+                is_issue: false,
             }],
             cancelled_events: vec![],
             cancel_reason: None,
@@ -4458,6 +4609,7 @@ mod tests {
                 event,
                 prompt_tag: "@mention".into(),
                 received_at: Instant::now(),
+                is_issue: false,
             }],
             cancelled_events: vec![],
             cancel_reason: None,
@@ -4494,11 +4646,13 @@ mod tests {
                     event: plain,
                     prompt_tag: "test".into(),
                     received_at: Instant::now(),
+                    is_issue: false,
                 },
                 BatchEvent {
                     event: threaded,
                     prompt_tag: "@mention".into(),
                     received_at: Instant::now(),
+                    is_issue: false,
                 },
             ],
             cancelled_events: vec![],
@@ -4531,11 +4685,13 @@ mod tests {
                     event: threaded,
                     prompt_tag: "@mention".into(),
                     received_at: Instant::now(),
+                    is_issue: false,
                 },
                 BatchEvent {
                     event: plain,
                     prompt_tag: "test".into(),
                     received_at: Instant::now(),
+                    is_issue: false,
                 },
             ],
             cancelled_events: vec![],
@@ -4563,6 +4719,7 @@ mod tests {
                 event: make_event(content),
                 prompt_tag: "test".into(),
                 received_at: Instant::now(),
+                is_issue: false,
             }],
             cancelled_events: vec![],
             cancel_reason: None,
@@ -4640,6 +4797,7 @@ mod tests {
             event: make_event("another message"),
             prompt_tag: "test".into(),
             received_at: Instant::now(),
+            is_issue: false,
         });
         assert_eq!(slash_command_for_batch(&multi, &[]), None);
 
@@ -4649,6 +4807,7 @@ mod tests {
             event: make_event("interrupted"),
             prompt_tag: "test".into(),
             received_at: Instant::now(),
+            is_issue: false,
         });
         assert_eq!(slash_command_for_batch(&cancelled, &[]), None);
 
@@ -4857,6 +5016,7 @@ mod tests {
                 event: make_event("hi"),
                 prompt_tag: "test".into(),
                 received_at: Instant::now(),
+                is_issue: false,
             }],
             cancelled_events: vec![],
             cancel_reason: None,
@@ -4886,6 +5046,7 @@ mod tests {
                 event: make_event("hi"),
                 prompt_tag: "test".into(),
                 received_at: Instant::now(),
+                is_issue: false,
             }],
             cancelled_events: vec![],
             cancel_reason: None,
@@ -4914,6 +5075,7 @@ mod tests {
                 event: make_event("hi"),
                 prompt_tag: "test".into(),
                 received_at: Instant::now(),
+                is_issue: false,
             }],
             cancelled_events: vec![],
             cancel_reason: None,
@@ -5283,6 +5445,7 @@ mod tests {
                 event,
                 prompt_tag: "test".into(),
                 received_at: Instant::now(),
+                is_issue: false,
             }],
             cancelled_events: vec![],
             cancel_reason: None,

@@ -117,8 +117,8 @@ const GATED_OBSERVER_QUEUE_CAP: usize = 256;
 use std::time::Instant;
 
 use buzz_core::kind::{
-    KIND_AGENT_OBSERVER_FRAME, KIND_MEMBER_ADDED_NOTIFICATION, KIND_MEMBER_REMOVED_NOTIFICATION,
-    KIND_TYPING_INDICATOR,
+    KIND_AGENT_OBSERVER_FRAME, KIND_GIT_ISSUE, KIND_MEMBER_ADDED_NOTIFICATION,
+    KIND_MEMBER_REMOVED_NOTIFICATION, KIND_TEXT_NOTE, KIND_TYPING_INDICATOR,
 };
 use futures_util::{SinkExt, StreamExt};
 use nostr::{Event, EventBuilder, Keys, Kind, RelayUrl, Tag};
@@ -457,8 +457,14 @@ impl RestClient {
 /// Events the harness cares about.
 #[derive(Debug, Clone)]
 pub struct BuzzEvent {
-    /// Which channel this event belongs to.
+    /// Which channel this event belongs to. For NIP-34 issue events (which
+    /// have no channel) this is a synthetic per-repo scope UUID derived by
+    /// [`issue_scope_uuid`] — stable per repo so queueing, turn exclusion,
+    /// and session affinity all key naturally per repo.
     pub channel_id: Uuid,
+    /// True when this event arrived via the global issues subscription
+    /// (`channel_id` is then a synthetic issue scope, not a real channel).
+    pub is_issue: bool,
     /// The underlying Nostr event.
     pub event: Event,
 }
@@ -528,6 +534,34 @@ enum RelayMessage {
 const MEMBERSHIP_NOTIF_SUB_ID: &str = "membership-notif";
 /// Subscription ID for encrypted owner-to-agent observer control frames.
 const OBSERVER_CONTROL_SUB_ID: &str = "agent-observer-control";
+/// Subscription ID for the global NIP-34 issue notification subscription
+/// (issues and issue comments that `p`-tag the agent — no `#h` filter).
+const ISSUES_NOTIF_SUB_ID: &str = "issues-notif";
+
+/// Fixed UUID v5 namespace for deriving synthetic per-repo issue scopes.
+const ISSUE_SCOPE_NAMESPACE: Uuid = Uuid::from_u128(0x4255_5a5a_4953_5355_4553_434f_5045_0001);
+
+/// Derive the synthetic scope UUID for a repo `a`-tag coordinate
+/// (`30617:<owner-hex>:<repo-d>`). Deterministic: the same repo always maps
+/// to the same scope, giving issue turns per-repo queueing and sessions.
+pub fn issue_scope_uuid(repo_a_value: &str) -> Uuid {
+    Uuid::new_v5(&ISSUE_SCOPE_NAMESPACE, repo_a_value.as_bytes())
+}
+
+/// Extract the repo coordinate from a NIP-34 issue or issue-comment event:
+/// the first `a` tag whose value is a `30617:<owner>:<repo>` coordinate.
+pub fn extract_issue_repo_coord(event: &Event) -> Option<String> {
+    event.tags.iter().find_map(|tag| {
+        let s = tag.as_slice();
+        if s.first().map(|k| k.as_str()) == Some("a") {
+            let v = s.get(1)?;
+            if v.starts_with("30617:") {
+                return Some(v.to_string());
+            }
+        }
+        None
+    })
+}
 
 /// Commands sent from `HarnessRelay` to the background WebSocket task.
 enum RelayCommand {
@@ -547,6 +581,9 @@ enum RelayCommand {
     SubscribeMembership,
     /// Subscribe to encrypted observer control frames addressed to this agent.
     SubscribeObserverControls,
+    /// Subscribe to global NIP-34 issue notifications (issues + comments
+    /// that `p`-tag the agent).
+    SubscribeIssues,
     /// Publish a signed event to the relay (for typing indicators, etc.).
     PublishEvent { event: Box<Event> },
     /// Floor `since` for membership notification replay; events before startup are never re-delivered.
@@ -813,6 +850,17 @@ impl HarnessRelay {
         Ok(())
     }
 
+    /// Subscribe to global NIP-34 issue notifications (issues and issue
+    /// comments that `p`-tag the agent). Events arrive as [`BuzzEvent`]s with
+    /// `is_issue = true` and a synthetic per-repo scope as `channel_id`.
+    pub async fn subscribe_issue_notifications(&mut self) -> Result<(), RelayError> {
+        self.cmd_tx
+            .send(RelayCommand::SubscribeIssues)
+            .await
+            .map_err(|_| RelayError::ConnectionClosed)?;
+        Ok(())
+    }
+
     /// Take the observer-control receiver for polling outside this relay object.
     pub fn take_observer_control_rx(&mut self) -> Option<mpsc::Receiver<Event>> {
         self.observer_control_rx.take()
@@ -1024,6 +1072,12 @@ struct BgState {
     membership_sub_active: bool,
     /// Whether the observer control subscription is active.
     observer_control_sub_active: bool,
+    /// Whether the global issues subscription is active.
+    issues_sub_active: bool,
+    /// Newest successfully-enqueued issue notification timestamp (reconnect `since`).
+    issues_last_seen: Option<u64>,
+    /// Oldest dropped issue-notification timestamp (backpressure recovery).
+    issues_dropped_since: Option<u64>,
     /// Oldest dropped channel-event timestamp per channel, keyed by channel_id.
     /// Mirrors `membership_dropped_since` but for ordinary channel events.
     /// On reconnect resubscribe, `since` = min(last_seen, channel_dropped_since).
@@ -1064,6 +1118,9 @@ struct BgState {
     /// subscription. The main-loop drain re-sends the REQ once the gate clears,
     /// even when `rate_limited_pending` is empty.
     observer_resub_needed: bool,
+    /// Set when the issues subscription REQ must be re-sent (rate limit or
+    /// send failure). Drained like `membership_resub_needed`.
+    issues_resub_needed: bool,
     /// Observer telemetry frames (kind 24200) parked while the rate-limit gate
     /// is armed. Unlike typing indicators, these frames are durable telemetry:
     /// dropping them silently loses turn history in the Desktop observer.
@@ -1101,6 +1158,9 @@ impl BgState {
             membership_last_seen: None,
             membership_sub_active: false,
             observer_control_sub_active: false,
+            issues_sub_active: false,
+            issues_last_seen: None,
+            issues_dropped_since: None,
             channel_dropped_since: HashMap::new(),
             proactive_resubscribe_needed: false,
             startup_watermark: None,
@@ -1109,6 +1169,7 @@ impl BgState {
             rate_limited_pending: HashMap::new(),
             membership_resub_needed: false,
             observer_resub_needed: false,
+            issues_resub_needed: false,
             gated_observer_pending: VecDeque::new(),
             observer_in_flight: VecDeque::new(),
             gated_observer_dropped: 0,
@@ -1302,6 +1363,9 @@ fn apply_command_to_state(state: &mut BgState, cmd: RelayCommand) {
         RelayCommand::SubscribeObserverControls => {
             state.observer_control_sub_active = true;
         }
+        RelayCommand::SubscribeIssues => {
+            state.issues_sub_active = true;
+        }
         RelayCommand::SetStartupWatermark { ts } => {
             state.startup_watermark = Some(ts);
             if state.membership_last_seen.is_none() {
@@ -1493,6 +1557,27 @@ async fn execute_connected_command(
             } else {
                 warn!("observer control subscribe REQ failed — recording intent for reconnect");
                 state.observer_resub_needed = true;
+                false
+            }
+        }
+        RelayCommand::SubscribeIssues => {
+            state.issues_sub_active = true;
+            if state.check_rate_gate().is_some() {
+                debug!("rate-gated: deferring issues subscription");
+                state.issues_resub_needed = true;
+                return true;
+            }
+            let since = state.issues_last_seen.or(state.startup_watermark);
+            let sent = send_issues_subscribe(ws, agent_pubkey_hex, since).await;
+            if sent {
+                state.issues_resub_needed = false;
+                if state.issues_last_seen.is_none() {
+                    state.issues_last_seen = since;
+                }
+                true
+            } else {
+                warn!("issues subscribe REQ failed — recording intent for reconnect");
+                state.issues_resub_needed = true;
                 false
             }
         }
@@ -1758,6 +1843,24 @@ async fn run_background_task(
                     } else {
                         warn!(
                             "membership control resub after rate-limit failed — will retry next drain"
+                        );
+                    }
+                }
+                if state.issues_resub_needed && budget > 0 {
+                    let replay_since = match (state.issues_dropped_since, state.issues_last_seen) {
+                        (Some(d), Some(l)) => Some(d.min(l)),
+                        (Some(d), None) => Some(d),
+                        (None, Some(l)) => Some(l),
+                        (None, None) => state.startup_watermark,
+                    };
+                    if send_issues_subscribe(&mut ws, &agent_pubkey_hex, replay_since).await {
+                        state.issues_resub_needed = false;
+                        state.issues_dropped_since = None;
+                        budget = budget.saturating_sub(1);
+                        any_sent = true;
+                    } else {
+                        warn!(
+                            "issues control resub after rate-limit failed — will retry next drain"
                         );
                     }
                 }
@@ -2132,6 +2235,7 @@ async fn handle_ws_message(
                         let ts = event.created_at.as_secs();
                         let buzz_event = BuzzEvent {
                             channel_id: channel_uuid,
+                            is_issue: false,
                             event: *event,
                         };
                         let cap = event_tx.max_capacity();
@@ -2167,12 +2271,60 @@ async fn handle_ws_message(
                             }
                             Err(mpsc::error::TrySendError::Closed(_)) => return false,
                         }
+                    } else if subscription_id == ISSUES_NOTIF_SUB_ID {
+                        // NIP-34 issue notification — derive the synthetic
+                        // per-repo scope from the `a` tag. Issue events carry
+                        // no `h` tag by design.
+                        let Some(repo_coord) = extract_issue_repo_coord(&event) else {
+                            debug!(
+                                event_id = %event.id.to_hex(),
+                                kind = event.kind.as_u16(),
+                                "issue notification without 30617 a-tag — dropping"
+                            );
+                            return true;
+                        };
+                        let scope = issue_scope_uuid(&repo_coord);
+                        // Dedup via seen_ids directly (not record_event) for
+                        // the same reason as membership: record_event would
+                        // contaminate per-channel replay watermarks.
+                        let event_id_hex = event.id.to_hex();
+                        if !state.seen_ids.insert(event_id_hex.clone()) {
+                            debug!(
+                                event_id = %event_id_hex,
+                                "duplicate issue notification — skipping"
+                            );
+                            return true;
+                        }
+                        let ts = event.created_at.as_secs();
+                        let buzz_event = BuzzEvent {
+                            channel_id: scope,
+                            is_issue: true,
+                            event: *event,
+                        };
+                        match event_tx.try_send(Some(buzz_event)) {
+                            Ok(()) => {
+                                state.issues_last_seen =
+                                    Some(state.issues_last_seen.unwrap_or(0).max(ts));
+                            }
+                            Err(mpsc::error::TrySendError::Full(_)) => {
+                                state.seen_ids.remove(&event_id_hex);
+                                state.issues_dropped_since =
+                                    Some(state.issues_dropped_since.map_or(ts, |d| d.min(ts)));
+                                state.proactive_resubscribe_needed = true;
+                                warn!(
+                                    ts,
+                                    "issue notification dropped (backpressure) — proactive resubscribe queued"
+                                );
+                            }
+                            Err(mpsc::error::TrySendError::Closed(_)) => return false,
+                        }
                     } else if let Some(channel_id) = channel_id_from_sub_id(&subscription_id) {
                         let ts = event.created_at.as_secs();
                         let event_id_hex = event.id.to_hex();
                         if state.record_event(channel_id, &event) {
                             let buzz_event = BuzzEvent {
                                 channel_id,
+                                is_issue: false,
                                 event: *event,
                             };
                             // Warn at 80% capacity.
@@ -2273,6 +2425,8 @@ async fn handle_ws_message(
                             state.membership_resub_needed = true;
                         } else if subscription_id == OBSERVER_CONTROL_SUB_ID {
                             state.observer_resub_needed = true;
+                        } else if subscription_id == ISSUES_NOTIF_SUB_ID {
+                            state.issues_resub_needed = true;
                         }
                         return true; // keep the socket
                     }
@@ -2325,6 +2479,21 @@ async fn handle_ws_message(
                             warn!(
                                 "membership resubscribe failed after CLOSED — triggering reconnect"
                             );
+                            return false;
+                        }
+                    } else if subscription_id == ISSUES_NOTIF_SUB_ID {
+                        let since = match (state.issues_dropped_since, state.issues_last_seen) {
+                            (Some(d), Some(l)) => Some(d.min(l)),
+                            (Some(d), None) => Some(d),
+                            (None, Some(l)) => Some(l),
+                            (None, None) => state.startup_watermark,
+                        };
+                        let sent = send_issues_subscribe(ws, agent_pubkey_hex, since).await;
+                        if sent {
+                            state.issues_dropped_since = None;
+                        } else {
+                            // Keep issues_sub_active = true so reconnect restores it.
+                            warn!("issues resubscribe failed after CLOSED — triggering reconnect");
                             return false;
                         }
                     } else if let Some(channel_id) = channel_id_from_sub_id(&subscription_id) {
@@ -2611,6 +2780,34 @@ async fn resubscribe_after_reconnect(
         }
     }
 
+    if state.issues_sub_active {
+        if state.check_rate_gate().is_some() {
+            debug!("rate-gated: parking issues resubscribe after reconnect");
+            state.issues_resub_needed = true;
+        } else {
+            if !state.active_subscriptions.is_empty()
+                && !pacing_sleep(cmd_rx, &mut deferred_commands, REQ_PACING_INTERVAL).await
+            {
+                return ResubscribeResult::Shutdown;
+            }
+            let replay_since = match (state.issues_dropped_since, state.issues_last_seen) {
+                (Some(d), Some(l)) => Some(d.min(l)),
+                (Some(d), None) => Some(d),
+                (None, Some(l)) => Some(l),
+                (None, None) => state.startup_watermark,
+            };
+            let sent = send_issues_subscribe(ws, agent_pubkey_hex, replay_since).await;
+            if sent {
+                state.issues_dropped_since = None;
+                state.issues_resub_needed = false;
+            } else {
+                warn!("failed to resubscribe issues after reconnect");
+                retain_deferred_command_intent(state, &mut deferred_commands);
+                return ResubscribeResult::RetryConnection;
+            }
+        }
+    }
+
     if state.observer_control_sub_active {
         if state.check_rate_gate().is_some() {
             debug!("rate-gated: parking observer control resubscribe after reconnect");
@@ -2864,7 +3061,8 @@ async fn drain_commands(
             }
             RelayCommand::Subscribe { .. }
             | RelayCommand::SubscribeMembership
-            | RelayCommand::SubscribeObserverControls => {
+            | RelayCommand::SubscribeObserverControls
+            | RelayCommand::SubscribeIssues => {
                 // A gated subscription is only parked in state; pace only an
                 // actual live send attempt.
                 let pace_after = state.check_rate_gate().is_none();
@@ -3295,6 +3493,48 @@ async fn send_membership_subscribe(
         }
         Err(e) => {
             warn!("failed to serialize membership notification REQ: {e}");
+            false
+        }
+    }
+}
+
+/// Send the global NIP-34 issues REQ: issues (1621) and issue comments
+/// (kind 1) that `p`-tag the agent, with no `#h` filter — issue events are
+/// stored channel-less on the relay and only reach global subscriptions.
+async fn send_issues_subscribe(
+    ws: &mut WsStream,
+    agent_pubkey_hex: &str,
+    since: Option<u64>,
+) -> bool {
+    let mut req_filter = serde_json::Map::new();
+    req_filter.insert("kinds".into(), json!([KIND_GIT_ISSUE, KIND_TEXT_NOTE]));
+    req_filter.insert("#p".into(), json!([agent_pubkey_hex]));
+
+    let since_ts = match since {
+        Some(ts) => ts.saturating_sub(SINCE_SKEW_SECS),
+        None => std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap_or_default()
+            .as_secs(),
+    };
+    req_filter.insert("since".into(), json!(since_ts));
+
+    let req = json!(["REQ", ISSUES_NOTIF_SUB_ID, Value::Object(req_filter)]);
+    match serde_json::to_string(&req) {
+        Ok(text) => {
+            match ws_send_timeout(ws, Message::Text(text.into()), WS_SEND_TIMEOUT_SECS).await {
+                Ok(()) => {
+                    debug!("subscribed to issue notifications (since={since_ts})");
+                    true
+                }
+                Err(e) => {
+                    warn!("failed to send issues REQ: {e}");
+                    false
+                }
+            }
+        }
+        Err(e) => {
+            warn!("failed to serialize issues REQ: {e}");
             false
         }
     }
@@ -4025,6 +4265,38 @@ async fn wait_for_any_ok(
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn issue_scope_uuid_is_deterministic_per_repo() {
+        let a = issue_scope_uuid("30617:aaaa:product-hunting");
+        let b = issue_scope_uuid("30617:aaaa:product-hunting");
+        let c = issue_scope_uuid("30617:aaaa:other-repo");
+        assert_eq!(a, b, "same repo must map to the same scope");
+        assert_ne!(a, c, "different repos must map to different scopes");
+    }
+
+    #[test]
+    fn extract_issue_repo_coord_finds_30617_a_tag() {
+        let keys = Keys::generate();
+        let event = EventBuilder::new(Kind::Custom(1621), "bug")
+            .tags([
+                Tag::parse(["e", &"b".repeat(64), "", "root"]).unwrap(),
+                Tag::parse(["a", "30617:owner-hex:my-repo"]).unwrap(),
+            ])
+            .sign_with_keys(&keys)
+            .unwrap();
+        assert_eq!(
+            extract_issue_repo_coord(&event).as_deref(),
+            Some("30617:owner-hex:my-repo")
+        );
+
+        // Non-repo `a` tags are ignored; missing coord yields None.
+        let no_repo = EventBuilder::new(Kind::Custom(1), "hi")
+            .tags([Tag::parse(["a", "30023:someone:article"]).unwrap()])
+            .sign_with_keys(&keys)
+            .unwrap();
+        assert_eq!(extract_issue_repo_coord(&no_repo), None);
+    }
 
     #[test]
     fn relay_ws_to_http_plain() {
