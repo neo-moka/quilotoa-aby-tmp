@@ -893,6 +893,22 @@ pub enum UsersCmd {
         #[arg(long, conflicts_with_all = ["text", "emoji"])]
         clear: bool,
     },
+    /// Mint a NIP-OA `auth` tag declaring YOUR identity as an agent's owner.
+    ///
+    /// Signs offline with your private key — no relay call is made. Paste the
+    /// `auth_tag` value into the agent's BUZZ_AUTH_TAG environment variable.
+    /// Empty conditions (the default) mean unrestricted delegation, matching
+    /// what Buzz Desktop mints for its managed agents.
+    #[command(name = "mint-auth-tag")]
+    MintAuthTag {
+        /// Agent pubkey (64-char hex)
+        #[arg(long)]
+        agent: String,
+        /// NIP-OA conditions grammar, e.g. "kind=9&created_at<4294967295".
+        /// Empty = unrestricted.
+        #[arg(long, default_value = "")]
+        conditions: String,
+    },
 }
 
 #[derive(Subcommand)]
@@ -2334,6 +2350,7 @@ mod tests {
             names(&cmd, "users"),
             vec![
                 "get",
+                "mint-auth-tag",
                 "presence",
                 "set-presence",
                 "set-profile",
@@ -2438,7 +2455,7 @@ mod tests {
             ("repos", 5),
             ("social", 7),
             ("upload", 1),
-            ("users", 5),
+            ("users", 6),
             ("workflows", 8),
         ];
 
