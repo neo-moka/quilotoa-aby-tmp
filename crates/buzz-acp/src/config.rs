@@ -488,6 +488,22 @@ pub struct CliArgs {
     #[arg(long, env = "BUZZ_ACP_RELAY_OBSERVER", default_value_t = false)]
     pub relay_observer: bool,
 
+    /// Publish a public NIP-38 status (kind 30315) while a turn is in flight.
+    ///
+    /// Complements `--relay-observer` rather than replacing it: observer frames
+    /// carry the raw ACP trace and are NIP-44 encrypted to the owner alone, so
+    /// nobody else in the community can tell a busy agent from a dead one. This
+    /// status is unencrypted and says only *that* the agent is working — never
+    /// what it is running — so it is safe to publish community-wide.
+    ///
+    /// Set by the harness at turn start and cleared by `ReactionGuard` on every
+    /// exit path (return, error, panic), so a crashed turn cannot strand a
+    /// permanent "busy" status. Agents may overwrite the text with something
+    /// more specific mid-turn; kind 30315 is replaceable, so the last write
+    /// wins and the guard still clears it.
+    #[arg(long, env = "BUZZ_ACP_PUBLIC_STATUS", default_value_t = false)]
+    pub public_status: bool,
+
     /// Watch NIP-34 issues: trigger a turn when an issue or issue comment
     /// `p`-tags the agent (mentions, comments on the agent's repos, and
     /// assignments). "off" disables, "watch" enables.
@@ -588,6 +604,8 @@ pub struct Config {
     pub has_generated_codex_config: bool,
     /// Whether to publish encrypted observer frames through the relay.
     pub relay_observer: bool,
+    /// Whether to publish a public NIP-38 status while a turn is in flight.
+    pub public_status: bool,
     /// Whether to watch NIP-34 issues (global subscription + issue turns).
     pub issues_watch: bool,
     /// Seconds without dispatched events before an idle harness exits. 0 = disabled.
@@ -1145,6 +1163,7 @@ impl Config {
             persona_env_vars,
             has_generated_codex_config,
             relay_observer: args.relay_observer,
+            public_status: args.public_status,
             issues_watch: args.issues == "watch",
             exit_after_inactivity_secs: args.exit_after_inactivity,
             lazy_pool: args.lazy_pool,
@@ -1519,6 +1538,7 @@ mod tests {
             persona_env_vars: vec![],
             has_generated_codex_config: false,
             relay_observer: false,
+            public_status: false,
             issues_watch: false,
             exit_after_inactivity_secs: 0,
             lazy_pool: false,

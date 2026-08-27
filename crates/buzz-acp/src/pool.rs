@@ -614,6 +614,9 @@ pub struct PromptContext {
     pub cwd: String,
     /// REST client for pre-prompt context fetches (thread/DM history).
     pub rest_client: RestClient,
+    /// Publish a public NIP-38 status while a turn is in flight. See
+    /// `Config::public_status` for why this is separate from the observer.
+    pub public_status: bool,
     /// Shared channel metadata for startup-known and dynamically joined channels.
     pub channel_info: ChannelInfoResolver,
     /// Max messages to include in thread/DM context. 0 = disabled.
@@ -1827,7 +1830,11 @@ pub async fn run_prompt_task(
         .as_ref()
         .map(|b| b.events.iter().map(|be| be.event.id.to_hex()).collect())
         .unwrap_or_default();
-    let _reaction_guard = ReactionGuard::new(ctx.rest_client.clone(), reaction_ids.clone());
+    let _reaction_guard = ReactionGuard::new(
+        ctx.rest_client.clone(),
+        reaction_ids.clone(),
+        ctx.public_status,
+    );
 
     //
     // Core memory is delivered inside the system prompt the harness already
@@ -2402,6 +2409,18 @@ pub async fn run_prompt_task(
         let ids = reaction_ids.clone();
         tokio::spawn(async move {
             react_working(&rest, &ids).await;
+        });
+    }
+
+    // Public NIP-38 status — the community-visible counterpart of 💬. Reactions
+    // only exist on channel messages, so ticket-driven turns leave no public
+    // trace at all; this one is published for every source. Fire-and-forget for
+    // the same reason as the reaction: it must not delay the prompt.
+    if ctx.public_status {
+        let rest = ctx.rest_client.clone();
+        let label = prompt_label(&source);
+        tokio::spawn(async move {
+            publish_working_status(&rest, &format!("trabajando · {label}")).await;
         });
     }
 
@@ -4122,11 +4141,20 @@ fn record_channel_delivery_success(
 struct ReactionGuard {
     rest: Option<crate::relay::RestClient>,
     ids: Vec<String>,
+    /// Clear the public NIP-38 status on drop. Held separately from `rest`
+    /// because that one is `None` when there are no reactions to clear —
+    /// which is exactly the ticket-driven case where the status matters most.
+    status_rest: Option<crate::relay::RestClient>,
 }
 
 impl ReactionGuard {
-    fn new(rest: crate::relay::RestClient, ids: Vec<String>) -> Self {
+    fn new(rest: crate::relay::RestClient, ids: Vec<String>, public_status: bool) -> Self {
         Self {
+            status_rest: if public_status {
+                Some(rest.clone())
+            } else {
+                None
+            },
             rest: if ids.is_empty() { None } else { Some(rest) },
             ids,
         }
@@ -4140,6 +4168,11 @@ impl Drop for ReactionGuard {
         // `run_prompt_task` is always spawned via `JoinSet::spawn`, so a
         // runtime handle is normally available; `try_current` is the safe
         // fallback for the rare cases it isn't.
+        if let Some(rest) = self.status_rest.take() {
+            if let Ok(handle) = tokio::runtime::Handle::try_current() {
+                handle.spawn(clear_working_status(rest));
+            }
+        }
         if let Some(rest) = self.rest.take() {
             let ids = std::mem::take(&mut self.ids);
             if let Ok(handle) = tokio::runtime::Handle::try_current() {
@@ -4662,6 +4695,59 @@ pub(crate) async fn reaction_remove(rest: &crate::relay::RestClient, event_id: &
         Ok(Ok(_)) => {}
         Ok(Err(e)) => tracing::debug!(event_id, emoji, "reaction remove failed: {e}"),
         Err(_) => tracing::debug!(event_id, emoji, "reaction remove timed out"),
+    }
+}
+
+/// Emoji shown beside the public NIP-38 status while a turn runs.
+const STATUS_WORKING_EMOJI: &str = "hammer_and_wrench";
+
+/// Publish a public NIP-38 status (kind 30315) announcing that a turn started.
+///
+/// Unlike observer frames — NIP-44 encrypted to the owner — this is readable by
+/// the whole community, which is the point: without it, a teammate cannot tell a
+/// busy agent from a dead one. It deliberately says only *that* work is in
+/// flight, never which tools or commands are running.
+///
+/// Best-effort and short-deadline: a status that fails to publish must never
+/// hold up the prompt.
+async fn publish_working_status(rest: &crate::relay::RestClient, text: &str) {
+    publish_working_status_inner(rest, text, Some(STATUS_WORKING_EMOJI)).await;
+}
+
+/// Clear the public status by replacing it with an empty one.
+///
+/// Kind 30315 is parameterized-replaceable on a fixed coordinate, so an empty
+/// text supersedes whatever is there — including a more specific status the
+/// agent wrote mid-turn. Called from `ReactionGuard::drop`, so it runs on every
+/// exit path and a crashed turn cannot strand a permanent "busy".
+async fn clear_working_status(rest: crate::relay::RestClient) {
+    publish_working_status_inner(&rest, "", None).await;
+}
+
+/// Shared publish path for both set and clear.
+async fn publish_working_status_inner(
+    rest: &crate::relay::RestClient,
+    text: &str,
+    emoji: Option<&str>,
+) {
+    let builder = match buzz_sdk::build_user_status(text, emoji) {
+        Ok(b) => b,
+        Err(e) => {
+            tracing::debug!("public status: build failed: {e}");
+            return;
+        }
+    };
+    let event = match builder.sign_with_keys(&rest.keys) {
+        Ok(e) => e,
+        Err(e) => {
+            tracing::debug!("public status: sign failed: {e}");
+            return;
+        }
+    };
+    match tokio::time::timeout(Duration::from_millis(1_000), rest.submit_event(&event)).await {
+        Ok(Ok(_)) => {}
+        Ok(Err(e)) => tracing::debug!("public status publish failed: {e}"),
+        Err(_) => tracing::debug!("public status publish timed out"),
     }
 }
 
@@ -7907,6 +7993,44 @@ printf '%s\n' '{{"jsonrpc":"2.0","id":0,"result":{{"stopReason":"end_turn"}}}}'"
         );
     }
 
+    // ── ReactionGuard: gating del estado publico ──────────────────────────
+
+    fn test_rest_client() -> crate::relay::RestClient {
+        crate::relay::RestClient {
+            http: reqwest::Client::new(),
+            base_url: "http://127.0.0.1:0".to_string(),
+            keys: nostr::Keys::generate(),
+            auth_tag_json: None,
+        }
+    }
+
+    /// Con `public_status: false` el guard no debe quedarse con un cliente para
+    /// limpiar: publicar el estado es opt-in y apagarlo tiene que ser total.
+    #[test]
+    fn reaction_guard_skips_status_when_disabled() {
+        let guard = ReactionGuard::new(test_rest_client(), vec!["abc".into()], false);
+        assert!(
+            guard.status_rest.is_none(),
+            "sin public_status el guard no debe intentar limpiar estado"
+        );
+    }
+
+    /// Con `public_status: true` el guard limpia AUNQUE no haya reacciones —
+    /// que es justo el caso de los turnos disparados por ticket, donde el
+    /// harness no pone 👀/💬 y el estado es la unica senal publica.
+    #[test]
+    fn reaction_guard_clears_status_even_without_reactions() {
+        let guard = ReactionGuard::new(test_rest_client(), vec![], true);
+        assert!(
+            guard.rest.is_none(),
+            "sin ids no hay reacciones que limpiar"
+        );
+        assert!(
+            guard.status_rest.is_some(),
+            "el estado se limpia aunque no haya reacciones: es el caso de los tickets"
+        );
+    }
+
     pub(super) fn make_prompt_context_no_owner() -> PromptContext {
         let agent_keys = nostr::Keys::generate();
         make_prompt_context_impl(&agent_keys, None)
@@ -7943,6 +8067,7 @@ printf '%s\n' '{{"jsonrpc":"2.0","id":0,"result":{{"stopReason":"end_turn"}}}}'"
                 keys: agent_keys.clone(),
                 auth_tag_json: None,
             },
+            public_status: false,
             channel_info: ChannelInfoResolver::new(
                 std::collections::HashMap::new(),
                 RestClient {
