@@ -1,5 +1,5 @@
 import * as React from "react";
-import { toast } from "sonner";
+import { toast } from "@/shared/ui/toast";
 
 import type { ProjectsWorkItemsResult } from "@/features/projects/projectWorkItems";
 import type { Project } from "@/features/projects/hooks";

@@ -6,7 +6,7 @@ import {
   Sparkles,
   TerminalSquare,
 } from "lucide-react";
-import { toast } from "sonner";
+import { toast } from "@/shared/ui/toast";
 
 import { useAgentWorking } from "@/features/agents/agentWorkingSignal";
 import { isManagedAgentActive } from "@/features/agents/lib/managedAgentControlActions";

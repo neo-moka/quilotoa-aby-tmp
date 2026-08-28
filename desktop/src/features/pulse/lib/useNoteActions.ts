@@ -1,7 +1,7 @@
 import * as React from "react";
 import { useNavigate } from "@tanstack/react-router";
 import { useQueryClient } from "@tanstack/react-query";
-import { toast } from "sonner";
+import { toast } from "@/shared/ui/toast";
 
 import { useOpenDmMutation } from "@/features/channels/hooks";
 import { useToggleReactionMutation } from "@/features/messages/hooks";

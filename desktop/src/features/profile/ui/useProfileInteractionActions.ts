@@ -1,6 +1,6 @@
 import { useQueryClient } from "@tanstack/react-query";
 import * as React from "react";
-import { toast } from "sonner";
+import { toast } from "@/shared/ui/toast";
 
 import { useAppNavigation } from "@/app/navigation/useAppNavigation";
 import {

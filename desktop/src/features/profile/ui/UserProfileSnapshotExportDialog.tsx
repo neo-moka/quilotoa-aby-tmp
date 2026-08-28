@@ -1,7 +1,7 @@
 import { useExportAgentSnapshotMutation } from "@/features/agents/hooks";
 import { AgentSnapshotExportDialog } from "@/features/agents/ui/AgentSnapshotExportDialog";
 import type { AgentPersona } from "@/shared/api/types";
-import { toast } from "sonner";
+import { toast } from "@/shared/ui/toast";
 
 export function UserProfileSnapshotExportDialog({
   persona,

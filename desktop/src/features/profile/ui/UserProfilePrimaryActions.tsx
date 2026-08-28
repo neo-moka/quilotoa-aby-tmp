@@ -10,7 +10,7 @@ import {
   UserMinus,
   UserPlus,
 } from "lucide-react";
-import { toast } from "sonner";
+import { toast } from "@/shared/ui/toast";
 
 import type {
   useFollowMutation,

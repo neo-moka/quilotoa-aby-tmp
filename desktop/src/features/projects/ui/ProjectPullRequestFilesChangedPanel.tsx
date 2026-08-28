@@ -25,7 +25,7 @@ import {
   type LucideIcon,
 } from "lucide-react";
 import * as React from "react";
-import { toast } from "sonner";
+import { toast } from "@/shared/ui/toast";
 
 import {
   type ProjectPullRequest,

@@ -1,5 +1,5 @@
 import { ChevronDown } from "lucide-react";
-import { toast } from "sonner";
+import { toast } from "@/shared/ui/toast";
 
 import { Spinner } from "@/shared/ui/spinner";
 import React from "react";

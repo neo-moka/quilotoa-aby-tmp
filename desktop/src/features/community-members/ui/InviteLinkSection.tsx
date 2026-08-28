@@ -1,7 +1,7 @@
 import { Check, ChevronDown } from "lucide-react";
 import { motion, useReducedMotion } from "motion/react";
 import * as React from "react";
-import { toast } from "sonner";
+import { toast } from "@/shared/ui/toast";
 
 import { mintInvite } from "@/shared/api/invites";
 import { writeTextToClipboard } from "@/shared/lib/clipboard";

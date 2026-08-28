@@ -117,3 +117,17 @@
 ::view-transition-new(root) {
   animation: none;
 }
+
+/* Toasts arrive and leave on a 350ms slide that HeroUI drives through view
+   transitions (see @heroui/styles toast.css). Sonner suppressed that motion
+   under a reduced-motion preference and HeroUI's stylesheet does not, so the
+   guard lives here — toasts still appear and still expire, they just stop
+   sliding. */
+@media (prefers-reduced-motion: reduce) {
+  ::view-transition-old(.toast-bottom),
+  ::view-transition-new(.toast-bottom),
+  ::view-transition-old(.toast-top),
+  ::view-transition-new(.toast-top) {
+    animation: none;
+  }
+}

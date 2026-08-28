@@ -13,7 +13,7 @@
 import * as React from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { invoke } from "@tauri-apps/api/core";
-import { toast } from "sonner";
+import { toast } from "@/shared/ui/toast";
 
 import { relayClient } from "@/shared/api/relayClient";
 import { isRelayDependentQuery } from "@/shared/api/relayQueryInvalidation";

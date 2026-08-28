@@ -1,6 +1,6 @@
 import { CalendarClock, Clock, Loader2 } from "lucide-react";
 import * as React from "react";
-import { toast } from "sonner";
+import { toast } from "@/shared/ui/toast";
 
 import { useReminderMutations } from "@/features/reminders/hooks";
 import {

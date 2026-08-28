@@ -1,6 +1,6 @@
 import { Check, Search, UserPlus, Users, X } from "lucide-react";
 import * as React from "react";
-import { toast } from "sonner";
+import { toast } from "@/shared/ui/toast";
 
 import { useIsArchivedPredicate } from "@/features/identity-archive/hooks";
 import type { Repository as Project } from "@/features/projects/hooks";

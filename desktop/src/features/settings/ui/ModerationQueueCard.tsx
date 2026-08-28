@@ -1,7 +1,7 @@
 import { useQueryClient } from "@tanstack/react-query";
 import { AlertTriangle, ChevronDown, ShieldAlert } from "lucide-react";
 import { useMemo } from "react";
-import { toast } from "sonner";
+import { toast } from "@/shared/ui/toast";
 
 import { invalidateChannelMembersRosters } from "@/features/channels/rosterFreshness";
 

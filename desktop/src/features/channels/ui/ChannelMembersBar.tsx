@@ -1,6 +1,6 @@
 import { EllipsisVertical, Settings2, Users } from "lucide-react";
 import * as React from "react";
-import { toast } from "sonner";
+import { toast } from "@/shared/ui/toast";
 import { useQueryClient } from "@tanstack/react-query";
 import { useHuddle } from "@/features/huddle";
 import { HuddleIndicator } from "@/features/huddle/components/HuddleIndicator";

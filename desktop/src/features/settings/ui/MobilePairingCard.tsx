@@ -8,7 +8,7 @@ import {
 } from "lucide-react";
 import { listen } from "@tauri-apps/api/event";
 import { AnimatePresence, motion, useReducedMotion } from "motion/react";
-import { toast } from "sonner";
+import { toast } from "@/shared/ui/toast";
 
 import {
   cancelPairing,

@@ -2,7 +2,7 @@ import { Plus, RefreshCw } from "lucide-react";
 import * as React from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { stringify as yamlStringify } from "yaml";
-import { toast } from "sonner";
+import { toast } from "@/shared/ui/toast";
 
 import {
   allWorkflowsQueryKey,

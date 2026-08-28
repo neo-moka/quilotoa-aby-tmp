@@ -1,6 +1,6 @@
 import { Ban, CircleSlash, Clock, ShieldCheck, UserMinus } from "lucide-react";
 import * as React from "react";
-import { toast } from "sonner";
+import { toast } from "@/shared/ui/toast";
 
 import { useRemoveChannelMemberMutation } from "@/features/channels/hooks";
 import {
