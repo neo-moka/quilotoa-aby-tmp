@@ -92,7 +92,13 @@ build-release:
     cargo build --workspace --release
 
 # Run repo lint, formatting, and repository policy checks
-check: fmt-check clippy desktop-check desktop-tauri-fmt-check desktop-tauri-clippy web-check mobile-check file-size-check
+check: fmt-check clippy desktop-check desktop-tauri-fmt-check desktop-tauri-clippy web-check mobile-check file-size-check testid-policy-check
+
+# Policy tests for the data-testid contract guard. The guard itself runs inside
+# `just desktop-check` (`pnpm check`); this covers the anchor logic that decides
+# when a testid has moved off the node its silent consumers need.
+testid-policy-check:
+    node --test scripts/check-testids-core.test.mjs
 
 # Run the repository-wide differential file-size ratchet and its policy tests.
 # The ratchet inspects only files changed from the merge base, so this stays

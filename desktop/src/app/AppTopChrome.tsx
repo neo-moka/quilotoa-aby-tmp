@@ -9,6 +9,21 @@ import { cn } from "@/shared/lib/cn";
 import { topChromeBackdrop } from "@/shared/layout/chromeLayout";
 import { useOptionalSidebar } from "@/shared/ui/sidebar";
 
+/**
+ * Deliberately not `Navbar` from `@heroui-pro/react`, and the shell around it
+ * deliberately not `AppLayout`. This row is not navigation: it is the Tauri
+ * window title bar. It carries `data-tauri-drag-region` on specific nodes, pads
+ * in fixed px to clear the macOS traffic lights, and exposes the
+ * `#app-top-chrome-content` portal that `ProjectDetailChrome` centres against.
+ * Pro's `Navbar` compound puts none of those on nodes we can reach, and a
+ * `<nav>` landmark around window controls is worse a11y than the plain `div`.
+ *
+ * `AppLayout` is not a separate call: its docs state it renders a
+ * `Sidebar.Provider` internally and forbid wrapping it in your own, so adopting
+ * it means adopting Pro's `Sidebar` — whose `data-sidebar` vocabulary has an
+ * empty intersection with the seven values `theme.css` styles against. See
+ * `docs/heroui-migration/component-map.md` §6quinquies for the evidence.
+ */
 type AppTopChromeProps = {
   canGoBack: boolean;
   canGoForward: boolean;
