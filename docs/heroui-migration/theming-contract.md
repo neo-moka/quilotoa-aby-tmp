@@ -26,6 +26,17 @@ capa de indirección donde interceptar.
 Tokens en colisión: `--background`, `--foreground`, `--accent`,
 `--accent-foreground`, `--border`, `--muted`, `--radius`.
 
+**Más cinco desde la capa Pro, con falla distinta.** `@heroui-pro/react/css`
+define `--chart-1..5` en `:root` como una rampa derivada del accent
+(`oklch(from var(--accent) calc(l ± 0.12) c h)`). La app también los define
+(`theme.css:42-46`, `:108-112`) y los consume en `animations.css:715-727`.
+
+Acá no hay ruptura visible: hay **override silencioso**. Pro se importa después,
+gana, y los cinco colores elegidos a mano quedan reemplazados por una rampa
+generada. Se ve como "cambiaron los colores del gradiente", no como "está roto".
+Remedio: redeclararlos **después** del import de Pro, no convertirlos como los
+otros siete.
+
 Falla en las dos direcciones:
 
 - Si gana la app → HeroUI evalúa `var(--accent)` = `266 85.05% 58.04%`, que no
@@ -121,29 +132,64 @@ En shadcn `--accent` es una superficie gris tenue de hover. Mapearlo literal
 deja todos los botones primarios de HeroUI en gris claro. Va a `--primary`
 (el mauve de Catppuccin).
 
-## 5. Valores de la paleta
+## 5. La paleta no es fija: son 61 temas generados en runtime
 
-Catppuccin Latte (claro) / Macchiato (oscuro), tal como están hoy en
-`desktop/src/shared/styles/globals/theme.css`.
+> **Corrección.** Una versión anterior de este documento presentaba los valores
+> de `:root` / `.dark` de `theme.css:2-124` como "la paleta Catppuccin de la
+> app". Es falso, y cambia el alcance del trabajo.
 
-| Token de la app | Claro (`:root`) | Oscuro (`.dark`) |
-|---|---|---|
-| `--background` | `220 23.08% 94.9%` | `232 23.4% 18.43%` |
-| `--foreground` | `234 16.02% 35.49%` | `227 68.25% 87.65%` |
-| `--card` | `220 23.08% 94.9%` | `232 23.4% 18.43%` |
-| `--popover` | `220 23.08% 94.9%` | `232 23.4% 18.43%` |
-| `--primary` | `266 85.05% 58.04%` | `267 82.69% 79.61%` |
-| `--primary-foreground` | `220 23.08% 94.9%` | `232 23.4% 18.43%` |
-| `--secondary` | `223 15.91% 82.75%` | `230 18.8% 26.08%` |
-| `--muted-foreground` | `233 12.8% 41.37%` | `228 39.22% 80%` |
-| `--destructive` | `347 86.67% 44.12%` | `351 73.91% 72.94%` |
-| `--border` / `--input` | `225 13.56% 76.86%` | `231 15.61% 33.92%` |
-| `--ring` | `234 16.02% 35.49%` | `227 68.25% 87.65%` |
-| `--radius` | `0.625rem` | *(igual)* |
+Ese bloque es un **fallback estático que se pisa apenas monta React**. Los
+valores reales los genera `createThemeVars`
+(`desktop/src/shared/theme/adaptive-theme.ts:191`) derivando ~38 tokens a
+partir de tres colores de un tema de Shiki. Hay **61 temas**
+(`theme-loader.ts:64-127`) y el default de la app es `buzz`, no Catppuccin —
+Catppuccin son 4 de los 61.
 
-`--radius` también colisiona: HeroUI usa `0.5rem`. **Gana el valor de la app**
-(`0.625rem`) — es una decisión de diseño existente, y HeroUI deriva
-`--field-radius: calc(var(--radius) * 1.5)` a partir de él.
+Derivaciones, para que quede claro que no hay valores que copiar:
+
+- `--muted` = `--accent` = `--secondary` = `elevate(0.06)`
+- `--popover` = `elevate(0.08)`
+- `--border` = `--input` = `mix(bg, fg, 0.15 oscuro / 0.12 claro)`
+- `--sidebar-background` = `calculateChromeColors()`, búsqueda binaria por
+  luminancia
+- `--muted-foreground` = color de comentario del tema de sintaxis
+
+Consecuencias vinculantes:
+
+1. **El mapa del §4 tiene que dar resultado válido para 61 entradas
+   generadas**, no para una paleta elegida a mano. `--success` y `--warning`
+   no se pueden hardcodear: hay que derivarlos como el resto, o quedan pegados
+   mientras los otros 60 temas cambian.
+2. **Validar sobre una muestra, nunca sobre dos temas.** Los que más estresan
+   `elevate()` y `calculateChromeColors()`: `buzz`, `buzz-dark`,
+   `github-light-high-contrast`, `synthwave-84`, `vitesse-black`.
+
+### `isDark` tampoco es una preferencia
+
+Se deduce de la luminancia del fondo del tema (`adaptive-theme.ts:197`):
+`luminance(syntaxBg) < 0.5`. Elegir tema y elegir esquema son la misma acción;
+no hay booleano que puentear. Refuerza la decisión del §3.
+
+### Los tokens se escriben inline en `<html>`
+
+`ThemeProvider.tsx:444-447` y `:405-407` hacen `root.style.setProperty(key,
+value)`. **Un estilo inline en el root gana contra toda regla de hoja de
+estilos**, sin importar capa, orden de import ni especificidad.
+
+Por eso `:root { --accent: … }` de HeroUI **nunca se aplica**, y el patrón de
+override que documenta HeroUI es inviable mientras `ThemeProvider` esté
+montado. No es una cuestión de orden de capas: es estructural.
+
+### El radio no se resuelve ganando `--radius`
+
+HeroUI deriva su escala: `--radius-sm: calc(var(--radius) * 0.5)` → 5px.
+Buzz define `rounded-sm: calc(var(--radius) - 4px)` → 6px
+(`tailwind.config.js:61-65`). **La escala derivada difiere aunque `--radius`
+coincida.** Hay que decidir explícitamente qué escala de radios gana, o
+`rounded-sm/md/xl/2xl/3xl` cambian de geometría en toda la app.
+
+`--radius` sí es de los pocos tokens genuinamente CSS-only e invariante
+(`0.625rem` idéntico en claro y oscuro, y `createThemeVars` no lo emite).
 
 ## 6. Regla de conversión
 
@@ -161,21 +207,63 @@ Catppuccin Latte (claro) / Macchiato (oscuro), tal como están hoy en
 /* después */ background-color: var(--background);
 ```
 
-### Los 56 usos con alfa son el punto delicado
+### El formato tiene un único punto de origen
 
-`hsl(var(--border) / 0.8)` deja de ser válido cuando `--border` ya es un color
-completo. Reemplazo, en orden de preferencia:
+**No hay que perseguir 42 sitios de escritura.** Una sola función produce el
+triplete: `hexToHsl` (`adaptive-theme.ts:141-168`), que devuelve `"H S% L%"`.
+Cambiarla para que devuelva `hsl(H S% L%)` convierte de una los 33 tokens de
+`createThemeVars` (`adaptive-theme.ts:236-288`) y los 9 de `applyAccentColor`
+(`ThemeProvider.tsx:198-237`).
 
-```css
-/* preferido — sintaxis de color relativo */
-hsl(from var(--border) h s l / 0.8)
+**No convertir** (ya son color completo): `--status-added`, `--status-deleted`,
+`--status-modified`, `--ui-warning` (hex), `--ui-warning-bg` (`rgba()`), y los
+`--buzz-gradient-*` (hex).
 
-/* alternativa */
-color-mix(in srgb, var(--border) 80%, transparent)
-```
+### Companions `-hsl` quirúrgicos, no masivos
 
-La app corre en el webview de Tauri (Chromium), así que ambas están
-disponibles; el soporte de navegadores no es un factor.
+Dos grupos no tienen salida con color completo:
+
+- **CSS con alfa** (~56 usos, `hsl(var(--x) / 0.8)`).
+- **JS que descompone canales**: `ProfileAvatarEditor.utils.ts:633-638`
+  (`hslToRgbString`) y `SpoilerParticles.tsx:220-260`.
+
+Para esos, y **solo** para los tokens que lo requieran, se conserva un
+companion `--x-hsl` con el triplete. El resto va a color completo a secas. El
+conjunto exacto se documenta en el commit que lo introduce.
+
+### Tres cosas que rompen y que ningún comando de verificación detecta
+
+1. **`desktop/index.html:48`** — ``style.backgroundColor = `hsl(${bg})` `` en
+   la ruta de pintura previa al bundle. Roto = **flash negro en cada arranque
+   en frío**, fuera del alcance de `pnpm check`.
+2. **`buzz-theme-cache` en localStorage** guarda el blob en formato viejo. Tras
+   la conversión, todo usuario con caché arranca en `hsl(hsl(220 …))` hasta que
+   resuelva `applyTheme`. **Versionar la clave en el mismo commit.**
+3. **Otros sitios que interpolan `hsl()`**: `ThemePreviewFrame.tsx:48` y `:52`
+   (con alfa), `AppearanceSettingsControls.tsx:292`,
+   `useThemePreviewVars.ts:110`.
+
+Y dos de los consumidores JS (`ProfileAvatarEditor`, `SpoilerParticles`)
+**fallan en silencio**: pintan mal en canvas sin lanzar excepción. Build y
+typecheck en verde no prueban nada sobre ellos.
+
+### Sub-temas locales: la herencia tiene que sobrevivir
+
+Cinco contenedores redefinen el vocabulario semántico completo hacia adentro —
+`.buzz-huddle-drawer`, `.buzz-huddle-popover` (`components.css:99-153`),
+`.buzz-onboarding-neutral-theme`, `.buzz-onboarding-security-theme`
+(`components.css:304-369`) y `[data-buzz-content-surface]`
+(`theme.css:311-314`).
+
+Todo componente de HeroUI dentro de esos scopes debe heredar del ancestro, no
+de `:root`, o el drawer de huddle sale con colores claros sobre superficie
+negra. **Con tokens crudos compartidos la cascada lo resuelve sola** — es un
+argumento más a favor de la decisión del §2: un puente vía `@theme inline` no
+habría heredado.
+
+Ojo también: las reglas del gradiente de Buzz están **deliberadamente fuera de
+`@layer`** (`theme.css:222-226`) para ganarle a las utilidades de Tailwind sin
+`!important`. No meterlas en una capa.
 
 Distribución de los 182 usos: `tailwind.config.js` 33, `markdown.css` 22,
 `DiffViewer.css` 22, `terminal.css` 18, `animations.css` 17, `theme.css` 11,
