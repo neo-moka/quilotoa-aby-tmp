@@ -6,13 +6,10 @@ import { cn } from "@/shared/lib/cn";
 import { safeNpub } from "@/shared/lib/nostrUtils";
 import { truncatePubkey } from "@/shared/lib/pubkey";
 import { Button } from "@/shared/ui/button";
-import {
-  DEFAULT_POPOVER_HOVER_OPEN_DELAY_MS,
-  Popover,
-  PopoverContent,
-  PopoverTrigger,
-} from "@/shared/ui/popover";
+import { Popover, PopoverContent, PopoverTrigger } from "@/shared/ui/popover";
+import { useHoverPopover } from "@/shared/ui/useHoverPopover";
 
+/** Preserved from this site's hand-rolled timer; see `useHoverPopover`. */
 const HOVER_CLOSE_DELAY_MS = 200;
 
 type PubKeyProps = {
@@ -87,37 +84,13 @@ export function PubKey({
   className,
   testId,
 }: PubKeyProps) {
-  const [open, setOpen] = React.useState(false);
-  const hoverTimerRef = React.useRef<ReturnType<typeof setTimeout> | null>(
-    null,
-  );
-
-  const clearHoverTimer = React.useCallback(() => {
-    if (hoverTimerRef.current !== null) {
-      clearTimeout(hoverTimerRef.current);
-      hoverTimerRef.current = null;
-    }
-  }, []);
-
-  const handleTriggerMouseEnter = React.useCallback(() => {
-    clearHoverTimer();
-    hoverTimerRef.current = setTimeout(() => {
-      setOpen(true);
-    }, DEFAULT_POPOVER_HOVER_OPEN_DELAY_MS);
-  }, [clearHoverTimer]);
-
-  const handleMouseLeave = React.useCallback(() => {
-    clearHoverTimer();
-    hoverTimerRef.current = setTimeout(() => {
-      setOpen(false);
-    }, HOVER_CLOSE_DELAY_MS);
-  }, [clearHoverTimer]);
-
-  const handleContentMouseEnter = React.useCallback(() => {
-    clearHoverTimer();
-  }, [clearHoverTimer]);
-
-  React.useEffect(() => clearHoverTimer, [clearHoverTimer]);
+  const hover = useHoverPopover({ closeDelay: HOVER_CLOSE_DELAY_MS });
+  // Only the pointer handlers, not the whole `triggerProps`. This trigger has
+  // never opened on focus, and `PubKey` renders inside lists and cards — adding
+  // it would pop a card open for every identity a keyboard user tabs past.
+  // Enabling it is an accessibility change to make on purpose, not a side
+  // effect of sharing the timers.
+  const { onMouseEnter, onMouseLeave } = hover.triggerProps;
 
   if (variant === "full") {
     const npub = safeNpub(pubkey);
@@ -155,7 +128,7 @@ export function PubKey({
   }
 
   return (
-    <Popover onOpenChange={setOpen} open={open}>
+    <Popover onOpenChange={hover.setOpen} open={hover.open}>
       <PopoverTrigger asChild>
         <button
           aria-label="Show full public key"
@@ -164,8 +137,8 @@ export function PubKey({
             className,
           )}
           data-testid={testId}
-          onMouseEnter={handleTriggerMouseEnter}
-          onMouseLeave={handleMouseLeave}
+          onMouseEnter={onMouseEnter}
+          onMouseLeave={onMouseLeave}
           type="button"
         >
           {truncatePubkey(pubkey)}
@@ -174,8 +147,7 @@ export function PubKey({
       <PopoverContent
         align="start"
         className="w-96 max-w-[90vw]"
-        onMouseEnter={handleContentMouseEnter}
-        onMouseLeave={handleMouseLeave}
+        {...hover.contentProps}
         onOpenAutoFocus={(event) => event.preventDefault()}
       >
         <PubKeyDetails pubkey={pubkey} />

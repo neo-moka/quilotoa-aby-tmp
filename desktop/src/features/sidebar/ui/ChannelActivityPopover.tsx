@@ -16,13 +16,9 @@ import type { Channel, FeedItem, HomeFeedResponse } from "@/shared/api/types";
 import { normalizePubkey, truncatePubkey } from "@/shared/lib/pubkey";
 import { useNow } from "@/shared/lib/useNow";
 import { Markdown } from "@/shared/ui/markdown";
-import {
-  DEFAULT_POPOVER_HOVER_OPEN_DELAY_MS,
-  Popover,
-  PopoverAnchor,
-  PopoverContent,
-} from "@/shared/ui/popover";
+import { Popover, PopoverAnchor, PopoverContent } from "@/shared/ui/popover";
 import { UserAvatar } from "@/shared/ui/UserAvatar";
+import { useHoverPopover } from "@/shared/ui/useHoverPopover";
 
 const HOVER_CLOSE_DELAY_MS = 180;
 const ACTIVITY_POPOVER_MOTION_STYLE = {
@@ -234,10 +230,6 @@ export function ChannelActivityPopover({
   channel: Channel;
   children: React.ReactNode;
 }) {
-  const [open, setOpen] = React.useState(false);
-  const hoverTimerRef = React.useRef<ReturnType<typeof setTimeout> | null>(
-    null,
-  );
   const {
     clearChannelUnreadSource,
     getChannelActivityItemReadAt,
@@ -258,6 +250,19 @@ export function ChannelActivityPopover({
       (item) => item.channelId === channel.id,
     );
   }, [channel.id, unreadThreadFeedItems]);
+  const hasContent =
+    unreadChannelFeedItems.length > 0 ||
+    (activeWorking?.agentPubkeys.length ?? 0) > 0;
+
+  // Declared here rather than beside the other handlers because `open` gates
+  // the profile query just below. `isDisabled` also closes an open popover when
+  // it flips, which is what a separate `!hasContent` effect used to do by hand.
+  const hover = useHoverPopover({
+    closeDelay: HOVER_CLOSE_DELAY_MS,
+    isDisabled: !hasContent,
+  });
+  const open = hover.open;
+
   const profilePubkeys = React.useMemo(
     () => [
       ...new Set([
@@ -299,45 +304,6 @@ export function ChannelActivityPopover({
     profiles,
     unreadChannelFeedItems,
   ]);
-  const hasContent =
-    unreadChannelFeedItems.length > 0 ||
-    (activeWorking?.agentPubkeys.length ?? 0) > 0;
-
-  const clearHoverTimer = React.useCallback(() => {
-    if (hoverTimerRef.current !== null) {
-      clearTimeout(hoverTimerRef.current);
-      hoverTimerRef.current = null;
-    }
-  }, []);
-  const openWithDelay = React.useCallback(() => {
-    if (!hasContent) return;
-    clearHoverTimer();
-    hoverTimerRef.current = setTimeout(() => {
-      setOpen(true);
-    }, DEFAULT_POPOVER_HOVER_OPEN_DELAY_MS);
-  }, [clearHoverTimer, hasContent]);
-  const openImmediately = React.useCallback(() => {
-    if (!hasContent) return;
-    clearHoverTimer();
-    setOpen(true);
-  }, [clearHoverTimer, hasContent]);
-  const closeWithDelay = React.useCallback(() => {
-    clearHoverTimer();
-    hoverTimerRef.current = setTimeout(() => {
-      setOpen(false);
-    }, HOVER_CLOSE_DELAY_MS);
-  }, [clearHoverTimer]);
-  const keepOpen = React.useCallback(() => {
-    clearHoverTimer();
-  }, [clearHoverTimer]);
-
-  React.useEffect(() => () => clearHoverTimer(), [clearHoverTimer]);
-  React.useEffect(() => {
-    if (!hasContent) {
-      setOpen(false);
-    }
-  }, [hasContent]);
-
   const clearUnreadOverride = React.useCallback(
     (item: InboxItem) => {
       const clearedItemIds = new Set(getGroupedInboxItemIds(item));
@@ -372,15 +338,12 @@ export function ChannelActivityPopover({
   }
 
   return (
-    <Popover onOpenChange={setOpen} open={open}>
+    <Popover onOpenChange={hover.setOpen} open={hover.open}>
       {/* biome-ignore lint/a11y/noStaticElementInteractions: hover/focus events bubble from the nested channel button while the wrapper keeps the preview interactive. */}
       <div
         className="w-full min-w-0"
-        onBlur={closeWithDelay}
-        onContextMenu={() => setOpen(false)}
-        onFocus={openImmediately}
-        onMouseEnter={openWithDelay}
-        onMouseLeave={closeWithDelay}
+        onContextMenu={() => hover.setOpen(false)}
+        {...hover.triggerProps}
       >
         <PopoverAnchor asChild>{children}</PopoverAnchor>
       </div>
@@ -388,9 +351,8 @@ export function ChannelActivityPopover({
         align="start"
         className="w-96 overflow-hidden p-0"
         data-testid={`channel-activity-popover-${channel.name}`}
-        onFocusCapture={keepOpen}
-        onMouseEnter={keepOpen}
-        onMouseLeave={closeWithDelay}
+        onFocusCapture={hover.cancelClose}
+        {...hover.contentProps}
         onOpenAutoFocus={(event) => event.preventDefault()}
         side="right"
         sideOffset={0}
@@ -415,7 +377,7 @@ export function ChannelActivityPopover({
                 activeWorking={activeWorking}
                 channelId={channel.id}
                 onOpen={(pubkey, channelId) => {
-                  setOpen(false);
+                  hover.setOpen(false);
                   openAgentActivity(pubkey, { channelId });
                 }}
                 profiles={profiles}
@@ -429,14 +391,14 @@ export function ChannelActivityPopover({
                     onMarkRead={() => handleMarkRead(item)}
                     onOpen={() => {
                       clearUnreadOverride(item);
-                      setOpen(false);
+                      hover.setOpen(false);
                       void goChannel(channel.id, {
                         messageId: item.id,
                         threadRootId: item.conversationId,
                       });
                     }}
                     onRemindLater={() => {
-                      setOpen(false);
+                      hover.setOpen(false);
                       openReminder({
                         authorPubkey: item.item.pubkey,
                         channelId: channel.id,
