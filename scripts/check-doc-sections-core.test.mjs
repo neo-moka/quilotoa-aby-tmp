@@ -192,6 +192,29 @@ test("an anchor passes while the number still names its section", () => {
   );
 });
 
+test("a cited section with no anchor is detectable, so the curated list stays honest", () => {
+  const cited = new Set(
+    parseCitations(
+      [
+        " * component-map.md §6ter and §6septies",
+        " * component-map.md §6bis",
+      ].join("\n"),
+    ).map((citation) => citation.headingId),
+  );
+  const anchored = new Set(
+    [
+      { section: "6ter", titleIncludes: "Los overlays", why: "popover.tsx" },
+      { section: "6septies", titleIncludes: "chat de Pro", why: "hook" },
+    ].map((anchor) => anchor.section),
+  );
+
+  // `6bis` is cited but unanchored, so it is covered only by existence — the
+  // half that cannot see a number being handed to another section.
+  assert.deepEqual([...cited].filter((id) => !anchored.has(id)).sort(), [
+    "6bis",
+  ]);
+});
+
 test("an uncited section is detectable without being an error", () => {
   const { ids } = parseSections(map);
   const cited = new Set(
