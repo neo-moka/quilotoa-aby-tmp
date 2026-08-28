@@ -1,3 +1,18 @@
+/**
+ * Vendored shadcn, deliberately **not** replaced by Pro's `Sidebar` — nor by
+ * `AppLayout`, which renders a `Sidebar.Provider` internally and forbids
+ * wrapping it in your own.
+ *
+ * `theme.css` styles this navigation through seven `data-sidebar` values across
+ * 27 selectors (`sidebar`, `menu-button`, `menu-sub-button`, `footer`,
+ * `group-label`, `menu-item`, `trigger`). Pro's sidebar emits exactly three:
+ * `label`, `menu`, `provider`. The intersection is empty, so adopting it drops
+ * the theme in one step, into something that still renders — which no gate
+ * catches. And `Sidebar.Menu` is a React Aria `Tree`, which the dnd-kit rows and
+ * per-row context menus here do not survive.
+ *
+ * Full write-up: `docs/heroui-migration/component-map.md` §6quinquies.
+ */
 import * as React from "react";
 import { Slot } from "@radix-ui/react-slot";
 import { cva, type VariantProps } from "class-variance-authority";

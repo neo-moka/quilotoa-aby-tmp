@@ -160,18 +160,59 @@ test("an explicit filter still wins over the default", async () => {
   );
 });
 
-test("the muted re-point sits on the dialog, above app content, with the surface captured on the container", async () => {
+test("the muted re-point sits on the nodes that read the token, not on the dialog", async () => {
+  // Scoping the whole dialog is what broke EmptyState in the widgets lot:
+  // nested controls inherited the re-point and their hover backgrounds
+  // resolved to a text grey.
+  const document = await renderPalette();
+
+  const dialog = document.querySelector('[data-slot="command-dialog"]');
+  assert.ok(
+    !dialog.className.includes("[--muted:var(--muted-foreground)]"),
+    "the re-point blankets the dialog root",
+  );
+
+  for (const slot of ["command-input-group", "command-list", "command-item"]) {
+    const node = document.querySelector(`[data-slot="${slot}"]`);
+    assert.ok(node, `no ${slot} rendered`);
+    assert.match(
+      node.className,
+      /\[--muted:var\(--muted-foreground\)\]/,
+      `${slot} reads --muted but carries no re-point`,
+    );
+  }
+});
+
+test("the container captures the surface value above the re-point", async () => {
   const document = await renderPalette();
 
   const container = document.querySelector('[data-slot="command-container"]');
-  const dialog = document.querySelector('[data-slot="command-dialog"]');
 
-  // Order matters: the capture has to resolve before the re-point, so it cannot
-  // live on the same element.
+  // Custom properties resolve per element, so capture and re-point cannot share
+  // one: the capture would read the value being replaced.
   assert.match(container.className, /\[--buzz-muted-surface:var\(--muted\)\]/);
-  assert.match(dialog.className, /\[--muted:var\(--muted-foreground\)\]/);
   assert.ok(
     !container.className.includes("[--muted:var(--muted-foreground)]"),
     "capture and re-point collapsed onto one element",
+  );
+});
+
+test("the surface does not mutate Pro's own Command namespace", async () => {
+  // Object.assign mutates its target. Assigning the app's overrides onto the
+  // imported binding would hand them to every other consumer of the package.
+  const { Command } = await import("@/shared/ui/command");
+  const pro = await import("@heroui-pro/react/command");
+
+  // Pro assembles its own namespace by attaching the parts to `CommandRoot`, so
+  // that object is shared with every other importer — which is exactly why the
+  // app's parts have to hang off a local wrapper instead.
+  assert.equal(pro.CommandRoot.Dialog, pro.CommandDialog);
+
+  assert.notEqual(Command, pro.CommandRoot);
+  assert.notEqual(Command.Dialog, pro.CommandDialog);
+  assert.equal(
+    pro.CommandRoot.Dialog,
+    pro.CommandDialog,
+    "the app's Dialog override leaked onto Pro's shared namespace",
   );
 });

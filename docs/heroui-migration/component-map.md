@@ -738,6 +738,13 @@ valen para cualquier lote que toque este componente:
    Menor: la doc llama `onLayout` a la prop del root; el código destructura
    `onLayoutChange`.
 
+**Ojo con generalizar esto**: la regla del equipo es que las tablas de "API
+Reference" de Pro son un **piso, no un techo** — lo que el root reenvía con
+`...rest` al primitivo de React Aria está disponible aunque no figure. `Resizable`
+es el caso contrario y por eso importa: ahí **no hay `...rest`**, así que la
+ausencia sí es un hueco real. Antes de concluir que Pro "no deja" hacer algo,
+mirá si el root spreadea; si spreadea, probalo.
+
 Para el rail en concreto, además se perdería el imán a 300px con háptica
 (`performSidebarDefaultHaptic`), el atributo `data-sidebar="rail"` y el
 contrato `--sidebar-width` en px que leen ~10 clases Tailwind — Pro maneja los
