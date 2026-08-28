@@ -97,11 +97,11 @@ export function CommunityEmojiIcon({
       </span>
     );
   }
-  return (
-    <span aria-hidden="true" className={className}>
-      <span className="-translate-y-px leading-normal">🐝</span>
-    </span>
-  );
+  // No icon rather than a stand-in. The bee that used to sit here was Buzz's
+  // mark, and after the ABY rename it read as decoration nobody chose — the
+  // same reason it came out of the sidebar profile card. A community without
+  // an icon shows its name, which is the thing being identified.
+  return null;
 }
 
 export function CommunitySwitcher({
