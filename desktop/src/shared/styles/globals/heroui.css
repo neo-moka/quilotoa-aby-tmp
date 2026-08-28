@@ -146,13 +146,24 @@
  * 286 times across its components, of which `context-menu`, the only Pro
  * component imported so far, happens to read it zero times. Counts for the
  * components most likely to arrive next: command 8, rich-text-editor 7,
- * prompt-input 6, file-tree 5, sidebar 5, markdown 3.
+ * prompt-input 6, file-tree 5, sidebar 5, markdown 3 — all of them bare.
  *
- * Any Pro component added to the import list above should be checked with
- * `grep -c 'var(--muted)'` against its file in
- * `@heroui-pro/react/dist/css/components/`. A non-zero count means that
- * component needs `HERO_MUTED_SCOPE` on its root, or its muted text renders
- * near-invisible in both themes.
+ * Any Pro component added to the import list above should be checked against
+ * its file in `@heroui-pro/react/dist/css/components/`. Audit the **dist**:
+ * the MCP's `get_css` returns the source, with `@apply` unexpanded, and it is
+ * the compiled file that ships.
+ *
+ * Count only *bare* `var(--muted)`. A usage written `var(--<token>,
+ * var(--muted))` falls through only when `<token>` is unmapped, so it is not a
+ * bug when the mapping above covers it. 282 of the 286 are bare; the other 4
+ * sit behind `var(--field-placeholder, …)`, mapped above — which is why
+ * `native-select` needs no scope even though a plain
+ * `grep -c 'var(--muted)'` reports two hits for it.
+ *
+ * A non-zero *bare* count means that component needs `HERO_MUTED_SCOPE`, or
+ * its muted text renders near-invisible in both themes. Apply it to the
+ * elements that read the token — not the component root, which also catches
+ * app markup composed into the component; see `shared/ui/heroMutedScope.ts`.
  * ─────────────────────────────────────────────────────────────────────── */
 
 /* ── Known gap ────────────────────────────────────────────────────────────
