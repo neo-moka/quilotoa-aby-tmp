@@ -10,14 +10,10 @@ import {
 import type { UserProfileLookup } from "@/features/profile/lib/identity";
 import type { ManagedAgent } from "@/shared/api/types";
 import { cn } from "@/shared/lib/cn";
-import {
-  DEFAULT_POPOVER_HOVER_OPEN_DELAY_MS,
-  Popover,
-  PopoverContent,
-  PopoverTrigger,
-} from "@/shared/ui/popover";
+import { Popover, PopoverContent, PopoverTrigger } from "@/shared/ui/popover";
 import { Shimmer } from "@/shared/ui/Shimmer";
 import { UserAvatar } from "@/shared/ui/UserAvatar";
+import { useHoverPopover } from "@/shared/ui/useHoverPopover";
 
 export type BotActivityAgent = Pick<ManagedAgent, "pubkey" | "name">;
 
@@ -43,10 +39,7 @@ export function BotActivityComposerAction({
   workingBotPubkeys,
   variant = "toolbar",
 }: BotActivityBarProps) {
-  const [open, setOpen] = React.useState(false);
-  const hoverTimerRef = React.useRef<ReturnType<typeof setTimeout> | null>(
-    null,
-  );
+  const hover = useHoverPopover({ closeDelay: HOVER_CLOSE_DELAY_MS });
 
   const workingAgents = React.useMemo(() => {
     const workingSet = new Set(
@@ -99,35 +92,6 @@ export function BotActivityComposerAction({
   }, [channelId, singleWorkingAgent, transcript]);
   const [headlineIndex, setHeadlineIndex] = React.useState(0);
 
-  const clearHoverTimer = React.useCallback(() => {
-    if (hoverTimerRef.current !== null) {
-      clearTimeout(hoverTimerRef.current);
-      hoverTimerRef.current = null;
-    }
-  }, []);
-
-  const openWithDelay = React.useCallback(() => {
-    clearHoverTimer();
-    hoverTimerRef.current = setTimeout(() => {
-      setOpen(true);
-    }, DEFAULT_POPOVER_HOVER_OPEN_DELAY_MS);
-  }, [clearHoverTimer]);
-
-  const closeWithDelay = React.useCallback(() => {
-    clearHoverTimer();
-    hoverTimerRef.current = setTimeout(() => {
-      setOpen(false);
-    }, HOVER_CLOSE_DELAY_MS);
-  }, [clearHoverTimer]);
-
-  const keepOpen = React.useCallback(() => {
-    clearHoverTimer();
-  }, [clearHoverTimer]);
-
-  React.useEffect(() => {
-    return () => clearHoverTimer();
-  }, [clearHoverTimer]);
-
   React.useEffect(() => {
     if (activityHeadlines.length <= 1) {
       return;
@@ -161,7 +125,7 @@ export function BotActivityComposerAction({
       : `${workingAgents[0]?.name ?? "Agent"} +${workingAgents.length - 1}`;
 
   return (
-    <Popover onOpenChange={setOpen} open={open}>
+    <Popover onOpenChange={hover.setOpen} open={hover.open}>
       <PopoverTrigger asChild>
         <button
           aria-label={`${triggerLabel}. View activity.`}
@@ -172,14 +136,13 @@ export function BotActivityComposerAction({
               : "h-9 min-w-9 gap-1.5 px-2 text-xs",
           )}
           data-testid="bot-activity-composer-trigger"
-          onBlur={closeWithDelay}
-          onClick={() => {
-            clearHoverTimer();
-            setOpen((current) => !current);
-          }}
-          onFocus={() => setOpen(true)}
-          onMouseEnter={openWithDelay}
-          onMouseLeave={closeWithDelay}
+          onBlur={hover.triggerProps.onBlur}
+          // The updater form is why `setOpen` takes a `SetStateAction`: this
+          // trigger toggles on click as well as opening on hover.
+          onClick={() => hover.setOpen((current) => !current)}
+          onFocus={hover.triggerProps.onFocus}
+          onMouseEnter={hover.triggerProps.onMouseEnter}
+          onMouseLeave={hover.triggerProps.onMouseLeave}
           type="button"
         >
           <span className="flex h-4.5 items-center overflow-visible -space-x-1">
@@ -225,8 +188,7 @@ export function BotActivityComposerAction({
       <PopoverContent
         align={isInline ? "start" : "end"}
         className="w-64 p-1"
-        onMouseEnter={keepOpen}
-        onMouseLeave={closeWithDelay}
+        {...hover.contentProps}
         onOpenAutoFocus={(event) => event.preventDefault()}
         side="top"
         sideOffset={8}
@@ -249,8 +211,7 @@ export function BotActivityComposerAction({
                 data-testid={`bot-activity-composer-item-${agent.pubkey}`}
                 key={agent.pubkey}
                 onClick={() => {
-                  clearHoverTimer();
-                  setOpen(false);
+                  hover.setOpen(false);
                   onOpenAgentSession(agent.pubkey, channelId);
                 }}
                 type="button"

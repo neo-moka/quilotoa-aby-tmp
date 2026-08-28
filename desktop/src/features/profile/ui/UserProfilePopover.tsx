@@ -28,12 +28,8 @@ import { cn } from "@/shared/lib/cn";
 import { normalizePubkey, truncatePubkey } from "@/shared/lib/pubkey";
 import { useProfileInteractionActions } from "@/features/profile/ui/useProfileInteractionActions";
 
-import {
-  DEFAULT_POPOVER_HOVER_OPEN_DELAY_MS,
-  Popover,
-  PopoverAnchor,
-  PopoverContent,
-} from "@/shared/ui/popover";
+import { Popover, PopoverAnchor, PopoverContent } from "@/shared/ui/popover";
+import { useHoverPopover } from "@/shared/ui/useHoverPopover";
 import { BotIdenticon } from "@/features/messages/ui/BotIdenticon";
 import { useNow } from "@/shared/lib/useNow";
 import { Button } from "@/shared/ui/button";
@@ -130,57 +126,30 @@ export function UserProfilePopover({
   role,
   botIdenticonValue,
 }: UserProfilePopoverProps) {
-  const [open, setOpen] = React.useState(false);
-  const hoverTimerRef = React.useRef<ReturnType<typeof setTimeout> | null>(
-    null,
-  );
+  // Only the pointer handlers below, not the whole `triggerProps`: this trigger
+  // has never opened on focus, and it wraps inline names and avatars all over
+  // the app, so focus-opening would fire while tabbing through a message list.
+  const { cancelClose, contentProps, open, setOpen, triggerProps } =
+    useHoverPopover({
+      closeDelay: HOVER_CLOSE_DELAY_MS,
+      isDisabled: !enableHoverPopover,
+    });
   const { openProfilePanel } = useProfilePanel();
   const canOpenProfilePanel = enableProfilePanel && Boolean(openProfilePanel);
 
-  const clearHoverTimer = React.useCallback(() => {
-    if (hoverTimerRef.current !== null) {
-      clearTimeout(hoverTimerRef.current);
-      hoverTimerRef.current = null;
-    }
-  }, []);
-
-  const handleTriggerMouseEnter = React.useCallback(() => {
-    if (!enableHoverPopover) {
-      return;
-    }
-    clearHoverTimer();
-    hoverTimerRef.current = setTimeout(() => {
-      setOpen(true);
-    }, DEFAULT_POPOVER_HOVER_OPEN_DELAY_MS);
-  }, [clearHoverTimer, enableHoverPopover]);
-
-  const handleMouseLeave = React.useCallback(() => {
-    clearHoverTimer();
-    hoverTimerRef.current = setTimeout(() => {
-      setOpen(false);
-    }, HOVER_CLOSE_DELAY_MS);
-  }, [clearHoverTimer]);
-
-  const handleContentMouseEnter = React.useCallback(() => {
-    clearHoverTimer();
-  }, [clearHoverTimer]);
-
   const handleTriggerClick = React.useCallback(
     (event: React.MouseEvent) => {
-      clearHoverTimer();
       if (canOpenProfilePanel && openProfilePanel) {
         event.preventDefault();
         event.stopPropagation();
         setOpen(false);
         openProfilePanel(pubkey);
+      } else {
+        cancelClose();
       }
     },
-    [canOpenProfilePanel, clearHoverTimer, openProfilePanel, pubkey],
+    [cancelClose, canOpenProfilePanel, openProfilePanel, pubkey, setOpen],
   );
-
-  React.useEffect(() => {
-    return clearHoverTimer;
-  }, [clearHoverTimer]);
 
   const TriggerElement = triggerElement;
   return (
@@ -199,13 +168,12 @@ export function UserProfilePopover({
             ) {
               e.preventDefault();
               e.stopPropagation();
-              clearHoverTimer();
               setOpen(false);
               openProfilePanel(pubkey);
             }
           }}
-          onMouseEnter={handleTriggerMouseEnter}
-          onMouseLeave={handleMouseLeave}
+          onMouseEnter={triggerProps.onMouseEnter}
+          onMouseLeave={triggerProps.onMouseLeave}
           className={cn(
             "inline-flex",
             canOpenProfilePanel && "cursor-pointer [&_*]:cursor-pointer",
@@ -218,9 +186,9 @@ export function UserProfilePopover({
         <UserProfilePopoverBody
           botIdenticonValue={botIdenticonValue}
           canOpenProfilePanel={canOpenProfilePanel}
-          onBeforeAction={clearHoverTimer}
-          onContentMouseEnter={handleContentMouseEnter}
-          onMouseLeave={handleMouseLeave}
+          onBeforeAction={cancelClose}
+          onContentMouseEnter={contentProps.onMouseEnter}
+          onMouseLeave={contentProps.onMouseLeave}
           onTriggerClick={handleTriggerClick}
           pubkey={pubkey}
           role={role}

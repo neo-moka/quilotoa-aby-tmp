@@ -33,8 +33,12 @@ export interface UseHoverPopoverOptions {
 export interface UseHoverPopoverResult {
   /** Current open state, for Radix's `open` prop. */
   open: boolean;
-  /** Direct control, for Radix's `onOpenChange` and for imperative closes. */
-  setOpen: (open: boolean) => void;
+  /**
+   * Direct control, for Radix's `onOpenChange` and for imperative opens and
+   * closes. Accepts the updater form because a trigger that also toggles on
+   * click needs `setOpen((current) => !current)` — `BotActivityBar` does.
+   */
+  setOpen: React.Dispatch<React.SetStateAction<boolean>>;
   /**
    * Spread onto the trigger — or onto a wrapper around it when the trigger is
    * `disabled`, since a disabled button emits no pointer events.
@@ -53,6 +57,15 @@ export interface UseHoverPopoverResult {
     onMouseEnter: () => void;
     onMouseLeave: () => void;
   };
+  /**
+   * Cancels a scheduled close without opening or closing anything.
+   *
+   * `contentProps.onMouseEnter` is this bound to an event; it is exposed on its
+   * own for panels that must also hold themselves open on another signal —
+   * `ChannelActivityPopover` cancels on `onFocusCapture`, so that tabbing into
+   * the panel does not let the close timer run out underneath the caret.
+   */
+  cancelClose: () => void;
 }
 
 /**
@@ -128,8 +141,10 @@ export function useHoverPopover({
     }
   }, [clearTimer, isDisabled]);
 
-  const setOpenControlled = React.useCallback(
-    (next: boolean) => {
+  const setOpenControlled = React.useCallback<
+    React.Dispatch<React.SetStateAction<boolean>>
+  >(
+    (next) => {
       clearTimer();
       setOpen(next);
     },
@@ -151,5 +166,11 @@ export function useHoverPopover({
     [clearTimer, scheduleClose],
   );
 
-  return { contentProps, open, setOpen: setOpenControlled, triggerProps };
+  return {
+    cancelClose: clearTimer,
+    contentProps,
+    open,
+    setOpen: setOpenControlled,
+    triggerProps,
+  };
 }
