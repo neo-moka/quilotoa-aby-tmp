@@ -28,6 +28,12 @@ import { buildVideoReviewPresentationByMessageId } from "@/features/messages/lib
 import { isThreadReply } from "@/features/messages/lib/threading";
 import { useComposerHeightPadding } from "@/features/messages/ui/useComposerHeightPadding";
 import { UserProfilePanel } from "@/features/profile/ui/UserProfilePanel";
+import {
+  closeAgentActivityPanel,
+  selectAgentActivityAgent,
+  useAgentActivityPanel,
+} from "@/features/agents/agentActivityPanelStore";
+import { AgentActivityPanel } from "@/features/agents/ui/AgentActivityPanel";
 import { AgentSessionThreadPanel } from "@/features/channels/ui/AgentSessionThreadPanel";
 import { ChannelManagementAuxiliaryPanel } from "@/features/channels/ui/ChannelManagementAuxiliaryPanel";
 import { RightAuxiliaryPane } from "@/features/channels/ui/RightAuxiliaryPane";
@@ -540,9 +546,11 @@ export const ChannelPane = React.memo(function ChannelPane({
       }),
     [agentSessionAgents, openAgentSessionPubkey, profilePanelPubkey, profiles],
   );
+  const agentActivityPanel = useAgentActivityPanel();
   const hasSplitAuxiliaryPane =
     useSplitAuxiliaryPane &&
-    (channelManagementOpen ||
+    (agentActivityPanel.isOpen ||
+      channelManagementOpen ||
       Boolean(threadHeadMessage) ||
       shouldShowThreadSkeleton ||
       Boolean(activeChannel && selectedAgent) ||
@@ -834,7 +842,29 @@ export const ChannelPane = React.memo(function ChannelPane({
        * frozen snapshot because the panel is fully prop-driven.
        */}
       <AnimatePresence onExitComplete={markExitComplete}>
-        {channelManagementOpen && activeChannel ? (
+        {/* The right pane is one slot with strict precedence, not a container,
+            so an explicitly toggled panel has to outrank the rest or its button
+            would appear to do nothing. Activity wins while open — and only
+            hides what is underneath: the thread, management panel and profile
+            keep their state and return when it is toggled off, which is why the
+            button does not close them. Its pressed state is what makes that
+            reversible rather than mysterious. */}
+        {agentActivityPanel.isOpen ? (
+          wrapAux(
+            <AgentActivityPanel
+              canResetWidth={canResetThreadPanelWidth}
+              onClose={closeAgentActivityPanel}
+              onResetWidth={onResetThreadPanelWidth}
+              onResizeStart={onThreadPanelResizeStart}
+              onSelectAgent={selectAgentActivityAgent}
+              profiles={profiles}
+              selectedPubkey={agentActivityPanel.selectedPubkey}
+              widthPx={threadPanelWidthPx}
+            />,
+            "agent-activity-auxiliary-pane",
+            { key: "agent-activity-panel" },
+          )
+        ) : channelManagementOpen && activeChannel ? (
           <ChannelManagementAuxiliaryPanel
             activeChannel={activeChannel}
             canResetThreadPanelWidth={canResetThreadPanelWidth}
