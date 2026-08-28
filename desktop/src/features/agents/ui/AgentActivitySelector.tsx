@@ -84,7 +84,7 @@ export function AgentActivitySelector({
               label={agent.name}
             />
           </ChatListView.Icon>
-          <ChatListView.ItemContent>
+          <ChatListView.ItemContent className={HERO_MUTED_SCOPE}>
             <ChatListView.Title>{agent.name}</ChatListView.Title>
             <ChatListView.Preview className={HERO_MUTED_SCOPE}>
               {AGENT_STATUS_LABELS[agent.status]}

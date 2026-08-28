@@ -1,5 +1,4 @@
 import * as React from "react";
-import { X } from "lucide-react";
 
 import { useActiveAgentTurnsByChannel } from "@/features/agents/activeAgentTurnsStore";
 import { useManagedAgentsQuery } from "@/features/agents/hooks";
@@ -14,7 +13,6 @@ import {
   AuxiliaryPanelHeaderGroup,
   AuxiliaryPanelTitle,
 } from "@/shared/layout/AuxiliaryPanel";
-import { Button } from "@/shared/ui/button";
 import { resolveActivityAgentPubkey } from "./agentActivitySelection";
 import { AgentActivitySettingsMenu } from "./AgentActivitySettingsMenu";
 import {
@@ -134,15 +132,8 @@ export function AgentActivityPanel({
                 showRaw={showRaw}
               />
             ) : null}
-            <Button
-              aria-label="Close agent activity"
-              data-testid="agent-activity-panel-close"
-              onClick={onClose}
-              size="icon-xs"
-              variant="ghost"
-            >
-              <X />
-            </Button>
+            {/* No close button here: `AuxiliaryPanelHeaderActions` appends its
+                own from the panel's `onClose`, and adding one produced two. */}
           </AuxiliaryPanelHeaderActions>
         </AuxiliaryPanelHeader>
       }
@@ -154,7 +145,10 @@ export function AgentActivityPanel({
       testId="agent-activity-panel"
       widthPx={widthPx}
     >
-      <AuxiliaryPanelBody>
+      {/* `flex flex-col` matters: the body is only `min-h-0 flex-1`, so without
+          a column context the transcript's own `flex-1` has nothing to fill and
+          the panel does not reach the bottom. */}
+      <AuxiliaryPanelBody className="flex flex-col">
         {agents.length === 0 ? (
           <p
             className="px-4 py-6 text-center text-sm text-muted-foreground"
@@ -163,8 +157,8 @@ export function AgentActivityPanel({
             No active agents. Start or deploy an agent to watch it work.
           </p>
         ) : (
-          <div className="flex min-h-0 flex-1 flex-col">
-            <div className="shrink-0 border-b border-border px-2 py-2">
+          <>
+            <div className="shrink-0 border-b border-border/60 px-2 py-1.5">
               <AgentActivitySelector
                 agents={agents}
                 onSelect={onSelectAgent}
@@ -173,18 +167,24 @@ export function AgentActivityPanel({
               />
             </div>
             {selectedAgent ? (
+              // Flush, not a card. `ManagedAgentSessionPanel` frames itself as
+              // a standalone card (`rounded-lg border … shadow-xs`) because its
+              // other caller is a preview inside a profile. In a sidebar that
+              // reads as a card dropped into a panel, so the frame is dissolved
+              // here — `cn` is tailwind-merge backed, so these win.
               <ManagedAgentSessionPanel
                 agent={selectedAgent}
                 autoTail
                 channelId={null}
-                className="min-h-0 flex-1"
+                className="min-h-0 flex-1 rounded-none border-0 bg-transparent shadow-none"
                 emptyDescription="This agent has not started a turn yet."
                 key={selectedAgent.pubkey}
+                panelPadding={false}
                 profiles={profiles}
                 showRaw={showRaw}
               />
             ) : null}
-          </div>
+          </>
         )}
       </AuxiliaryPanelBody>
     </AuxiliaryPanel>

@@ -39,6 +39,13 @@
 @import "@heroui-pro/react/css/components/command.css" layer(components);
 @import "@heroui-pro/react/css/components/context-menu.css" layer(components);
 @import "@heroui-pro/react/css/components/empty-state.css" layer(components);
+/* Required by chat-list-view, not by anything importing it directly: Pro
+   components composed on another Pro component ship only their delta, and
+   `ChatListView` renders `ListView`'s elements. Without this the rows lose
+   `display:flex` and `min-width:0`, so every row stacks vertically and its text
+   overflows — which is exactly how it failed. When adding a Pro component,
+   check its dist for `from"../<base>/"` and import the base's CSS too. */
+@import "@heroui-pro/react/css/components/list-view.css" layer(components);
 
 /* The app's radius scale wins.
  *
