@@ -16,6 +16,7 @@ import { SetStatusDialog } from "@/features/user-status/ui/SetStatusDialog";
 import { StatusEmoji } from "@/features/user-status/ui/StatusEmoji";
 import type { PresenceStatus } from "@/shared/api/types";
 import { cn } from "@/shared/lib/cn";
+import { Identicon } from "@/shared/ui/Identicon";
 import {
   MENU_ICON_CLASS,
   MENU_ITEM_CLASS,
@@ -47,6 +48,16 @@ interface ProfilePopoverProps {
   // Optional slot rendered before the profile actions. Used by the sidebar to
   // surface active-community actions inside the profile menu.
   communitySwitcherSlot?: React.ReactNode;
+  /**
+   * Whether `displayName` is a real profile name. When false it is the
+   * truncated npub the identity command synthesises, and this header stops
+   * dressing it as a name: monospace at regular weight, and an identicon in
+   * place of initials that would otherwise be invented from the key text.
+   * Defaults to true so callers that always have a name are unaffected.
+   */
+  hasProfileName?: boolean;
+  /** Pubkey seeding the identicon. Only read when `hasProfileName` is false. */
+  identiconSeed?: string | null;
 }
 
 const ALL_STATUSES: PresenceStatus[] = ["online", "away", "offline"];
@@ -69,11 +80,15 @@ export function ProfilePopover({
   children,
   triggerContainerRef,
   communitySwitcherSlot,
+  hasProfileName = true,
+  identiconSeed,
 }: ProfilePopoverProps) {
   const [statusDialogOpen, setStatusDialogOpen] = React.useState(false);
   const [presenceMenuOpen, setPresenceMenuOpen] = React.useState(false);
   const hasUserStatus = Boolean(userStatusText || userStatusEmoji);
   const settingsShortcutLabel = isMacPlatform() ? "⌘," : "Ctrl+,";
+  const showIdenticon =
+    !hasProfileName && !avatarUrl && !avatarDataUrl && Boolean(identiconSeed);
 
   function handlePopoverOpenChange(nextOpen: boolean) {
     if (!nextOpen) {
@@ -133,16 +148,29 @@ export function ProfilePopover({
                 cutout={{ cx: 28, cy: 28, r: 7.5 }}
                 size={32}
               >
-                <ProfileAvatar
-                  avatarDataUrl={avatarDataUrl}
-                  avatarUrl={avatarUrl}
-                  className="h-full w-full text-xs"
-                  iconClassName="h-4 w-4"
-                  label={displayName}
-                />
+                {showIdenticon && identiconSeed ? (
+                  <Identicon
+                    className="h-full w-full overflow-hidden rounded-full bg-primary/10"
+                    size={32}
+                    value={identiconSeed}
+                  />
+                ) : (
+                  <ProfileAvatar
+                    avatarDataUrl={avatarDataUrl}
+                    avatarUrl={avatarUrl}
+                    className="h-full w-full text-xs"
+                    iconClassName="h-4 w-4"
+                    label={displayName}
+                  />
+                )}
               </MaskedAvatarBadgeFrame>
               <div className="min-w-0 flex-1">
-                <p className="truncate text-sm font-semibold leading-tight text-popover-foreground">
+                <p
+                  className={cn(
+                    "truncate text-sm leading-tight text-popover-foreground",
+                    hasProfileName ? "font-semibold" : "font-mono font-normal",
+                  )}
+                >
                   {displayName}
                 </p>
                 {/* ── Presence chip (opens status chooser) ─────────── */}
