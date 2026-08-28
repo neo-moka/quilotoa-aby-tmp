@@ -81,25 +81,35 @@ no tiene ese patrón.
 > Ese conteo era de líneas con `grep`, no de sitios de llamada, y sobreestima el
 > trabajo por un factor de diez.
 
-Resolviendo cada `asChild` a su tag JSX contenedor y el tag a su import: **296
-ocurrencias de la palabra, de las cuales 38 no son JSX** (declaraciones
-`asChild?: boolean`, destructuring, la línea `const Comp = asChild ? Slot : …`,
-comentarios). **Atributos JSX reales: 258**, y se reparten así:
+Escaneando cada tag JSX de apertura completo (no líneas) y resolviendo el tag a
+su import: **296 ocurrencias de la palabra, de las cuales 39 no son atributos
+JSX** (declaraciones `asChild?: boolean`, destructuring, la línea
+`const Comp = asChild ? Slot : …`, el `type={asChild ? … }` de
+`attachment.tsx`, y comentarios). **Atributos JSX: 257**, de los cuales 256 son
+sitios de llamada — el restante está dentro de un comentario en `markdown.tsx`.
+Se reparten así:
 
 | Grupo | n | Qué implica |
 |---|---|---|
 | Sobre Radix que **se queda en Radix** (§6ter) | 179 | No se tocan |
 | Sobre wrappers **ya migrados**, que conservan `asChild` como API propia | 58 | Ya resueltos en los lotes B y D |
 | Sobre nuestros propios wrappers con `Slot` | 19 | El alcance real del Lote F |
-| No son sitios de llamada (implementación de `attachment.tsx`, un comentario en `markdown.tsx`) | 2 | — |
 
 Desglose del primer grupo: `TooltipTrigger` 86, `PopoverTrigger` 29,
 `AlertDialogCancel` 17, `AlertDialogAction` 16, `PopoverAnchor` 13,
-`DialogClose` 9, `DialogTrigger` 3, `DialogPrimitive.*` 3 (Radix directo),
-`TooltipContent` 3, y uno cada uno de `Tooltip`, `AlertDialogTrigger`,
-`DialogDescription`, `FocusScope`. **`tooltip.tsx` sigue en Radix** (el Lote D
-descartó el `Tooltip` de HeroUI por `skipDelayDuration`), así que sus 90 usos
-son `Slot` de verdad, no API propia.
+`DialogClose` 9, `DialogTrigger` 3, `DialogPrimitive.*` 3 (Radix directo), y uno
+cada uno de `AlertDialogTrigger`, `DialogDescription` y `FocusScope`.
+**`tooltip.tsx` sigue en Radix** (el Lote D descartó el `Tooltip` de HeroUI por
+`skipDelayDuration`), así que sus **86** usos son `Slot` de verdad, no API
+propia.
+
+> **Cuidado con el conteo del tooltip.** Un `grep -A4 '<TooltipContent'` sugiere
+> 3 `TooltipContent asChild` y 1 `Tooltip asChild`; **son falsos positivos.** Lo
+> que matchean son líneas `<TooltipTrigger asChild>` de bloques vecinos. Ni
+> `Tooltip`, ni `TooltipContent`, ni `TooltipProvider` llevan `asChild` en
+> ningún sitio: el total de la familia es 86, todo en `TooltipTrigger`. Es el
+> mismo error de proximidad que inflaba el "285" original — cualquier conteo por
+> líneas de contexto lo repite.
 
 Segundo grupo: `DropdownMenuTrigger` 51 (compone vía `Pressable`),
 `ContextMenuTrigger` 7 (vía el `render` de Pro).
@@ -334,6 +344,38 @@ unitarios y build en verde.
   la base trae `rounded-3xl`, `md:h-9` y `sm:size-4` — dimensionado dependiente
   del viewport que la rampa plana de esta app no tiene. Se importaría la hoja de
   estilos solo para pisarla.
+
+### `onClick` sobre el botón: 15 sitios, no 418
+
+Relevado caso por caso porque §4 lo marca como trampa. **Como el botón se
+conserva sobre un `<button>` nativo, esta traducción no ocurre en este lote** —
+queda registrada porque es el dato que necesita quien lo reintente, y porque el
+relevamiento es el trabajo caro.
+
+De los **418 `onClick` sobre `<Button>`**, **403 no declaran parámetro de
+evento**: son `() => hacerAlgo()`. Se traducen a `onPress` sin pensar. Los 15
+que sí tocan el objeto:
+
+| Qué usan | n | Sitios |
+|---|---|---|
+| `preventDefault` | 6 | `ChannelManagementModerationActions:134`, `JoinPolicyNotice:72` y `:86`, `MergePullRequestButton:215`, `ProjectCards:421`, `SidebarProjectsSection:422` |
+| `stopPropagation` | 4 | `AddMemberSearchResultRow:78`, `ChannelBrowserDialog:819`, `UserProfilePanelTabs:638`, `ProjectListRowMenu:21` |
+| ambos | 1 | `DraftsPanel:174` |
+| `currentTarget` | 1 | `AgentsView:140` |
+| lo reciben y lo pasan | 3 | `ThreadViewModeToggle:66` (`event.detail`), `HuddleProfileControl:160`, `sidebar.tsx:402` |
+
+Dos merecen atención particular en un reintento:
+
+- **`ThreadViewModeToggle:66` lee `event.detail`** para distinguir activación por
+  teclado (`detail === 0`) de click. `usePress` llama al handler con el evento
+  real en el camino de mouse, pero **sintetiza un `new MouseEvent('click', e)`
+  en el de teclado**, así que `detail` deja de venir del navegador.
+- **Los `preventDefault` dentro de `AlertDialogAction`/`AlertDialogCancel`** no
+  son cosméticos: cancelan el cierre automático del diálogo. Sobreviven mientras
+  el handler del caller y el de Radix compartan el mismo objeto de evento —
+  cosa que deja de ser cierta en el camino sintético de teclado.
+
+Nada de esto lo ve typecheck ni build.
 
 ### Qué cambiaría la decisión
 
