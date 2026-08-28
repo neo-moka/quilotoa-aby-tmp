@@ -27,9 +27,18 @@ export const MENU_POPOVER_MOTION_CLASS =
 export const MENU_POPOVER_SIDE_MOTION_CLASS =
   "data-[placement=bottom]:slide-in-from-top-1 data-[placement=left]:slide-in-from-right-1 data-[placement=right]:slide-in-from-left-1 data-[placement=top]:slide-in-from-bottom-1";
 
-/** Padding lives on the menu list, which is the node HeroUI pads. */
+/**
+ * Padding lives on the menu list, which is the node HeroUI pads.
+ *
+ * `pointer-events-auto` is what keeps menus opened from inside a modal dialog
+ * clickable. Radix's modal `Dialog` blanks `pointer-events` on `<body>` and
+ * hands them back only to its own content, and its `DismissableLayer` used to
+ * hand them back to the Radix menu too. React Aria portals to the same body and
+ * claims nothing, so without this the popover paints above the dialog and the
+ * dialog underneath it still takes the click — visibly correct, entirely dead.
+ */
 export const MENU_POPOVER_CLASS =
-  "z-50 overflow-y-auto overflow-x-hidden rounded-xl p-0";
+  "pointer-events-auto z-50 overflow-y-auto overflow-x-hidden rounded-xl p-0";
 
 export const MENU_LIST_CLASS = "gap-0 p-1";
 
