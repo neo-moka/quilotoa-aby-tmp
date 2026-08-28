@@ -134,7 +134,7 @@ export function useApplyTemplate() {
     try {
       const result = await createChannelManagedAgents(channelId, inputs);
       if (result.failures.length > 0) {
-        const { toast } = await import("sonner");
+        const { toast } = await import("@/shared/ui/toast");
         toast.warning(
           result.failures.length === 1
             ? "1 agent from the template could not be created"

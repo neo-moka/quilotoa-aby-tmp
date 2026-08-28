@@ -125,7 +125,7 @@ export function useFeatureToggle(
 }
 
 /**
- * Fires a sonner toast.warning when a preview feature is currently disabled.
+ * Fires a toast.warning when a preview feature is currently disabled.
  *
  * Usage: drop in at the top of a route component to give users hitting a
  * direct link to a disabled preview feature a hint about how to surface it.
@@ -146,7 +146,7 @@ export function usePreviewFeatureWarning(featureId: string): void {
     // that ARE enabled. Manifest membership = preview by definition.
     if (!feature || enabled) return;
     let cancelled = false;
-    void import("sonner").then(({ toast }) => {
+    void import("@/shared/ui/toast").then(({ toast }) => {
       if (cancelled) return;
       toast.warning(
         `${feature.name} is a preview feature. Enable it in Settings → Experiments to surface it in your sidebar.`,
