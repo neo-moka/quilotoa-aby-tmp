@@ -167,6 +167,10 @@ Object.assign(globalThis, {
   IS_REACT_ACT_ENVIRONMENT: true,
   IntersectionObserver: NoopObserver,
   MutationObserver: dom.window.MutationObserver,
+  // React Aria's tab panel walks for a tabbable child with a TreeWalker, which
+  // reads Node.ELEMENT_NODE and NodeFilter.SHOW_ELEMENT off the globals.
+  Node: dom.window.Node,
+  NodeFilter: dom.window.NodeFilter,
   ResizeObserver: NoopObserver,
   document: dom.window.document,
   getComputedStyle: (...args) => dom.window.getComputedStyle(...args),

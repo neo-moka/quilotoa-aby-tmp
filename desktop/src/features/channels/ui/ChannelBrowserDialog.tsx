@@ -120,8 +120,9 @@ export function ChannelBrowserDialog({
   const [createInitialName, setCreateInitialName] = React.useState("");
   const inputRef = React.useRef<HTMLInputElement>(null);
   const tabListRef = React.useRef<HTMLDivElement>(null);
+  // React Aria renders a tab as a <div role="tab">, not a <button>.
   const tabTriggerRefs = React.useRef<
-    Record<BrowserTab, HTMLButtonElement | null>
+    Record<BrowserTab, HTMLDivElement | null>
   >({
     all: null,
     joined: null,
