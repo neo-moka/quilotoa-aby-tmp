@@ -1,8 +1,15 @@
 use super::*;
 
-/// Binary names for the Buzz desktop/Tauri process. Used by dead-instance
+/// Binary names for the ABY desktop/Tauri process. Used by dead-instance
 /// detection to confirm the owning desktop is still alive.
+///
+/// On macOS the process name comes from `productName`, so the bundle rename to
+/// ABY introduced a new name here. `Buzz` stays listed: an installed build from
+/// before the rename still reports the old name, and failing to recognize it
+/// would make this treat a live desktop as dead.
 const DESKTOP_BINARY_NAMES: &[&str] = &[
+    "ABY",
+    "ABY Dev",
     "Buzz",
     "buzz-desktop",
     "buzz_desktop",

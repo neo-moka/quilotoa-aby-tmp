@@ -63,7 +63,7 @@ export function ChannelIntroBlock({
         </p>
       ) : null}
       {intro.actions?.length ? (
-        <div className="mt-4 flex max-w-full flex-nowrap gap-3 overflow-x-auto p-1">
+        <div className="-mx-1 mt-4 flex max-w-full flex-nowrap gap-3 overflow-x-auto p-1">
           {intro.actions.map((action) => {
             const hasDescription = Boolean(action.description);
 
@@ -72,7 +72,7 @@ export function ChannelIntroBlock({
                 className={cn(
                   "flex shrink-0 border border-border/70 bg-background/70 text-left transition-colors hover:bg-muted/60 focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ring",
                   hasDescription
-                    ? "h-56 w-[13.75rem] flex-col rounded-2xl p-4"
+                    ? "h-36 w-[13.75rem] flex-col rounded-2xl p-4"
                     : "h-28 w-64 flex-col rounded-2xl p-4",
                 )}
                 data-testid={action.testId}

@@ -89,7 +89,7 @@ pub use storage::*;
 pub use teams::*;
 pub use types::*;
 
-/// Returns the Buzz nest directory (`~/.buzz`) if it exists as a real
+/// Returns the ABY nest directory (`~/.buzz`) if it exists as a real
 /// directory (not a symlink), falling back to the user's home directory.
 ///
 /// Used as the default working directory for spawned agent processes.

@@ -930,3 +930,55 @@
     animation: none;
   }
 }
+
+/*
+ * Landing honeycomb (see `LandingHoneycomb.tsx`). The lattice sits on the dark
+ * onboarding shell: every cell is a thin violet outline, and a diagonal wave
+ * lights each one in turn by raising its fill and stroke together. Cells stagger
+ * via a negative `animation-delay` set inline, so the wave is already mid-flight
+ * on first paint instead of starting from a blank grid.
+ */
+.buzz-honeycomb-cell {
+  fill: rgb(36 79 147 / 0%);
+  stroke: rgb(36 79 147 / 42%);
+  stroke-width: 1;
+  animation: buzz-honeycomb-wave 7s linear infinite;
+}
+
+/* Sparse nodes read as the addressed cells of the hive. */
+.buzz-honeycomb-cell--node {
+  stroke: rgb(90 140 210 / 45%);
+  animation-name: buzz-honeycomb-node;
+}
+
+@keyframes buzz-honeycomb-wave {
+  0%,
+  72%,
+  100% {
+    fill: rgb(36 79 147 / 0%);
+    stroke: rgb(36 79 147 / 42%);
+  }
+  12% {
+    fill: rgb(36 79 147 / 18%);
+    stroke: rgb(90 140 210 / 85%);
+  }
+}
+
+@keyframes buzz-honeycomb-node {
+  0%,
+  72%,
+  100% {
+    fill: rgb(36 79 147 / 12%);
+    stroke: rgb(90 140 210 / 45%);
+  }
+  12% {
+    fill: rgb(36 79 147 / 34%);
+    stroke: rgb(138 180 240 / 95%);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .buzz-honeycomb-cell {
+    animation: none;
+  }
+}

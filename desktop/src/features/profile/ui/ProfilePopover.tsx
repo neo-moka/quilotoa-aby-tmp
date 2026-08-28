@@ -1,5 +1,5 @@
 import * as React from "react";
-import { Smile } from "lucide-react";
+import { MessageSquarePlus, Settings, Smile } from "lucide-react";
 
 import { Popover, PopoverContent, PopoverTrigger } from "@/shared/ui/popover";
 import { ProfileAvatar } from "@/features/profile/ui/ProfileAvatar";
@@ -16,6 +16,12 @@ import { SetStatusDialog } from "@/features/user-status/ui/SetStatusDialog";
 import { StatusEmoji } from "@/features/user-status/ui/StatusEmoji";
 import type { PresenceStatus } from "@/shared/api/types";
 import { cn } from "@/shared/lib/cn";
+import {
+  MENU_ICON_CLASS,
+  MENU_ITEM_CLASS,
+  MENU_PANEL_WIDTH,
+  MENU_SEPARATOR_CLASS,
+} from "@/shared/ui/menu-item";
 import { isMacPlatform } from "@/shared/lib/platform";
 
 interface ProfilePopoverProps {
@@ -42,9 +48,6 @@ interface ProfilePopoverProps {
   // surface active-community actions inside the profile menu.
   communitySwitcherSlot?: React.ReactNode;
 }
-
-const MENU_ITEM_CLASS =
-  "flex min-h-9 w-full cursor-pointer items-center gap-2 rounded-lg px-3 py-2 text-left text-sm text-popover-foreground outline-hidden transition-colors hover:bg-muted/50 focus:outline-none focus-visible:bg-muted/50 focus-visible:outline-none";
 
 const ALL_STATUSES: PresenceStatus[] = ["online", "away", "offline"];
 
@@ -98,7 +101,7 @@ export function ProfilePopover({
           side="top"
           align="start"
           sideOffset={-32}
-          className="w-[280px] p-1"
+          className={`${MENU_PANEL_WIDTH} p-1`}
           data-testid="profile-popover"
           onInteractOutside={(event) => {
             const target = event.target as Node | null;
@@ -112,7 +115,7 @@ export function ProfilePopover({
         >
           <div aria-label="Profile menu" role="menu">
             {/* ── Identity block ─────────────────────────────────── */}
-            <div className="flex items-center gap-2 px-3 pt-2 pb-2">
+            <div className="flex items-center gap-2.5 px-2.5 pt-2 pb-2">
               <MaskedAvatarBadgeFrame
                 badge={
                   <span
@@ -168,7 +171,7 @@ export function ProfilePopover({
                   </PopoverTrigger>
                   <PopoverContent
                     align="start"
-                    className="w-52 p-1"
+                    className={`${MENU_PANEL_WIDTH} p-1`}
                     side="bottom"
                     sideOffset={4}
                   >
@@ -197,9 +200,9 @@ export function ProfilePopover({
             </div>
 
             {/* ── Status input (Slack-style) ──────────────────────── */}
-            <div className="px-2 pt-0 pb-1">
+            <div className="pt-0 pb-1">
               <button
-                className="flex w-full items-center gap-2 rounded-lg border border-border/60 bg-transparent px-3 py-2 text-left text-sm outline-hidden transition-colors hover:bg-muted/50 focus:outline-none focus-visible:bg-muted/50 focus-visible:outline-none"
+                className={cn(MENU_ITEM_CLASS, "bg-muted/30")}
                 data-testid="profile-popover-set-status"
                 onClick={() => {
                   closePopover();
@@ -210,7 +213,7 @@ export function ProfilePopover({
                 role="menuitem"
                 type="button"
               >
-                <Smile className="h-4 w-4 shrink-0 text-muted-foreground" />
+                <Smile className={MENU_ICON_CLASS} />
                 {hasUserStatus ? (
                   <span className="flex min-w-0 flex-1 items-center gap-1 truncate text-popover-foreground">
                     {userStatusEmoji ? (
@@ -229,7 +232,7 @@ export function ProfilePopover({
               </button>
             </div>
 
-            <hr className="my-1 h-px border-0 bg-border/60" />
+            <hr className={MENU_SEPARATOR_CLASS} />
 
             {communitySwitcherSlot ? (
               <>
@@ -237,7 +240,7 @@ export function ProfilePopover({
                 <div className="py-1" data-testid="profile-popover-community">
                   {communitySwitcherSlot}
                 </div>
-                <hr className="my-1 h-px border-0 bg-border/60" />
+                <hr className={MENU_SEPARATOR_CLASS} />
               </>
             ) : null}
 
@@ -254,6 +257,7 @@ export function ProfilePopover({
                 role="menuitem"
                 type="button"
               >
+                <MessageSquarePlus className={MENU_ICON_CLASS} />
                 <span className="flex-1">Send feedback</span>
               </button>
             ) : null}
@@ -271,6 +275,7 @@ export function ProfilePopover({
               role="menuitem"
               type="button"
             >
+              <Settings className={MENU_ICON_CLASS} />
               <span className="flex-1">Settings</span>
               <kbd className="text-xs text-muted-foreground">
                 {settingsShortcutLabel}

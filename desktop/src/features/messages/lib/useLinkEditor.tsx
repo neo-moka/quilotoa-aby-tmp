@@ -102,13 +102,19 @@ export function useLinkEditor(richText: UseRichTextEditorResult) {
         // Fall through to the caret coordinates below.
       }
 
-      const coords = editor.view.coordsAtPos(info.from);
-      return {
-        left: coords.left,
-        top: coords.top,
-        width: Math.max(1, coords.right - coords.left),
-        height: Math.max(1, coords.bottom - coords.top),
-      };
+      // Same guard as the range path: reading `editor.view` throws while the
+      // editor is unmounted, so the caret fallback must not sit outside a try.
+      try {
+        const coords = editor.view.coordsAtPos(info.from);
+        return {
+          left: coords.left,
+          top: coords.top,
+          width: Math.max(1, coords.right - coords.left),
+          height: Math.max(1, coords.bottom - coords.top),
+        };
+      } catch {
+        return null;
+      }
     },
     [richText.editor],
   );

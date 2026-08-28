@@ -46,15 +46,22 @@ function getSelectionRect(editor: Editor): DOMRect | null {
     // Fall back to the caret coordinates below.
   }
 
-  const startCoords = editor.view.coordsAtPos(from);
-  const endCoords = editor.view.coordsAtPos(to);
-  const left = Math.min(startCoords.left, endCoords.left);
-  const right = Math.max(startCoords.right, endCoords.right);
-  const top = Math.min(startCoords.top, endCoords.top);
-  const bottom = Math.max(startCoords.bottom, endCoords.bottom);
+  // The caret fallback reads `editor.view` too, which throws while the editor
+  // is still unmounted — so it needs the same guard as the range path above,
+  // not just the `domAtPos` call inside the previous `try`.
+  try {
+    const startCoords = editor.view.coordsAtPos(from);
+    const endCoords = editor.view.coordsAtPos(to);
+    const left = Math.min(startCoords.left, endCoords.left);
+    const right = Math.max(startCoords.right, endCoords.right);
+    const top = Math.min(startCoords.top, endCoords.top);
+    const bottom = Math.max(startCoords.bottom, endCoords.bottom);
 
-  if (right <= left && bottom <= top) return null;
-  return new DOMRect(left, top, Math.max(1, right - left), bottom - top);
+    if (right <= left && bottom <= top) return null;
+    return new DOMRect(left, top, Math.max(1, right - left), bottom - top);
+  } catch {
+    return null;
+  }
 }
 
 function getTrayPosition(
@@ -161,43 +168,68 @@ export function SelectionFormattingTray({
       return;
     }
 
-    const editorDom = editor.view.dom;
-    const hide = () => setPosition(null);
-    const handleContextMenu = () => {
-      suppressRightClickUpdatesRef.current = true;
-      cancelScheduledUpdate();
-      setPosition(null);
-    };
-    const clearSuppression = () => {
-      suppressRightClickUpdatesRef.current = false;
+    let cancelled = false;
+    let setupFrame = 0;
+    let teardown: (() => void) | undefined;
+
+    const setup = () => {
+      // Tiptap v3 throws when `view` is read before the editor mounts, and this
+      // effect runs as soon as the editor object exists — which can be a frame
+      // ahead of its view. Retry on the next frame instead of letting the throw
+      // escape into the error boundary and blank the app.
+      let editorDom: HTMLElement;
+      try {
+        editorDom = editor.view.dom as HTMLElement;
+      } catch {
+        if (!cancelled) setupFrame = window.requestAnimationFrame(setup);
+        return;
+      }
+
+      const hide = () => setPosition(null);
+      const handleContextMenu = () => {
+        suppressRightClickUpdatesRef.current = true;
+        cancelScheduledUpdate();
+        setPosition(null);
+      };
+      const clearSuppression = () => {
+        suppressRightClickUpdatesRef.current = false;
+        scheduleUpdate();
+      };
+      const handlePointerDown = (event: PointerEvent) => {
+        if (event.button === 0) clearSuppression();
+      };
+
       scheduleUpdate();
-    };
-    const handlePointerDown = (event: PointerEvent) => {
-      if (event.button === 0) clearSuppression();
+      editor.on("selectionUpdate", scheduleUpdate);
+      editor.on("transaction", scheduleUpdate);
+      editor.on("focus", scheduleUpdate);
+      editor.on("blur", hide);
+      editorDom.addEventListener("contextmenu", handleContextMenu);
+      editorDom.addEventListener("pointerdown", handlePointerDown);
+      editorDom.addEventListener("keydown", clearSuppression);
+      window.addEventListener("resize", scheduleUpdate);
+      window.addEventListener("scroll", scheduleUpdate, true);
+
+      teardown = () => {
+        editor.off("selectionUpdate", scheduleUpdate);
+        editor.off("transaction", scheduleUpdate);
+        editor.off("focus", scheduleUpdate);
+        editor.off("blur", hide);
+        editorDom.removeEventListener("contextmenu", handleContextMenu);
+        editorDom.removeEventListener("pointerdown", handlePointerDown);
+        editorDom.removeEventListener("keydown", clearSuppression);
+        window.removeEventListener("resize", scheduleUpdate);
+        window.removeEventListener("scroll", scheduleUpdate, true);
+      };
     };
 
-    scheduleUpdate();
-    editor.on("selectionUpdate", scheduleUpdate);
-    editor.on("transaction", scheduleUpdate);
-    editor.on("focus", scheduleUpdate);
-    editor.on("blur", hide);
-    editorDom.addEventListener("contextmenu", handleContextMenu);
-    editorDom.addEventListener("pointerdown", handlePointerDown);
-    editorDom.addEventListener("keydown", clearSuppression);
-    window.addEventListener("resize", scheduleUpdate);
-    window.addEventListener("scroll", scheduleUpdate, true);
+    setup();
 
     return () => {
+      cancelled = true;
+      if (setupFrame) window.cancelAnimationFrame(setupFrame);
       cancelScheduledUpdate();
-      editor.off("selectionUpdate", scheduleUpdate);
-      editor.off("transaction", scheduleUpdate);
-      editor.off("focus", scheduleUpdate);
-      editor.off("blur", hide);
-      editorDom.removeEventListener("contextmenu", handleContextMenu);
-      editorDom.removeEventListener("pointerdown", handlePointerDown);
-      editorDom.removeEventListener("keydown", clearSuppression);
-      window.removeEventListener("resize", scheduleUpdate);
-      window.removeEventListener("scroll", scheduleUpdate, true);
+      teardown?.();
     };
   }, [cancelScheduledUpdate, editor, scheduleUpdate]);
 

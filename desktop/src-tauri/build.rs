@@ -20,6 +20,23 @@ fn main() {
     println!("cargo:rerun-if-env-changed=BUZZ_BUILD_AUTO_CONNECT_DEFAULT_RELAY");
     println!("cargo:rustc-check-cfg=cfg(buzz_updater_enabled)");
 
+    // tauri_build embeds the app icon into the binary (it becomes the macOS
+    // Dock icon in `tauri dev`, which produces no .app bundle to read one
+    // from) but only declares tauri.conf.json as an input. Without these,
+    // replacing the artwork leaves cargo reusing the cached build-script
+    // output and the old icon stays baked in, which reads as "the icon change
+    // did not work" rather than as a stale build.
+    for icon in [
+        "icons/32x32.png",
+        "icons/128x128.png",
+        "icons/128x128@2x.png",
+        "icons/icon.icns",
+        "icons/icon.ico",
+        "icons/icon.png",
+    ] {
+        println!("cargo:rerun-if-changed={icon}");
+    }
+
     // Explicit owner-only agent-access capability. Release packaging sets this
     // presence-only marker; OSS/custom builds leave agent access configurable.
     if std::env::var("BUZZ_BUILD_AGENT_ACCESS_OWNER_ONLY").is_ok() {

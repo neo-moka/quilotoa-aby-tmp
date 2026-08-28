@@ -259,11 +259,11 @@ function composerLinkPresentation(
   const entity = parseEntityLink(href);
   if (!entity.ok) {
     return {
-      ariaLabel: "Buzz link",
+      ariaLabel: "ABY link",
       channelName: "",
       dataAttributes: {},
       icon: "message",
-      label: "Buzz link",
+      label: "ABY link",
     };
   }
 

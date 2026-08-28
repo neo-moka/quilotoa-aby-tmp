@@ -543,7 +543,7 @@ export function InboxListPane({
       )}
     >
       <TopChromeInsetHeader flush transparent>
-        <div className="px-5 py-2">
+        <div className="px-3 py-2">
           <div className="flex min-h-9 w-full min-w-0 items-center justify-between gap-3">
             <div className="order-2 ml-auto flex shrink-0 items-center justify-end">
               <Popover>

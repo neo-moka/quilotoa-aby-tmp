@@ -889,7 +889,7 @@ export const MessageRow = React.memo(
               : isThreadReplyLayout
                 ? "mx-1 px-2"
                 : "px-2",
-            "flex gap-2.5",
+            "flex gap-3",
             isDisplayedAsContinuation ? "items-center" : "items-start",
             hasActiveReminder ? "bg-blue-500/10" : "",
             highlighted

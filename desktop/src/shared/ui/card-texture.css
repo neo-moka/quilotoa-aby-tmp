@@ -74,3 +74,27 @@
 .buzz-card-textured-dark.buzz-card-textured-compact {
   --buzz-card-textured-source: url("./assets/card-texture-dark-compact.png");
 }
+
+/*
+ * The onboarding shell is a near-black world, so every textured card inside it
+ * takes the dark cut automatically — otherwise the baked white centre stamps a
+ * bright slab onto the dark field. Light dialogs are portaled out of the shell
+ * and keep the light cut.
+ *
+ * This override lives here rather than in `components.css` on purpose: this
+ * file is imported unlayered from `card.tsx`, and unlayered rules beat anything
+ * inside `@layer components` regardless of specificity.
+ */
+.buzz-onboarding-neutral-theme.buzz-startup-shell:not(
+  .buzz-onboarding-security-theme
+)
+.buzz-card-textured {
+  --buzz-card-textured-source: url("./assets/card-texture-dark.png");
+}
+
+.buzz-onboarding-neutral-theme.buzz-startup-shell:not(
+    .buzz-onboarding-security-theme
+  )
+  .buzz-card-textured-compact {
+  --buzz-card-textured-source: url("./assets/card-texture-dark-compact.png");
+}

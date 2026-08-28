@@ -230,7 +230,7 @@ test("restricted repositories keep event work visible and offer access help", as
   await expect(chatPanel.getByTestId("message-composer")).toBeVisible();
 });
 
-test("repository pages show a centered Buzz loader while fetching", async ({
+test("repository pages show a centered ABY loader while fetching", async ({
   page,
 }) => {
   await installMockBridge(page, { projectRepoSnapshotDelayMs: 750 });
@@ -641,7 +641,7 @@ test("projects v3 workspace screenshot states", async ({ page }) => {
   const agentContext = agentChatPanel.getByTestId("project-agent-context");
   await expect(agentContext).toBeVisible();
   await expect(agentContext).toContainText("Overview");
-  await expect(agentContext).not.toContainText("Buzz /");
+  await expect(agentContext).not.toContainText("ABY /");
   // The context rail reveals the chat panel with a width transition; measure
   // only after it settles or the panel's unclipped box overhangs the rail.
   await waitForAnimations(page);

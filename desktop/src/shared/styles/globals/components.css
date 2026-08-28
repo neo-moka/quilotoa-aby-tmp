@@ -257,6 +257,22 @@
     width: 100%;
   }
 
+  /*
+   * Landing wordmark. Rendered as text rather than a baked image so it follows
+   * the foreground token and Cmd +/- zoom. The blue bloom ties it to the
+   * honeycomb lattice behind it without needing a second asset.
+   */
+  .buzz-landing-wordmark {
+    filter: drop-shadow(0 0 2.75rem rgb(36 79 147 / 70%))
+      drop-shadow(0 0 0.9rem rgb(138 180 240 / 30%));
+  }
+
+  @media (prefers-reduced-transparency: reduce) {
+    .buzz-landing-wordmark {
+      filter: none;
+    }
+  }
+
   .buzz-onboarding-step-frame {
     min-height: min(1000px, max(0px, calc(100dvh - 106px - 7rem)));
     max-height: 1000px;
@@ -272,14 +288,15 @@
   }
 
   .buzz-onboarding-neutral-theme.buzz-startup-shell {
-    /* Dot grid over the chartreuse→light-blue gradient (dots layer first so
-       they sit on top). The welcome page overrides this with dots over a flat
-       chartreuse fill below. */
+    /* Dot grid over the shell gradient (dots layer first so they sit on top).
+       The welcome page overrides this with dots over a flat fill below. Both
+       the dot ink and the gradient stops are tokens, so the light dialog world
+       and the dark shell world share this one rule. */
     background-image:
-      radial-gradient(circle, rgb(0 0 0 / 0.08) 1px, transparent 1px),
+      radial-gradient(circle, var(--buzz-onboarding-dot) 1px, transparent 1px),
       linear-gradient(
         to bottom,
-        var(--buzz-welcome-chartreuse),
+        var(--buzz-welcome-accent),
         var(--buzz-onboarding-shell-bottom)
       );
     background-size:
@@ -288,30 +305,32 @@
   }
 
   .buzz-onboarding-neutral-theme.buzz-startup-shell.buzz-onboarding-welcome {
-    background-color: var(--buzz-welcome-chartreuse);
-    /* Landing is a flat chartreuse field, so the docked-footer scrim must match
-       it (not the gradient's light-blue bottom) to stay invisible. */
-    --buzz-onboarding-shell-bottom: var(--buzz-welcome-chartreuse);
-    /* Subtle dot grid: 2px dots spaced on a 24px lattice. */
-    background-image: radial-gradient(
-      circle,
-      rgb(0 0 0 / 0.08) 1px,
-      transparent 1px
-    );
-    background-size: 24px 24px;
+    background-color: var(--buzz-welcome-accent);
+    /* Landing is a flat field, so the docked-footer scrim must match it (not
+       the gradient's bottom stop) to stay invisible. */
+    --buzz-onboarding-shell-bottom: var(--buzz-welcome-accent);
+    /* No dot lattice here: the landing carries the animated honeycomb
+       (`LandingHoneycomb`) as its texture, and stacking both reads as noise.
+       The steps keep the dot grid. */
+    background-image: none;
   }
 
   .buzz-onboarding-neutral-theme {
-    /* Landing "chartreuse" — the welcome background; reused for the CTA label. */
-    --buzz-welcome-chartreuse: #d7d72e;
+    /* Landing lavender — the welcome background; reused for the CTA label.
+       The startup shell overrides this (and the tokens below) with its own
+       dark world further down; these values serve the light dialogs that are
+       portaled out of the shell. */
+    --buzz-welcome-accent: #c9b0ea;
+    /* Ink of the 24px dot lattice painted over the shell background. */
+    --buzz-onboarding-dot: rgb(0 0 0 / 0.08);
     /* Bottom stop of the onboarding shell gradient; also the docked-footer
        scrim color so content scrolling under the CTA fades into the page. */
     --buzz-onboarding-shell-bottom: #d7e7f6;
     /* Label color for the primary onboarding CTA (light blue on the dark pill). */
     --buzz-onboarding-cta-label: #d7e6f0;
-    /* Olive ink for the backup step's private key and its "never share" caption,
+    /* Violet ink for the backup step's private key and its "never share" caption,
        reading against the fuzzy-white key frame. */
-    --buzz-onboarding-backup-ink: #717106;
+    --buzz-onboarding-backup-ink: #5b3a8e;
     --background: 0 0% 100%;
     --foreground: 0 0% 9%;
     --primary: 0 0% 9%;
@@ -329,11 +348,11 @@
     --buzz-onboarding-emoji-picker-color: 23, 23, 23;
     --buzz-onboarding-emoji-picker-input: 255, 255, 255;
     --buzz-onboarding-avatar-dialog-bg: 255 255 255;
-    --buzz-onboarding-avatar-accent-bg: 240 240 205;
-    --buzz-onboarding-avatar-accent-fg: 113 113 6;
+    --buzz-onboarding-avatar-accent-bg: 234 226 246;
+    --buzz-onboarding-avatar-accent-fg: 91 58 142;
     --buzz-onboarding-avatar-action-bg: 23 23 23;
-    --buzz-onboarding-avatar-action-fg: 240 240 205;
-    --buzz-onboarding-avatar-control-fg: 113 113 6;
+    --buzz-onboarding-avatar-action-fg: 234 226 246;
+    --buzz-onboarding-avatar-control-fg: 91 58 142;
     --buzz-onboarding-avatar-dialog-shadow: 0 0 0;
   }
 
@@ -408,12 +427,12 @@
     --buzz-onboarding-emoji-picker-background: 38, 38, 38;
     --buzz-onboarding-emoji-picker-color: 250, 250, 250;
     --buzz-onboarding-emoji-picker-input: 10, 10, 10;
-    --buzz-onboarding-avatar-dialog-bg: 24 24 20;
-    --buzz-onboarding-avatar-accent-bg: 211 211 163;
-    --buzz-onboarding-avatar-accent-fg: 24 24 20;
-    --buzz-onboarding-avatar-action-bg: 113 113 6;
-    --buzz-onboarding-avatar-action-fg: 240 240 205;
-    --buzz-onboarding-avatar-control-fg: 224 224 176;
+    --buzz-onboarding-avatar-dialog-bg: 22 20 26;
+    --buzz-onboarding-avatar-accent-bg: 196 176 226;
+    --buzz-onboarding-avatar-accent-fg: 22 20 26;
+    --buzz-onboarding-avatar-action-bg: 91 58 142;
+    --buzz-onboarding-avatar-action-fg: 234 226 246;
+    --buzz-onboarding-avatar-control-fg: 208 190 235;
     --buzz-onboarding-avatar-dialog-shadow: 0 0 0;
   }
 
@@ -439,11 +458,11 @@
     --buzz-onboarding-emoji-picker-color: 23, 23, 23;
     --buzz-onboarding-emoji-picker-input: 255, 255, 255;
     --buzz-onboarding-avatar-dialog-bg: 255 255 255;
-    --buzz-onboarding-avatar-accent-bg: 240 240 205;
-    --buzz-onboarding-avatar-accent-fg: 113 113 6;
+    --buzz-onboarding-avatar-accent-bg: 234 226 246;
+    --buzz-onboarding-avatar-accent-fg: 91 58 142;
     --buzz-onboarding-avatar-action-bg: 23 23 23;
-    --buzz-onboarding-avatar-action-fg: 240 240 205;
-    --buzz-onboarding-avatar-control-fg: 113 113 6;
+    --buzz-onboarding-avatar-action-fg: 234 226 246;
+    --buzz-onboarding-avatar-control-fg: 91 58 142;
     --buzz-onboarding-avatar-dialog-shadow: 0 0 0;
   }
 
@@ -466,13 +485,100 @@
     --buzz-onboarding-emoji-picker-background: 38, 38, 38;
     --buzz-onboarding-emoji-picker-color: 250, 250, 250;
     --buzz-onboarding-emoji-picker-input: 10, 10, 10;
-    --buzz-onboarding-avatar-dialog-bg: 24 24 20;
-    --buzz-onboarding-avatar-accent-bg: 211 211 163;
-    --buzz-onboarding-avatar-accent-fg: 24 24 20;
-    --buzz-onboarding-avatar-action-bg: 113 113 6;
-    --buzz-onboarding-avatar-action-fg: 240 240 205;
-    --buzz-onboarding-avatar-control-fg: 224 224 176;
+    --buzz-onboarding-avatar-dialog-bg: 22 20 26;
+    --buzz-onboarding-avatar-accent-bg: 196 176 226;
+    --buzz-onboarding-avatar-accent-fg: 22 20 26;
+    --buzz-onboarding-avatar-action-bg: 91 58 142;
+    --buzz-onboarding-avatar-action-fg: 234 226 246;
+    --buzz-onboarding-avatar-control-fg: 208 190 235;
     --buzz-onboarding-avatar-dialog-shadow: 0 0 0;
+  }
+
+  /*
+   * The onboarding shell is its own dark world, built on three brand colors:
+   *
+   *   rgb(9 9 9)      #090909  page field
+   *   rgb(27 47 75)   #1b2f4b  element surfaces (buttons, cards, inputs)
+   *   rgb(36 79 147)  #244f93  element borders and accents
+   *
+   * It is deliberately independent of both the app theme and the OS color
+   * scheme — first launch should look the same for everyone.
+   *
+   * Specificity (0,3,0) and document order both beat the
+   * `[data-system-color-scheme="light"]` block above, which would otherwise
+   * force the shell light on a light OS. The `:not()` leaves the backup
+   * security subview's own darker treatment alone.
+   */
+  .buzz-onboarding-neutral-theme.buzz-startup-shell:not(
+    .buzz-onboarding-security-theme
+  ) {
+    color-scheme: dark;
+    /* Flat landing field and the gradient's top stop. */
+    --buzz-welcome-accent: #090909;
+    /* Bottom stop: barely a lift off the field. The element surface (#1b2f4b)
+       is for buttons and cards, not the page — using it here washed the lower
+       third of the screen blue instead of keeping the flat, near-black field
+       the reference IDE uses. */
+    --buzz-onboarding-shell-bottom: #0c1016;
+    --buzz-onboarding-dot: rgb(138 180 240 / 9%);
+    /* CTA pills are the element surface with a border, so the label is light. */
+    --buzz-onboarding-cta-label: #ffffff;
+    /* Blue ink for the backup step's private key and its "never share"
+       caption. Lightened from the border blue, which is too dark to read as
+       text against the near-black key frame. */
+    --buzz-onboarding-backup-ink: #8ab4f0;
+    --background: 0 0% 3.5%;
+    --foreground: 0 0% 95%;
+    --card: 215 47% 20%;
+    --card-foreground: 0 0% 95%;
+    --popover: 215 47% 20%;
+    --popover-foreground: 0 0% 95%;
+    --primary: 215 47% 20%;
+    --primary-foreground: 0 0% 95%;
+    --secondary: 215 47% 20%;
+    --secondary-foreground: 0 0% 95%;
+    --muted: 215 42% 15%;
+    --muted-foreground: 214 32% 70%;
+    --accent: 217 61% 36%;
+    --accent-foreground: 0 0% 98%;
+    --destructive: 0 84% 70%;
+    --destructive-foreground: 0 0% 3.5%;
+    --border: 217 61% 36%;
+    --input: 217 61% 36%;
+    /* Focus rings brighten the border blue so they read against it. */
+    --ring: 217 66% 52%;
+    --buzz-onboarding-emoji-picker-background: 27, 47, 75;
+    --buzz-onboarding-emoji-picker-color: 240, 240, 240;
+    --buzz-onboarding-emoji-picker-input: 9, 9, 9;
+    --buzz-onboarding-avatar-dialog-bg: 13 20 31;
+    --buzz-onboarding-avatar-accent-bg: 36 79 147;
+    --buzz-onboarding-avatar-accent-fg: 240 246 255;
+    --buzz-onboarding-avatar-action-bg: 27 47 75;
+    --buzz-onboarding-avatar-action-fg: 234 241 251;
+    --buzz-onboarding-avatar-control-fg: 138 180 240;
+    --buzz-onboarding-avatar-dialog-shadow: 0 0 0;
+    /* Hosted-community surfaces live inside this shell, so their semantic
+       tokens follow it dark. The `:root` values in theme.css keep serving the
+       light modal, which is portaled out. */
+    --buzz-hosted-community-surface-fg: 240 240 240;
+    --buzz-hosted-community-divider-border: 36 79 147;
+    --buzz-hosted-community-action-bg: 27 47 75;
+    --buzz-hosted-community-action-bg-hover: 36 79 147;
+    --buzz-hosted-community-input-bg: 13 20 31;
+    --buzz-hosted-community-identity-bg: 13 20 31;
+  }
+
+  /*
+   * Element borders. The palette gives buttons a surface *and* a border, so the
+   * shell's CTAs carry the border blue rather than floating as bare fills.
+   * Scoped to the CTA marker class, not to `button`, so inline text links and
+   * bare icon controls keep their unboxed treatment.
+   */
+  .buzz-onboarding-neutral-theme.buzz-startup-shell:not(
+    .buzz-onboarding-security-theme
+  )
+  .buzz-onboarding-cta {
+    border: 1px solid hsl(var(--border));
   }
 
   /* The key-import card is viewport-centered on ordinary windows, independent
@@ -581,7 +687,7 @@
   .buzz-onboarding-runtime-setup[data-setup-flash="true"]::after {
     animation: buzz-onboarding-runtime-setup-ring 560ms
       cubic-bezier(0.22, 1, 0.36, 1) both;
-    border: 1px solid var(--buzz-welcome-chartreuse);
+    border: 1px solid var(--buzz-welcome-accent);
     border-radius: inherit;
     content: "";
     inset: -0.25rem;
@@ -733,7 +839,7 @@
 
     .buzz-onboarding-runtime-setup[data-setup-flash="true"] {
       animation: none;
-      outline: 2px solid var(--buzz-welcome-chartreuse);
+      outline: 2px solid var(--buzz-welcome-accent);
       outline-offset: 2px;
       will-change: auto;
     }

@@ -28,6 +28,12 @@ import {
   SidebarMenuItem,
 } from "@/shared/ui/sidebar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/shared/ui/popover";
+import {
+  MENU_ITEM_CLASS,
+  MENU_ITEM_DESTRUCTIVE_CLASS,
+  MENU_PANEL_WIDTH,
+  MENU_SEPARATOR_CLASS,
+} from "@/shared/ui/menu-item";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/shared/ui/tooltip";
 import { cn } from "@/shared/lib/cn";
 import type { ConnectionState } from "@/shared/api/relayClientShared";
@@ -175,7 +181,7 @@ export function CommunitySwitcher({
       if (result?.status === "already-absent") {
         toast("Community removed", {
           description:
-            "You were no longer a member, so Buzz removed the community from this device.",
+            "You were no longer a member, so ABY removed the community from this device.",
         });
       }
     } catch (error) {
@@ -257,7 +263,7 @@ export function CommunitySwitcher({
                 ? `${activeCommunity?.name ?? "Community"} — ${connectionLabel}`
                 : "Community actions"
             }
-            className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-sm text-popover-foreground outline-hidden transition-colors hover:bg-muted/50 focus:bg-muted/50 focus:outline-none focus-visible:bg-muted/50 focus-visible:outline-none data-[state=open]:bg-muted/50 data-[state=open]:text-popover-foreground"
+            className={MENU_ITEM_CLASS}
             data-testid="community-switcher"
             onMouseEnter={() => scheduleProfileMenu(true)}
             onMouseLeave={() => scheduleProfileMenu(false)}
@@ -268,13 +274,13 @@ export function CommunitySwitcher({
           </button>
         </PopoverTrigger>
         <PopoverContent
-          align="end"
-          className="w-60 p-1"
+          align="start"
+          className={`${MENU_PANEL_WIDTH} p-1`}
           onMouseEnter={() => scheduleProfileMenu(true)}
           onMouseLeave={() => scheduleProfileMenu(false)}
           onOpenAutoFocus={(event) => event.preventDefault()}
           side="right"
-          sideOffset={0}
+          sideOffset={6}
         >
           <div
             aria-label="Community actions"
@@ -284,7 +290,7 @@ export function CommunitySwitcher({
             {activeCommunity ? (
               <>
                 <button
-                  className="flex min-h-9 w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-sm outline-hidden transition-colors hover:bg-muted/50 focus:bg-muted/50 focus:outline-none focus-visible:bg-muted/50 focus-visible:outline-none"
+                  className={MENU_ITEM_CLASS}
                   onClick={() => {
                     setDropdownOpen(false);
                     void writeTextToClipboard(activeCommunity.relayUrl);
@@ -297,7 +303,7 @@ export function CommunitySwitcher({
                 </button>
                 {canInvite && onInvite ? (
                   <button
-                    className="flex min-h-9 w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-sm outline-hidden transition-colors hover:bg-muted/50 focus:bg-muted/50 focus:outline-none focus-visible:bg-muted/50 focus-visible:outline-none"
+                    className={MENU_ITEM_CLASS}
                     onClick={() => {
                       setDropdownOpen(false);
                       onInvite();
@@ -310,7 +316,7 @@ export function CommunitySwitcher({
                   </button>
                 ) : null}
                 <button
-                  className="flex min-h-9 w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-sm outline-hidden transition-colors hover:bg-muted/50 focus:bg-muted/50 focus:outline-none focus-visible:bg-muted/50 focus-visible:outline-none"
+                  className={MENU_ITEM_CLASS}
                   onClick={() => {
                     setDropdownOpen(false);
                     setEditingCommunity(activeCommunity);
@@ -322,7 +328,7 @@ export function CommunitySwitcher({
                   <span>Community settings</span>
                 </button>
                 <button
-                  className="flex min-h-9 w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-sm text-destructive outline-hidden transition-colors hover:bg-destructive/10 focus:bg-destructive/10 focus:outline-none focus-visible:bg-destructive/10 focus-visible:outline-none disabled:pointer-events-none disabled:opacity-50"
+                  className={MENU_ITEM_DESTRUCTIVE_CLASS}
                   disabled={isLeaving}
                   onClick={() => void handleLeaveCommunity()}
                   role="menuitem"
@@ -339,11 +345,11 @@ export function CommunitySwitcher({
                     {leaveError}
                   </p>
                 ) : null}
-                <hr className="-mx-1 my-1 h-px border-0 bg-muted" />
+                <hr className={MENU_SEPARATOR_CLASS} />
               </>
             ) : null}
             <button
-              className="flex min-h-9 w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-sm outline-hidden transition-colors hover:bg-muted/50 focus:bg-muted/50 focus:outline-none focus-visible:bg-muted/50 focus-visible:outline-none"
+              className={MENU_ITEM_CLASS}
               onClick={() => {
                 setDropdownOpen(false);
                 onAddCommunity();

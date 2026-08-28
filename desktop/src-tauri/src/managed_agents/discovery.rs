@@ -100,7 +100,7 @@ const KNOWN_ACP_RUNTIMES: &[KnownAcpRuntime] = &[
         adapter_install_commands: &[],
         cli_install_instructions_url: "https://goose-docs.ai/docs/getting-started/installation/",
         adapter_install_instructions_url: "",
-        cli_install_hint: "Buzz talks to Goose through the Goose CLI.",
+        cli_install_hint: "ABY talks to Goose through the Goose CLI.",
         adapter_install_hint: "",
         skill_dir: Some(".goose/skills"),
         supports_acp_model_switching: false,
@@ -133,8 +133,8 @@ const KNOWN_ACP_RUNTIMES: &[KnownAcpRuntime] = &[
         adapter_install_commands: &["npm install -g @agentclientprotocol/claude-agent-acp"],
         cli_install_instructions_url: "https://code.claude.com/docs/en/getting-started",
         adapter_install_instructions_url: "https://github.com/agentclientprotocol/claude-agent-acp",
-        cli_install_hint: "Buzz talks to Claude Code through the Claude Code CLI.",
-        adapter_install_hint: "Buzz talks to the Claude Code CLI through an ACP adapter. Install it with: npm install -g @agentclientprotocol/claude-agent-acp.",
+        cli_install_hint: "ABY talks to Claude Code through the Claude Code CLI.",
+        adapter_install_hint: "ABY talks to the Claude Code CLI through an ACP adapter. Install it with: npm install -g @agentclientprotocol/claude-agent-acp.",
         skill_dir: Some(".claude/skills"),
         supports_acp_model_switching: false,
         model_env_var: None,
@@ -166,8 +166,8 @@ const KNOWN_ACP_RUNTIMES: &[KnownAcpRuntime] = &[
         adapter_install_commands: &["npm install -g @agentclientprotocol/codex-acp"],
         cli_install_instructions_url: "https://developers.openai.com/codex/cli/",
         adapter_install_instructions_url: "https://github.com/agentclientprotocol/codex-acp",
-        cli_install_hint: "Buzz talks to Codex through the Codex CLI.",
-        adapter_install_hint: "Buzz talks to the Codex CLI through an ACP adapter. Install it with: npm install -g @agentclientprotocol/codex-acp.",
+        cli_install_hint: "ABY talks to Codex through the Codex CLI.",
+        adapter_install_hint: "ABY talks to the Codex CLI through an ACP adapter. Install it with: npm install -g @agentclientprotocol/codex-acp.",
         skill_dir: Some(".codex/skills"),
         supports_acp_model_switching: false,
         model_env_var: None,
@@ -188,7 +188,7 @@ const KNOWN_ACP_RUNTIMES: &[KnownAcpRuntime] = &[
     },
     KnownAcpRuntime {
         id: "buzz-agent",
-        label: "Buzz Agent",
+        label: "ABY Agent",
         commands: &["buzz-agent"],
         aliases: &[],
         avatar_url: BUZZ_AGENT_AVATAR_URL,
@@ -200,7 +200,7 @@ const KNOWN_ACP_RUNTIMES: &[KnownAcpRuntime] = &[
         adapter_install_commands: &[],
         cli_install_instructions_url: "https://github.com/block/buzz",
         adapter_install_instructions_url: "https://github.com/block/buzz",
-        cli_install_hint: "Ships with the Buzz desktop app.",
+        cli_install_hint: "Ships with the ABY desktop app.",
         adapter_install_hint: "",
         skill_dir: None,
         supports_acp_model_switching: true,
@@ -583,7 +583,7 @@ pub fn resolve_command(command: &str) -> Option<PathBuf> {
 
 /// Cache-only command resolution for the cheap discovery path.
 ///
-/// Consults the Buzz-managed shim dir (a filesystem stat, never a spawn) and
+/// Consults the ABY-managed shim dir (a filesystem stat, never a spawn) and
 /// the resolve cache; on a miss it reports the command absent rather than
 /// resolving live via `resolve_command_uncached` → `find_via_login_shell`,
 /// which spawns a login shell on the channel-switch / composer hot path — the
@@ -810,7 +810,7 @@ fn runtime_needs_npm(runtime: &KnownAcpRuntime) -> bool {
 
 /// Returns `true` when `cmd` is an npm global install/uninstall invocation.
 ///
-/// Buzz rewrites these catalog commands to an app-private npm prefix before
+/// ABY rewrites these catalog commands to an app-private npm prefix before
 /// execution; the global shape remains in the catalog so existing install plans
 /// and Doctor's Node.js-required detection stay simple.
 pub(crate) fn is_npm_global_install(cmd: &str) -> bool {
@@ -934,7 +934,7 @@ pub fn missing_command_message(command: &str, role: &str) -> String {
     }
 
     format!(
-        "{role} `{command}` was not found. Make sure it is installed and on your PATH. Antivirus software can quarantine bundled binaries — if that happened, restore the file or reinstall Buzz. (Source builds: see TESTING.md.)"
+        "{role} `{command}` was not found. Make sure it is installed and on your PATH. Antivirus software can quarantine bundled binaries — if that happened, restore the file or reinstall ABY. (Source builds: see TESTING.md.)"
     )
 }
 
@@ -964,7 +964,7 @@ pub(crate) fn classify_runtime(
     }
 }
 
-/// The oldest `codex-acp` version supported by Buzz managed agents.
+/// The oldest `codex-acp` version supported by ABY managed agents.
 ///
 /// Older 1.x adapters are detected successfully, but can still bundle a Codex runtime
 /// that does not reliably give `buzz` CLI subprocesses outbound relay access.
@@ -1198,8 +1198,8 @@ fn discover_acp_runtime_phase1(runtime: &'static KnownAcpRuntime, force: bool) -
         | AcpAvailabilityStatus::NotInstalled => runtime.cli_install_instructions_url,
     };
 
-    // node_required now means Buzz cannot provide npm for this platform.
-    // On supported desktop platforms, Buzz downloads a private Node/npm
+    // node_required now means ABY cannot provide npm for this platform.
+    // On supported desktop platforms, ABY downloads a private Node/npm
     // runtime into app data before running npm-backed adapter installs.
     let node_required = matches!(
         availability,

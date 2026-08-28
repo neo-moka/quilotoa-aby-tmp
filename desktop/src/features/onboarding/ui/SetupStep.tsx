@@ -80,7 +80,7 @@ function RuntimeReadinessIndicator({
   return (
     <span
       aria-hidden="true"
-      className="pointer-events-none absolute right-8 top-8 flex h-8 w-8 items-center justify-center rounded-full border border-[var(--buzz-welcome-chartreuse)] bg-[var(--buzz-welcome-chartreuse)]"
+      className="pointer-events-none absolute right-8 top-8 flex h-8 w-8 items-center justify-center rounded-full border border-[var(--buzz-welcome-accent)] bg-[var(--buzz-welcome-accent)]"
       data-testid={`onboarding-runtime-check-${runtime.id}`}
     >
       <Check
@@ -155,7 +155,7 @@ function RuntimeStatus({
       <div className="flex flex-col items-center gap-1.5">
         <Button
           aria-label={`Sign in to ${runtime.label}`}
-          className="buzz-onboarding-runtime-setup h-5 rounded-full bg-[var(--buzz-welcome-chartreuse)]/30 px-2.5 font-mono !text-badge font-normal uppercase text-foreground hover:bg-[var(--buzz-welcome-chartreuse)]/40"
+          className="buzz-onboarding-runtime-setup h-5 rounded-full bg-[var(--buzz-welcome-accent)]/30 px-2.5 font-mono !text-badge font-normal uppercase text-foreground hover:bg-[var(--buzz-welcome-accent)]/40"
           data-testid={`onboarding-runtime-instructions-${runtime.id}`}
           onClick={() => {
             if (didSignInCheckTimeOut) {
@@ -243,7 +243,7 @@ function RuntimeStatus({
       return (
         <Button
           aria-label={`Check ${runtime.label} again`}
-          className="buzz-onboarding-runtime-setup h-5 rounded-full bg-[var(--buzz-welcome-chartreuse)]/30 px-2.5 font-mono !text-badge font-normal uppercase text-foreground hover:bg-[var(--buzz-welcome-chartreuse)]/40"
+          className="buzz-onboarding-runtime-setup h-5 rounded-full bg-[var(--buzz-welcome-accent)]/30 px-2.5 font-mono !text-badge font-normal uppercase text-foreground hover:bg-[var(--buzz-welcome-accent)]/40"
           data-testid={`onboarding-runtime-recheck-${runtime.id}`}
           onClick={() => void runtimesQuery.forceRefresh()}
           type="button"
@@ -280,7 +280,7 @@ function RuntimeStatus({
     return (
       <Button
         aria-label={`Check ${runtime.label} again`}
-        className="buzz-onboarding-runtime-setup h-5 rounded-full bg-[var(--buzz-welcome-chartreuse)]/30 px-2.5 font-mono !text-badge font-normal uppercase text-foreground hover:bg-[var(--buzz-welcome-chartreuse)]/40"
+        className="buzz-onboarding-runtime-setup h-5 rounded-full bg-[var(--buzz-welcome-accent)]/30 px-2.5 font-mono !text-badge font-normal uppercase text-foreground hover:bg-[var(--buzz-welcome-accent)]/40"
         disabled={runtimesQuery.isFetching}
         onClick={() => void runtimesQuery.forceRefresh()}
         type="button"
@@ -296,7 +296,7 @@ function RuntimeStatus({
     return (
       <Button
         aria-label={`${installError ? "Retry installing" : "Install"} ${runtime.label}`}
-        className="buzz-onboarding-runtime-setup h-5 rounded-full bg-[var(--buzz-welcome-chartreuse)]/30 px-2.5 font-mono !text-badge font-normal uppercase text-foreground hover:bg-[var(--buzz-welcome-chartreuse)]/40"
+        className="buzz-onboarding-runtime-setup h-5 rounded-full bg-[var(--buzz-welcome-accent)]/30 px-2.5 font-mono !text-badge font-normal uppercase text-foreground hover:bg-[var(--buzz-welcome-accent)]/40"
         data-testid={`onboarding-runtime-install-${runtime.id}`}
         onClick={onInstall}
         type="button"
@@ -310,7 +310,7 @@ function RuntimeStatus({
   return (
     <Button
       aria-label={`View ${runtime.label} install instructions`}
-      className="buzz-onboarding-runtime-setup h-5 rounded-full bg-[var(--buzz-welcome-chartreuse)]/30 px-2.5 font-mono !text-badge font-normal uppercase text-foreground hover:bg-[var(--buzz-welcome-chartreuse)]/40"
+      className="buzz-onboarding-runtime-setup h-5 rounded-full bg-[var(--buzz-welcome-accent)]/30 px-2.5 font-mono !text-badge font-normal uppercase text-foreground hover:bg-[var(--buzz-welcome-accent)]/40"
       data-testid={`onboarding-runtime-instructions-${runtime.id}`}
       onClick={() => void openUrl(runtime.installInstructionsUrl)}
       type="button"
@@ -370,8 +370,8 @@ function RuntimeDetails({ runtime }: { runtime: AcpRuntimeCatalogEntry }) {
           <code className="rounded bg-white/10 px-0.5 font-mono text-xs text-white">
             codex-acp
           </code>{" "}
-          adapter. Older Buzz releases using the legacy adapter contract may
-          lose community access until{" "}
+          adapter. Older ABY releases using the legacy adapter contract may lose
+          community access until{" "}
           <code className="rounded bg-white/10 px-0.5 font-mono text-xs text-white">
             @zed-industries/codex-acp@0.16.0
           </code>{" "}
@@ -661,8 +661,8 @@ function RuntimeProvidersSection({
           Set up your agent harnesses
         </h1>
         <p className="mx-auto mt-3 max-w-[760px] text-sm leading-6 text-foreground/90">
-          Buzz checks for command-line harnesses on this machine. Install the
-          CLI or sign in to at least one to continue.
+          ABY checks for command-line harnesses on this machine. Install the CLI
+          or sign in to at least one to continue.
         </p>
       </div>
 

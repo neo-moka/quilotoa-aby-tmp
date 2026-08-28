@@ -197,7 +197,7 @@ export function MessageRowItem({
     <div
       className={cn(
         "flex flex-col gap-1",
-        isFollowedByContinuation ? "pb-0" : "pb-2.5",
+        isFollowedByContinuation ? "pb-0" : "pb-4",
       )}
     >
       <MessageRow

@@ -8,7 +8,7 @@
     --card-foreground: 234 16.02% 35.49%;
     --popover: 220 23.08% 94.9%;
     --popover-foreground: 234 16.02% 35.49%;
-    --primary: 266 85.05% 58.04%;
+    --primary: 217 61% 36%;
     --primary-foreground: 220 23.08% 94.9%;
     --secondary: 223 15.91% 82.75%;
     --secondary-foreground: 234 16.02% 35.49%;
@@ -47,7 +47,7 @@
     --sidebar: 218 25.1% 93.73%;
     --sidebar-background: 218 25.1% 93.73%;
     --sidebar-foreground: 234 16.02% 35.49%;
-    --sidebar-primary: 266 85.05% 58.04%;
+    --sidebar-primary: 217 61% 36%;
     --sidebar-primary-foreground: 220 23.08% 94.9%;
     --sidebar-active: var(--sidebar-primary);
     --sidebar-active-foreground: var(--sidebar-primary-foreground);
@@ -56,17 +56,27 @@
     --sidebar-border: 225 13.56% 76.86%;
     --sidebar-ring: 225 13.56% 76.86%;
     /* Exact Buzz palette tokens; components consume these semantically. */
-    --buzz-gradient-light-top: #e6e6b6;
-    --buzz-gradient-light-bottom: #c4d0da;
-    --buzz-gradient-dark-top: #4a4616;
-    --buzz-gradient-dark-bottom: #0a1423;
-    --buzz-content-dark: 0 0% 10.1960784314%;
+    /*
+     * Chrome surface. These read as a "gradient" for historical reasons, but
+     * both stops are deliberately equal: the shell is a flat panel, and depth
+     * comes from elevation between chrome and content plus a hairline divider,
+     * not from a wash of color. Keeping the two tokens lets the existing
+     * layer-swap machinery (a WKWebView raster workaround) stay untouched.
+     */
+    --buzz-gradient-light-top: #e4e7ec;
+    --buzz-gradient-light-bottom: #e4e7ec;
+    --buzz-gradient-dark-top: #0b0b0d;
+    --buzz-gradient-dark-bottom: #0b0b0d;
+    /* Inset content canvas — the chat surface, rgb(24 25 27). One step *up*
+       from the chrome so the reading surface is the lighter of the two, as in
+       the reference IDE. */
+    --buzz-content-dark: 220 6% 10%;
     /* Hosted-community onboarding intentionally keeps this light palette in
        both app themes; semantic tokens keep component code color-agnostic. */
     --buzz-hosted-community-surface-fg: 23 23 23;
-    --buzz-hosted-community-divider-border: 150 150 10;
-    --buzz-hosted-community-action-bg: 240 240 205;
-    --buzz-hosted-community-action-bg-hover: 232 232 188;
+    --buzz-hosted-community-divider-border: 123 90 173;
+    --buzz-hosted-community-action-bg: 234 226 246;
+    --buzz-hosted-community-action-bg-hover: 222 210 240;
     --buzz-hosted-community-input-bg: 255 255 255;
     --buzz-hosted-community-modal-action-fg: 255 255 255;
     --buzz-hosted-community-modal-overlay-bg: 0 0 0;
@@ -74,53 +84,59 @@
   }
 
   .dark {
-    /* Catppuccin Macchiato (mauve accent) */
+    /*
+     * Neutral cool greyscale built on the chat surface, rgb(24 25 27).
+     * Catppuccin Macchiato used to sit here; its 227-234 hues at 19-23%
+     * saturation tinted every surface, which is what read as a colored cast
+     * once the blue accent landed next to it. Everything structural is now one
+     * low-saturation ramp at hue 220, and color appears only as accent.
+     */
     --radius: 0.625rem;
-    --background: 232 23.4% 18.43%;
-    --foreground: 227 68.25% 87.65%;
-    --card: 232 23.4% 18.43%;
-    --card-foreground: 227 68.25% 87.65%;
-    --popover: 232 23.4% 18.43%;
-    --popover-foreground: 227 68.25% 87.65%;
-    --primary: 267 82.69% 79.61%;
-    --primary-foreground: 232 23.4% 18.43%;
-    --secondary: 230 18.8% 26.08%;
-    --secondary-foreground: 227 68.25% 87.65%;
-    --muted: 230 18.8% 26.08%;
-    --muted-foreground: 228 39.22% 80%;
-    --huddle-drawer-surface: 230 18.8% 26.08%;
-    --huddle-control-surface: 231 15.61% 33.92%;
-    --huddle-control-hover-surface: 231 15.61% 38%;
-    --huddle-control-chevron-surface: 231 13.16% 29.8%;
-    --huddle-control-chevron-hover-surface: 231 15.61% 33.92%;
-    --huddle-control-foreground: 227 68.25% 87.65%;
-    --huddle-popover-surface: 231 13.16% 29.8%;
-    --huddle-popover-border: 231 15.61% 38%;
-    --huddle-tooltip-surface: 231 15.61% 33.92%;
-    --huddle-tooltip-foreground: 227 68.25% 87.65%;
-    --accent: 230 18.8% 26.08%;
-    --accent-foreground: 227 68.25% 87.65%;
-    --destructive: 351 73.91% 72.94%;
-    --destructive-foreground: 232 23.4% 18.43%;
-    --border: 231 15.61% 33.92%;
-    --input: 231 15.61% 33.92%;
-    --ring: 227 68.25% 87.65%;
+    --background: 220 6% 10%;
+    --foreground: 220 8% 93%;
+    --card: 220 6% 10%;
+    --card-foreground: 220 8% 93%;
+    --popover: 220 6% 13%;
+    --popover-foreground: 220 8% 93%;
+    --primary: 217 66% 62%;
+    --primary-foreground: 220 6% 10%;
+    --secondary: 220 6% 16%;
+    --secondary-foreground: 220 8% 93%;
+    --muted: 220 6% 16%;
+    --muted-foreground: 220 7% 64%;
+    --huddle-drawer-surface: 220 6% 13%;
+    --huddle-control-surface: 220 6% 20%;
+    --huddle-control-hover-surface: 220 6% 24%;
+    --huddle-control-chevron-surface: 220 6% 17%;
+    --huddle-control-chevron-hover-surface: 220 6% 20%;
+    --huddle-control-foreground: 220 8% 93%;
+    --huddle-popover-surface: 220 6% 17%;
+    --huddle-popover-border: 220 6% 24%;
+    --huddle-tooltip-surface: 220 6% 20%;
+    --huddle-tooltip-foreground: 220 8% 93%;
+    --accent: 220 6% 19%;
+    --accent-foreground: 220 8% 93%;
+    --destructive: 351 74% 73%;
+    --destructive-foreground: 220 6% 10%;
+    --border: 220 6% 22%;
+    --input: 220 6% 22%;
+    --ring: 217 66% 52%;
     --chart-1: 333 20.78% 38.04%;
     --chart-2: 193 19.61% 38.04%;
     --chart-3: 224 26.67% 41.18%;
     --chart-4: 30 8.24% 42.35%;
     --chart-5: 139 10.98% 38.82%;
-    --sidebar: 234 22.75% 17.25%;
-    --sidebar-background: 234 22.75% 17.25%;
-    --sidebar-foreground: 227 68.25% 87.65%;
-    --sidebar-primary: 267 82.69% 79.61%;
-    --sidebar-primary-foreground: 232 23.4% 18.43%;
+    --sidebar: 220 7% 5%;
+    --sidebar-background: 220 7% 5%;
+    --sidebar-foreground: 220 8% 93%;
+    --sidebar-primary: 217 66% 62%;
+    --sidebar-primary-foreground: 220 6% 10%;
     --sidebar-active: var(--sidebar-primary);
     --sidebar-active-foreground: var(--sidebar-primary-foreground);
-    --sidebar-accent: 232 23.4% 18.43%;
-    --sidebar-accent-foreground: 227 68.25% 87.65%;
-    --sidebar-border: 231 15.61% 33.92%;
-    --sidebar-ring: 231 15.61% 33.92%;
+    --sidebar-accent: 220 6% 13%;
+    --sidebar-accent-foreground: 220 8% 93%;
+    --sidebar-border: 220 6% 18%;
+    --sidebar-ring: 220 6% 22%;
   }
 
   * {
@@ -304,13 +320,18 @@
 }
 
 /*
- * Buzz Dark uses a warmer neutral for the inset main/settings content canvas.
- * Override `--background` locally as well as the surface fill so descendant
- * headers and panes using `bg-background` remain visually continuous.
+ * Buzz Dark insets the main/settings content canvas one elevation step above
+ * the flat chrome. Override `--background` locally as well as the surface fill
+ * so descendant headers and panes using `bg-background` stay continuous.
+ *
+ * With the gradient gone, that one step is nearly all the separation there is,
+ * so a hairline carries the panel edge — the light theme already does this with
+ * its own shadow rule above.
  */
 :root[data-buzz-sidebar].dark [data-buzz-content-surface] {
   --background: var(--buzz-content-dark);
   background-color: hsl(var(--background));
+  box-shadow: inset 1px 1px 0 0 rgb(255 255 255 / 7%);
 }
 
 :root[data-buzz-sidebar] .buzz-huddle-app-surface {
