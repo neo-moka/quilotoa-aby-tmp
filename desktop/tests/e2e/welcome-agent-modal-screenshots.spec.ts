@@ -152,7 +152,7 @@ test.describe("welcome and channel agent entry points", () => {
       .click();
     await page.locator("#persona-model").click();
     await page
-      .getByRole("button", { name: "Custom model...", exact: true })
+      .getByRole("option", { name: "Custom model...", exact: true })
       .click();
     await page.getByLabel("Custom model ID").fill("claude-opus-4-5");
     await page.getByLabel("Anthropic API Key").fill("sk-test-api-key-for-e2e");

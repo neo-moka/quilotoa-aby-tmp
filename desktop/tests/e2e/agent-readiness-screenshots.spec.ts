@@ -71,7 +71,7 @@ async function setCustomModel(
     .toContain("discover_agent_models");
   await page.locator("#persona-model").click();
   await page
-    .getByRole("button", { name: "Custom model...", exact: true })
+    .getByRole("option", { name: "Custom model...", exact: true })
     .click();
   await page.getByLabel("Custom model ID").fill(modelId);
 }
@@ -162,7 +162,7 @@ test.describe("agent readiness gate screenshots", () => {
     await openCreateDialog(page);
     await selectProvider(page, "ABY shared compute");
 
-    await expect(page.locator("#persona-model")).toContainText("Automatic");
+    await expect(page.locator("#persona-model")).toHaveValue("Automatic");
     await expect(page.getByTestId("persona-dialog-submit")).toBeEnabled();
     await settleAnimations(page);
 

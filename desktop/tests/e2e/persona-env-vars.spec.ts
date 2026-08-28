@@ -62,13 +62,15 @@ async function openModelCombobox(
   page: import("@playwright/test").Page,
   model: import("@playwright/test").Locator,
 ) {
-  // PersonaModelCombobox renders a role="combobox" trigger + a Radix Popover
-  // with a search <input> and plain <button> options — not a role="menu".
+  // PersonaModelCombobox renders a React Aria ComboBox: the trigger is the
+  // <input> itself (no separate search field), and options are role="option"
+  // inside a role="listbox" — not a role="menu", and not a Radix popover, so
+  // there is no [data-radix-popper-content-wrapper] to scope by.
   await model.click();
-  const searchInput = page.getByPlaceholder("Search models…");
-  await expect(searchInput).toBeVisible({ timeout: 5_000 });
-  // Return the popover content container so callers can scope option clicks.
-  return page.locator("[data-radix-popper-content-wrapper]").last();
+  const listbox = page.getByRole("listbox").last();
+  await expect(listbox).toBeVisible({ timeout: 5_000 });
+  // Return the listbox so callers can scope option clicks.
+  return listbox;
 }
 
 async function selectDropdownOption(
@@ -323,7 +325,7 @@ test("persona model options follow the selected LLM provider", async ({
   await expect(llmProvider).toBeVisible();
   await expect(model).toBeVisible();
   // Custom mode requires a model selection until a provider is chosen.
-  await expect(model).toContainText("Choose a model");
+  await expect(model).toHaveAttribute("placeholder", "Choose a model");
 
   await selectDropdownOption(page, llmProvider, "OpenAI");
   const dialog = page.getByRole("dialog");
@@ -336,7 +338,7 @@ test("persona model options follow the selected LLM provider", async ({
   // The combobox offers only "Custom model..." — verify it is present and selectable.
   const openAiModelPopover = await openModelCombobox(page, model);
   await openAiModelPopover
-    .getByRole("button", { name: "Custom model...", exact: true })
+    .getByRole("option", { name: "Custom model...", exact: true })
     .click();
 
   await selectDropdownOption(page, llmProvider, "Anthropic");
