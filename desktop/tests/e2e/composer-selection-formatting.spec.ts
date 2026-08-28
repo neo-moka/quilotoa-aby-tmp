@@ -722,8 +722,8 @@ test("Buzz theme uses the primary color for the selection formatter", async ({
 
   const colors = await tray.evaluate((element) => {
     const probe = document.createElement("span");
-    probe.style.backgroundColor = "hsl(var(--primary))";
-    probe.style.color = "hsl(var(--primary-foreground))";
+    probe.style.backgroundColor = "var(--primary)";
+    probe.style.color = "var(--primary-foreground)";
     document.body.appendChild(probe);
     const probeStyles = getComputedStyle(probe);
     const trayStyles = getComputedStyle(element);

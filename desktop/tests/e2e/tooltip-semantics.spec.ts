@@ -15,7 +15,7 @@ async function expectSecondarySurface(tooltip: Locator) {
   const colors = await tooltip.evaluate((element) => {
     const sample = document.createElement("div");
     sample.style.cssText =
-      "position:fixed;visibility:hidden;background:hsl(var(--secondary));color:hsl(var(--secondary-foreground))";
+      "position:fixed;visibility:hidden;background:var(--secondary);color:var(--secondary-foreground)";
     document.body.append(sample);
     const tooltipStyle = getComputedStyle(element);
     const sampleStyle = getComputedStyle(sample);

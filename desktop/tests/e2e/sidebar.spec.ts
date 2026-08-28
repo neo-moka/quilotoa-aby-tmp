@@ -86,7 +86,7 @@ test("sidebar rows separate hover, selected, and reorder states", async ({
   await page.mouse.move(600, 100);
   const establishedActiveBackground = await page.evaluate(() => {
     const probe = document.createElement("span");
-    probe.style.backgroundColor = "hsl(var(--sidebar-active))";
+    probe.style.backgroundColor = "var(--sidebar-active)";
     document.body.append(probe);
     const background = getComputedStyle(probe).backgroundColor;
     probe.remove();
@@ -116,7 +116,7 @@ test("sidebar rows separate hover, selected, and reorder states", async ({
 
   const establishedHoverBackground = await page.evaluate(() => {
     const probe = document.createElement("span");
-    probe.style.backgroundColor = "hsl(var(--sidebar-accent))";
+    probe.style.backgroundColor = "var(--sidebar-accent)";
     document.body.append(probe);
     const background = getComputedStyle(probe).backgroundColor;
     probe.remove();

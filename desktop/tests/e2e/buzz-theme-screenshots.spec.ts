@@ -1377,7 +1377,7 @@ for (const { activeSurface, hoverSurface, mode, theme } of [
     await expect(inactiveRow).toHaveCSS("background-color", hoverSurface);
     const expectedForeground = await sidebar.evaluate((element) => {
       const probe = document.createElement("span");
-      probe.style.color = "hsl(var(--sidebar-active-foreground))";
+      probe.style.color = "var(--sidebar-active-foreground)";
       element.append(probe);
       const color = getComputedStyle(probe).color;
       probe.remove();
@@ -1414,8 +1414,8 @@ for (const { mode, theme } of [
       );
       if (!sidebar || !row) return null;
       const probe = document.createElement("span");
-      probe.style.backgroundColor = "hsl(var(--sidebar-active))";
-      probe.style.color = "hsl(var(--sidebar-active-foreground))";
+      probe.style.backgroundColor = "var(--sidebar-active)";
+      probe.style.color = "var(--sidebar-active-foreground)";
       sidebar.append(probe);
       const probeStyles = getComputedStyle(probe);
       const rowStyles = getComputedStyle(row);
