@@ -60,8 +60,8 @@ individual:
 |---|---|---|
 | `sonner` | `Toast` (OSS) | **Reemplazar** — equivalencia limpia |
 | `embla-carousel-react` | `Carousel` (Pro) | ~~Reemplazar~~ → **CONSERVAR.** Ver §6quater. |
-| `tiptap` + `tiptap-markdown` | `RichTextEditor` (Pro) | **CONSERVAR.** El composer es superficie de producto central: menciones, markdown, atajos, caret. Un reemplazo acá es un proyecto propio, no parte de esta migración. |
-| `virtua` | `ListView` (Pro) | **CONSERVAR.** Está parchado (`patchedDependencies: virtua@0.49.3`); reemplazarlo tira el parche a la basura. |
+| `tiptap` + `tiptap-markdown` | `RichTextEditor` (Pro) | **CONSERVAR.** No es "tiptap contra Pro": el `RichTextEditor` de Pro **es tiptap** — declara `@tiptap/{core,react,pm,starter-kit,suggestion,extension-link,extension-underline,extensions}` como peers **opcionales** en `>=3.23.6`, o sea que usa nuestra instancia y no duplica ProseMirror. La competencia real es *nuestro wrapper contra el suyo*, y el suyo pierde por el modelo de valor: Pro es JSON-first controlado (`value: JSONContent`), el composer es markdown-first (`tiptap-markdown` con `transformPastedText`/`transformCopiedText` + `plainTextProjection.ts`). Sumado al bump desde `^3.22.3` y a tres paquetes que hoy no están instalados, adoptarlo agrega un wrapper sin sacar una línea de las nuestras. Ver §6septies. |
+| `virtua` | ~~`ListView` (Pro)~~ | **CONSERVAR — y la comparación era falsa.** `ChatListView` de Pro **no es una lista virtualizada**: son filas de lista para sidebars y selectores de conversación (`Item/Icon/Title/Preview/Meta`), sin virtualización ni anclaje de scroll. Nunca hubo un reemplazo que evaluar. Aparte, virtua está parchado (`patchedDependencies: virtua@0.49.3`) y el parche son **cuatro extensiones de API**, no un hack: `itemSize` acepta `(data, index) => number`; el camino de shift/prepend usa alturas reales en vez del promedio (historial sin salto de viewport); una acción nueva `9` hace que la rueda retire el modo shift; y los `scrollTo` sucesivos acumulan desde el destino pendiente. `ui/virtuaWheelModePatch.test.mjs` asertea el texto del parche. Ver §6septies. |
 | `@dnd-kit/*` | — | **CONSERVAR.** `Kanban` de Pro trae su propio DnD pero no es un reemplazo general. |
 | `react-diff-view` | — | **CONSERVAR.** Sin equivalente. |
 | `lucide-react`, `cva`, `tailwind-merge` | — | Ortogonales. HeroUI trae `tailwind-variants`; conviven sin problema. |
@@ -71,6 +71,33 @@ individual:
 No alcanza con renombrar imports.
 
 ### `asChild` → composición
+
+#### Inventario de `sidebar.tsx`
+
+Vivía como comentario de 17 líneas dentro del archivo, que ya estaba en el
+techo de 1000 líneas y **hacía fallar el ratchet de tamaño**. Se movió acá; el
+archivo conserva un puntero de una línea.
+
+Cinco componentes declaran `asChild` y **solo `SidebarGroupLabel` tiene sitios
+de llamada** — cinco: `CustomChannelSection` (×2), `SidebarProjectsSection`,
+`SidebarSection` y `sidebarLoadingSkeleton`.
+
+La prop está muerta en `SidebarMenuButton` (5 consumidores) y
+`SidebarMenuAction` (1), y **se conserva a propósito**: esto es shadcn
+vendorizado, donde `<SidebarMenuButton asChild><a … /></SidebarMenuButton>` es
+la forma documentada upstream de renderizar una fila como link. Sacarla no gana
+nada en runtime —es código muerto, se tree-shakea— y rompe al próximo que siga
+la doc de upstream.
+
+`SidebarMenuSubButton` no tiene ningún sitio de llamada, pero **se conserva**:
+`theme.css` tiene cinco reglas apuntando a su `data-sidebar="menu-sub-button"`.
+
+`SidebarGroupAction` **se eliminó**: cero sitios de llamada y su
+`data-sidebar="group-action"` no lo lee ninguna regla de `theme.css`, así que
+no dejó CSS huérfano.
+
+`Slot` se queda en este archivo pase lo que pase con la migración a HeroUI —
+igual que en `button.tsx`, `card.tsx` y `attachment.tsx`. Ver §6sexies.
 
 Radix usa `Slot` para fusionar props en un hijo arbitrario. HeroUI/react-aria
 no tiene ese patrón.
@@ -200,7 +227,7 @@ Lotes independientes, un agente cada uno:
 | **C — Controles de formulario** | `switch.tsx`, `checkbox.tsx`, `toggle.tsx`, `input.tsx`, `textarea.tsx` | |
 | **D — Display** | `tooltip.tsx`, `avatar.tsx`, `separator.tsx`, `badge.tsx`, `card.tsx`, `skeleton.tsx` | El más mecánico. |
 | **E — Navegación** | `tabs.tsx`, `segmented-control.tsx`, `step-progress.tsx`, `progress.tsx` | |
-| **F — Botón + `asChild`** | `button.tsx` + los `asChild` | **HECHO. Ver §6quater.** Migrado vía la prop `render`, que mantiene abierto el contrato de props; los 523 sitios de llamada quedan sin tocar. `asChild` conserva `Slot` (6 sitios, envuelven un `<a>`). Los `asChild` reales del lote eran 19, no 285 (§4). |
+| **F — Botón + `asChild`** | `button.tsx` + los `asChild` | **HECHO. Ver §6sexies.** Migrado vía la prop `render`, que mantiene abierto el contrato de props; los 523 sitios de llamada quedan sin tocar. `asChild` conserva `Slot` (6 sitios, envuelven un `<a>`). Los `asChild` reales del lote eran 19, no 285 (§4). |
 | **G — Toasts** | `sonner.tsx` | Independiente. |
 
 Los lotes A–E y G son paralelos entre sí. F depende de todos.
@@ -419,7 +446,7 @@ Revisar si la tarjeta de actividad deja de depender de una altura fija llena, o
 si Pro expone su viewport. Adoptar dots/thumbnails/flechas de Pro es otra
 pregunta: el consumidor no usa ninguno.
 
-## 6quater. El botón migra vía `render`, no vía props
+## 6sexies. El botón migra vía `render`, no vía props
 
 Resultado del Lote F. **`button.tsx` pasa al `Button` de HeroUI.** Los 523
 sitios de llamada quedan sin tocar. Pinneado en
@@ -622,6 +649,194 @@ tests dan verde sobre código previo.
 `agents` tiene 154 testids de los cuales **94 no los toca ningún spec** (104
 archivos `.tsx`). `pulse` y `terminal` no emiten ninguno. Ahí una regresión
 pasa entera sin ser detectada — hay que verificar a mano.
+
+## 6quinquies. El shell no adopta Pro — cuatro veredictos con su evidencia
+
+Resultado del lote del shell (`app-layout`, `navbar`, `sidebar`, `command`,
+`resizable`). Verificado contra el `dist` realmente instalado de
+`@heroui-pro/react@1.0.0-beta.8`, no contra la documentación del MCP —  que en
+dos puntos no coincide con el código (abajo).
+
+### El número que decide tres de los cuatro
+
+`theme.css` tiene **67 selectores `[data-testid]`, y los 13 testids distintos
+son todos del shell**. No es una concentración: es el total.
+
+| Ocurrencias | testid |
+|---|---|
+| 36 | `app-sidebar` |
+| 10 | `settings-sidebar` |
+| 5 | `sidebar-pinned-header` |
+| 4 | `open-search` |
+| 2 c/u | `stream-list`, `starred-list`, `dm-list` |
+| 1 c/u | `sidebar-profile-card`, `sidebar-primary-menu`, `community-rail`, `app-top-chrome`, `global-back`, `global-forward` |
+
+Encima hay **27 selectores `[data-sidebar="…"]`** sobre siete valores:
+`sidebar` (6), `menu-button` (7), `menu-sub-button` (5), `footer` (5),
+`group-label` (2), `menu-item` (1), `trigger` (1).
+
+### `sidebar` — no se adopta
+
+El Sidebar de Pro emite otro vocabulario. Barrido sobre
+`node_modules/@heroui-pro/react/dist/components/sidebar/sidebar.js`:
+
+```
+data-sidebar : "label", "menu", "provider"          ← los tres únicos valores
+data-slot    : "sidebar-menu-item", "sidebar-menu-label", … (28 valores)
+```
+
+**Intersección con los siete valores que consume `theme.css`: vacía.** No es
+que el tema corra riesgo de perderse en algún nodo — se pierden los 27
+selectores de una vez, y el resultado sigue siendo "visible", así que ningún
+gate lo ve.
+
+Y no sería un cambio de marcado sino de modelo: `Sidebar.Menu` es un `Tree` de
+RAC y `Sidebar.MenuItem` un `TreeItem` (colección, con su propio pase oculto en
+`<template>` — §4). El sidebar de esta app tiene filas ordenables con dnd-kit,
+context menu por fila y secciones reordenables; nada de eso sobrevive al modelo
+de colección.
+
+Detalle menor pero real: acá el atajo es `SIDEBAR_KEYBOARD_SHORTCUT = "s"`;
+`Sidebar.Provider` de Pro trae `toggleShortcut: "mod+b"` por defecto. Cambiaría
+en silencio.
+
+### `app-layout` — no se adopta, y no es una decisión independiente
+
+La documentación es explícita: *"Under the hood `AppLayout` renders a
+`Sidebar.Provider`"* y *"Do not wrap `AppLayout` with your own
+`Sidebar.Provider`"*. Adoptarlo **obliga** a adoptar el Sidebar de Pro, o sea el
+veredicto anterior. Además `AppShell.tsx` monta `CommunityRail` y
+`AppHuddleShell` por fuera del provider, una topología que el scaffold no
+modela.
+
+### `navbar` — no se adopta porque no hay navbar
+
+`AppTopChrome.tsx` no es navegación: es la barra de título de la ventana Tauri
+(`data-tauri-drag-region`, padding en px para despejar los semáforos de macOS,
+y el portal `#app-top-chrome-content`). Meterlo en un landmark `<nav>` empeora
+la a11y, y los atributos de arrastre tienen que caer en nodos concretos que el
+compound de Pro no expone.
+
+### `resizable` — no se adopta para el rail, y trae dos trampas para todos
+
+Hoy hay tres resizers a mano y ninguno usa `react-resizable-panels` (que está
+en `package.json` **sin un solo import**: entró como peer requerido de Pro):
+`SidebarRail` en `sidebar.tsx`, `useThreadPanelWidth.ts` +
+`AuxiliaryPanelShell.tsx` (5 consumidores) y `useResizableInboxListWidth.ts`.
+
+Leyendo `dist/components/resizable/resizable.js` y su `.d.ts`, dos cosas que
+valen para cualquier lote que toque este componente:
+
+1. **`Resizable.Panel` y `Resizable.Handle` no hacen spread del resto de las
+   props.** No es la allowlist de `filterDOMProps` (§3): directamente no existe
+   un `...rest` en la firma. Un `data-testid` o un `ref` puesto sobre un Panel o
+   un Handle **se descarta sin error ni aviso de tipos**.
+2. **`onDragging` está documentado en la API de `Resizable.Handle` y no existe
+   en la implementación** — cero ocurrencias en el `.js` y en el `.d.ts`. Quien
+   lo pase se come un no-op silencioso.
+
+   Menor: la doc llama `onLayout` a la prop del root; el código destructura
+   `onLayoutChange`.
+
+Para el rail en concreto, además se perdería el imán a 300px con háptica
+(`performSidebarDefaultHaptic`), el atributo `data-sidebar="rail"` y el
+contrato `--sidebar-width` en px que leen ~10 clases Tailwind — Pro maneja los
+tamaños como porcentaje interno, no como variable CSS.
+
+### `command` — el único hueco real, y queda abierto
+
+No hay paleta de comandos. Cmd+K vive en
+`app/useAppShellKeyboardShortcuts.ts:73` y abre
+`features/search/ui/TopbarSearch.tsx`, un `Dialog` de Radix con listbox propio.
+`Command` de Pro aportaría fuzzy search, navegación por teclado y grupos.
+
+Queda sin hacer por alcance, no por veredicto: el archivo es de
+`features/search`, está en **999 de 1000 líneas** (no admite una línea más sin
+partirlo) y un diálogo pisa el lote de overlays. El trigger `open-search` no lo
+afecta un cambio de diálogo.
+
+### Un riesgo de runtime que no estaba anotado en §6bis
+
+`projectsSectionMeta.ts:31` no solo lee el testid: hace
+`querySelector<HTMLButtonElement>('[data-testid="open-search"]')?.click()`. O
+sea que `open-search` tiene que seguir siendo **un `<button>` nativo**, no solo
+existir. Si un componente lo re-emite sobre un `div` con `role="button"`, el
+tipo resuelve a `null` y el botón de búsqueda de la toolbar de Projects deja de
+hacer nada, sin error en consola.
+## 6septies. Los componentes de chat de Pro — auditados contra `dist`
+
+Resultado de la evaluación del núcleo del chat (`features/messages`,
+`features/chat`). Nueve componentes de Pro evaluados, **cero adoptados**. Los
+motivos no son de esfuerzo: son estructurales y cada uno se verificó contra el
+paquete instalado (`@heroui-pro/react@1.0.0-beta.8`), no contra la doc.
+
+### La causa raíz, que se repite componente por componente
+
+Dos cosas, y las dos ya estaban dichas en otras partes de este documento:
+
+1. **La categoría "AI" de Pro modela un transcript de asistente; esto es un chat
+   de equipo entre humanos.** `ChatMessage` solo tiene `--user` (burbuja a la
+   derecha) y `--assistant` (avatar + cuerpo): un modelo de **dos partes**, sin
+   concepto de tercer participante, agrupación de mensajes consecutivos, hilos
+   ni filas de sistema.
+2. **El modelo de foco de esta app es el que §6ter ya documentó**: el caret se
+   queda en un input mientras el overlay se abre, y la navegación va por
+   `aria-activedescendant`. Los componentes de colección y de overlay de React
+   Aria no pueden expresar eso. Todo lo de Pro que sea colección (`ListBox`,
+   `Select`) o popover hereda el mismo bloqueo.
+
+### Componente por componente
+
+| Componente | Veredicto | Motivo verificado |
+|---|---|---|
+| `chat-list-view` | **Descartado** | No es una lista virtualizada — ver la fila de `virtua` en §3. Para las filas de picker (`NewMessageScreen`, `DraftsPanel`) tampoco entra: `NewMessageScreen` navega con `aria-activedescendant` y el foco **dentro del input** de búsqueda (`role="listbox"` en el contenedor, `role="option"` + `tabIndex={-1}` en las filas), y una colección de RAC quiere el foco adentro; las filas de `DraftsPanel` anidan botones de acción (editar/borrar/enviar) que un item de colección no puede hospedar. |
+| `prompt-input` | **Descartado** | Es un `TextArea` de HeroUI con cáscara (`value: string`). Adoptarlo borra menciones, emoji custom, spoilers, code blocks, ida y vuelta a markdown y nodos de link a mensajes. |
+| `chat-message` / `chat-conversation` | **Descartado** | `ChatMessage` es el modelo de dos partes de arriba. `ChatConversation` es un `div` con `overflow-y-auto`, un ancla de scroll y una máscara de degradado: **sin virtualización**, y pelearía con `useAnchoredScroll`. |
+| `chat-message-actions` | **Descartado** | Su CSS completo es una regla: `@apply flex items-start`. `MessageActionBar` son 552 líneas de menú con permisos y manejo de foco. |
+| `chat-attachment` | **Descartado** | Miniatura de 64px + tarjeta de archivo + quitar. `ComposerAttachments` (831 líneas) tiene anotación de imágenes, spoilers, revert, spoilers de video, progreso de subida y tarjetas de snapshot. |
+| `chat-loader` | **Descartado** | `ChatLoader.Dots` dice *que* algo carga; `TypingIndicatorRow` dice **quién** (avatares apilados + nombres). Y `ChatLoader.Skeleton` es un bloque fijo, mientras `TimelineSkeleton` cachea la forma de las filas en `localStorage` (`buzz-timeline-skeleton-shape.v1`) para imitar la conversación real. |
+| `chat-source` | **Descartado** | Trae favicons desde `google.com/s2/favicons`: **pedido externo bajo el CSP de Tauri, y le filtra a un tercero qué links ve el usuario.** Eso solo ya lo saca, sin evaluar el resto. |
+| `emoji-reaction-button` | **Descartado**, y por un motivo distinto del que parecía | Era el mejor calce: es el único de la evaluación que Pro **no** clasifica bajo "AI". `filterDOMProps` descarta `title` (el nombre del emoji), pero **eso no es lo que lo bloquea**: `render` lo recupera, la misma escotilla que usa `button.tsx` — aunque la doc de Pro no liste esa prop para este componente, el root reenvía sus rest props al `ToggleButton` de React Aria, que sí la honra. Lo que lo bloquea es `isReadOnly`, que era **la única razón para adoptarlo** (eliminar el `<span>` que delega hover/focus alrededor de un botón `disabled` en `MessageReactions`): su CSS trae `[data-readonly=true]{pointer-events:none}` y el root fuerza `excludeFromTabOrder`, o sea ni hovereable ni tabulable. El span se queda, y con él se cae el motivo. Encima el estado seleccionado resuelve de `--accent` (necesita `HERO_ACCENT_SCOPE`) y su geometría `--md` hay que pisarla. Ganancia neta: una animación de press. Los cinco hechos están fijados en `shared/ui/emojiReactionButtonHeroUiGap.test.mjs`. |
+| `hover-card` | **Descartado**, y es el que más dolía | Hay **seis** implementaciones a mano del mismo patrón (`DEFAULT_POPOVER_HOVER_OPEN_DELAY_MS` + timer de cierre): `MessageReactions`, `ChannelActivityPopover`, `UserProfilePopover`, `BotActivityBar`, `PubKey`, `InlineEmojiPopover`. Pro lo trae con `openDelay`/`closeDelay` y hasta resuelve el Escape de §6ter con un listener a nivel `document`. Pero pasa `isNonModal: true` a `Popover` de RAC, y con eso `usePopover` le da `onClose: state.close` a `useOverlayPosition`, que **sí** importa `useCloseOnScroll`. O sea: el hover card se cierra cuando scrollea cualquier ancestro del trigger — y casi todos estos sitios viven dentro del timeline, que auto-scrollea al llegar un mensaje. |
+| `emoji-picker` | **Descartado** | Es un `Select` + `ListBox` + `Popover` de RAC: **es dueño del foco y del teclado**, contra el contrato del composer (`ComposerEmojiPicker` hace `onOpenAutoFocus={e => e.preventDefault()}` y un `MutationObserver` que le da el foco al input de búsqueda en shadow DOM). Además habría que reconstruir la capa de datos de emoji-mart: `buildCustomEmojiCategory(useCustomEmoji())` mete los **emoji custom del relay**, y la selección se normaliza para que resuelvan a `emojiUrl`. |
+| `drop-zone` | **Descartado** | `DropZone` de RAC está construido sobre el sistema de drag-and-drop de React Aria; el composer necesita `File` crudos de un drag del sistema operativo y usa un contador de profundidad (`dragDepthRef` en `useMediaUpload`) para el problema clásico de `dragenter`/`dragleave` anidados. Es reescribir algo que funciona por equivalente. |
+| `text-shimmer` | **Descartado** | `shared/ui/Shimmer` son 26 líneas y hace lo mismo. |
+
+### Correcciones a datos que circularon durante este trabajo
+
+- **§6ter sigue en pie, con una atribución corregida.** El cierre por scroll del
+  popover no-modal es real en `react-aria@3.51.0`, pero **no** está cableado en
+  `usePopover.mjs` como decía el texto: `usePopover` le pasa
+  `onClose: isNonModal && !isSubmenu ? state.close : null` a
+  `useOverlayPosition`, y es **ese** el que importa `useCloseOnScroll`. La otra
+  mitad (`isDismissable: !isNonModal || isSubmenu`) está donde decía.
+- **La tabla de props de la doc de Pro no es la API real.** El "API Reference"
+  de `emoji-reaction-button` no lista `render`, y el componente **sí la honra**
+  (el root hace `...rest` sobre el `ToggleButton` de React Aria). Esta
+  evaluación llegó a afirmar lo contrario por leer la tabla en vez del `dist`,
+  que es exactamente el error contra el que advierte el punto siguiente. Para
+  cualquier componente de Pro: la lista de props documentada es un piso, no un
+  techo — todo lo que el root reenvíe al primitivo de RAC está disponible
+  aunque no figure.
+- **Todos estos componentes se exportan desde la raíz del paquete** — para el
+  bundler y para `tsc`. En un test de Node con jsdom conviene igual el subpath:
+  el barrel de la raíz arrastra `sheet`, cuyo `use-scale-background` llama a
+  `window.matchMedia` **en el scope del módulo**, y jsdom no lo implementa, así
+  que un import desde la raíz revienta al importar y no en una aserción.
+  La exportación se verificó con resolución real y con `tsc --noEmit`, no por
+  `grep` de nombres:
+  `dist/index.d.ts` es un barrel de tres líneas (`export * from "./components"`),
+  así que buscar el nombre ahí da cero y **es un falso negativo**. Aplica a
+  `ChatListView`, `DropZone`, `EmojiPicker`, `EmojiReactionButton`, `EmptyState`,
+  `HoverCard` y `TextShimmer`. Solo son subpath-only las entradas que el MCP
+  lista **con** una ruta (`rich-text-editor`, `code-block`, `markdown`, …).
+
+### Lo que sí queda como trabajo
+
+El hueco de los seis hover cards a mano es real y sigue abierto — pero el motor
+correcto es Radix, no Pro, por el cierre-por-scroll. Un wrapper propio en
+`shared/ui/` que encapsule el par de timers valdría la pena; no es parte de esta
+migración.
 
 ## 7. Reglas duras para todo agente de este trabajo
 

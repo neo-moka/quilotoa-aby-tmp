@@ -35,15 +35,7 @@
    utility, so `.context-menu__popover`'s padding would beat the app's classes
    on the very elements those classes exist to restyle. */
 @import "@heroui-pro/react/css/components/context-menu.css" layer(components);
-/* `native-select.css` reads `--muted` twice — on the indicator and on the
-   placeholder-option colour — but both are guarded:
-   `var(--field-placeholder, var(--muted))`. `--field-placeholder` is mapped
-   below, so the fallback never fires and the inverted-`--muted` hazard (Pro
-   treats it as a text colour, this app as a surface) stays dormant here. The
-   call sites still put an explicit `text-*` utility on `NativeSelect.Indicator`,
-   because `--field-placeholder` resolves at `:root` and would carry the root
-   value into the onboarding sub-themes; a utility resolves at the element. */
-@import "@heroui-pro/react/css/components/native-select.css" layer(components);
+@import "@heroui-pro/react/css/components/empty-state.css" layer(components);
 
 /* The app's radius scale wins.
  *
@@ -128,6 +120,40 @@
    theme.css precisely so the app's declarations land last; keep that order, or
    re-declare the ramp after the Pro import. Only @heroui/styles is imported
    today, so the clash is not live yet. */
+
+/* ── Known gap: `--muted` ─────────────────────────────────────────────────
+ * `--muted` is NOT mapped either, and for the same structural reason as
+ * `--accent` below: the app already spends the name on something else.
+ *
+ * HeroUI reads `--muted` as a text colour — its "muted foreground". This app
+ * uses it as a surface (`bg-muted`, 226 files) and keeps the text colour in
+ * `--muted-foreground`. theme.css declares it unlayered, so the app's surface
+ * value wins over HeroUI's `layer(theme)`. That inversion is Trampa 1 in
+ * docs/heroui-migration/theming-contract.md §4; only one instance of it was
+ * ever applied — `--field-placeholder` above, which HeroUI derives from
+ * `--muted` and which is remapped to `--muted-foreground` for exactly this
+ * reason.
+ *
+ * Mapping `--muted: var(--muted-foreground)` here would close the gap for
+ * HeroUI and open a bigger one for the app, repainting all 226 `bg-muted`
+ * surfaces with a text grey — the same trap, mirrored. So it is resolved per
+ * subtree instead, by `shared/ui/heroMutedScope.ts`, the way `--accent` is
+ * resolved by `heroAccentScope.ts`.
+ *
+ * Nothing is broken today, and it is worth recording why: the OSS component
+ * CSS imported above reads `var(--muted)` **zero** times, so the adopted
+ * `@heroui/react` wrappers are unaffected. It is the Pro layer that reads it —
+ * 286 times across its components, of which `context-menu`, the only Pro
+ * component imported so far, happens to read it zero times. Counts for the
+ * components most likely to arrive next: command 8, rich-text-editor 7,
+ * prompt-input 6, file-tree 5, sidebar 5, markdown 3.
+ *
+ * Any Pro component added to the import list above should be checked with
+ * `grep -c 'var(--muted)'` against its file in
+ * `@heroui-pro/react/dist/css/components/`. A non-zero count means that
+ * component needs `HERO_MUTED_SCOPE` on its root, or its muted text renders
+ * near-invisible in both themes.
+ * ─────────────────────────────────────────────────────────────────────── */
 
 /* ── Known gap ────────────────────────────────────────────────────────────
  * `--accent` is NOT mapped. HeroUI reads it as the brand/action colour (it
