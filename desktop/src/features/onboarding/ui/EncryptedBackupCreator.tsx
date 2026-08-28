@@ -1,4 +1,3 @@
-import { NativeSelect } from "@heroui-pro/react";
 import { AlertTriangle, Eye, EyeOff, RefreshCw } from "lucide-react";
 import * as React from "react";
 import { createPortal } from "react-dom";
@@ -403,30 +402,19 @@ function PassphraseGeneratorPopover({
           >
             Separator
           </label>
-          {/* Pro's `NativeSelect` keeps the real `<select>` — `Trigger` spreads
-              `data-testid` onto it, so `selectOption()` still targets the same
-              node — and swaps the OS-drawn arrow for a themed chevron. This
-              popover renders inside `.buzz-onboarding-security-theme`, where the
-              system-painted arrow was the one control that ignored the sub-theme.
-              The chevron takes a colour *utility* rather than Pro's
-              `--field-placeholder` default, which is declared on `:root` and
-              would carry the root value in here. */}
-          <NativeSelect>
-            <NativeSelect.Trigger
-              className="h-8 rounded-lg border border-border bg-background px-2 pr-7 text-sm text-foreground outline-hidden focus-visible:ring-1 focus-visible:ring-ring"
-              data-testid="backup-passphrase-separator"
-              id="backup-passphrase-separator"
-              onChange={(event) => setSeparator(event.target.value)}
-              value={separator}
-            >
-              {SEPARATOR_OPTIONS.map((option) => (
-                <option key={option.label} value={option.value}>
-                  {option.label}
-                </option>
-              ))}
-              <NativeSelect.Indicator className="right-1.5 text-muted-foreground" />
-            </NativeSelect.Trigger>
-          </NativeSelect>
+          <select
+            className="h-8 rounded-lg border border-border bg-background px-2 text-sm text-foreground outline-hidden focus-visible:ring-1 focus-visible:ring-ring"
+            id="backup-passphrase-separator"
+            data-testid="backup-passphrase-separator"
+            onChange={(event) => setSeparator(event.target.value)}
+            value={separator}
+          >
+            {SEPARATOR_OPTIONS.map((option) => (
+              <option key={option.label} value={option.value}>
+                {option.label}
+              </option>
+            ))}
+          </select>
         </div>
 
         {error ? (

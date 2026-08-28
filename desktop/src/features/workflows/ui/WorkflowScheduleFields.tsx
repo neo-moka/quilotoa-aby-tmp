@@ -54,8 +54,7 @@ function monthlyDayWarning(monthDay: string): string | null {
  *
  * Same reasoning as `shared/ui/segmented-control.tsx`: adopt Pro where it
  * supplies something absent, not where it replaces a working control with a
- * heavier one wearing our CSS. The `FormSelect` in this file *is* on Pro — see
- * `workflowFormPrimitives.tsx` — because the app owned no select at all.
+ * heavier one wearing our CSS.
  */
 
 function customCronSeed(schedule: ScheduleFormState): string {

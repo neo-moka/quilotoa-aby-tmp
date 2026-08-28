@@ -1,25 +1,33 @@
-import { NativeSelect } from "@heroui-pro/react";
+import { ChevronDown } from "lucide-react";
 import type * as React from "react";
 
 /**
- * The app owns no select form control — `dropdown-menu` is a menu and
- * `segmented-control` is a toggle bar — so every `<select>` in the product was
- * hand-rolled, each with its own chevron math and field skin. This one is built
- * on `@heroui-pro/react`'s `NativeSelect`, which is a real `<select>` plus a
- * CSS-positioned indicator: the same control, with the placement arithmetic and
- * the `appearance: none` reset moved out of the call site.
+ * Hand-rolled because the app owns no select control — `dropdown-menu` is a
+ * menu and `segmented-control` is a toggle bar — and `features/` does not
+ * import HeroUI directly. **Migrate to `shared/ui/select.tsx` when it lands**;
+ * this is one of four hand-rolled selects that have drifted apart (three
+ * heights, two radii, two border tokens, and two with no chevron at all, left
+ * on the OS-drawn arrow that system chrome paints in its own colours).
  *
- * `NativeSelect.Trigger` spreads its remaining props straight onto the
- * `<select>` (verified against the installed 1.0.0-beta.8 `dist`, not the docs —
- * `Resizable` in the same beta silently drops them), so `id`, `disabled`,
- * `value` and `onChange` land on the same node as before.
+ * Three findings from evaluating Pro's `NativeSelect` here, verified against
+ * the installed 1.0.0-beta.8 `dist` rather than the docs, for whoever builds
+ * that primitive:
  *
- * The skin stays Buzz's, following the precedent `shared/ui/input.tsx` set:
- * Pro's field CSS paints from `--field-background`, which the theming contract
- * maps to the app's `--input` — a border-weight grey — so taking it would
- * repaint the field. The classes below are the ones this control already had.
- * `pr-8` is kept rather than deferred to Pro's computed indicator inset because
- * `px-3` is a utility and would win over it anyway.
+ * - `NativeSelect.Trigger` *does* spread its rest props onto the real
+ *   `<select>`; it is plain JSX with no React Aria `filterDOMProps` in the
+ *   path, so `data-testid` survives. That matters — `onboarding-backup.spec.ts`
+ *   drives `backup-passphrase-separator` through `selectOption()`.
+ * - Its CSS reads `--muted` twice, but both are guarded as
+ *   `var(--field-placeholder, var(--muted))`, and `--field-placeholder` is
+ *   already mapped in `heroui.css`, so the inverted-`--muted` hazard stays
+ *   dormant and `HERO_MUTED_SCOPE` is not needed. The indicator still wants an
+ *   explicit colour utility: that token resolves at `:root` and would carry the
+ *   root value into the onboarding sub-themes, where a utility resolves at the
+ *   element instead.
+ * - It dims a select whose `option[value=""]` is checked, treating the empty
+ *   value as an unfilled placeholder. `ChannelTemplatesSettingsCard`'s runtime
+ *   row uses `value=""` for "Default", a real choice, so that one needs the
+ *   dimming pinned off or it reads as unset.
  */
 export function FormSelect({
   children,
@@ -35,22 +43,18 @@ export function FormSelect({
   value: string;
 }) {
   return (
-    <NativeSelect className="w-full">
-      <NativeSelect.Trigger
-        className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 pr-8 text-sm shadow-xs transition-colors focus-visible:outline-hidden focus-visible:ring-1 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50"
+    <div className="relative">
+      <select
+        className="flex h-9 w-full appearance-none rounded-md border border-input bg-transparent px-3 pr-8 text-sm shadow-xs transition-colors focus-visible:outline-hidden focus-visible:ring-1 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50"
         disabled={disabled}
         id={id}
         onChange={(event) => onChange(event.target.value)}
         value={value}
-        wrapperClassName="w-full"
       >
         {children}
-        {/* Explicit colour utility, not Pro's `--field-placeholder` default:
-            that token is declared on `:root`, so it would carry the root value
-            into any sub-theme. A utility resolves at the element. */}
-        <NativeSelect.Indicator className="right-2 text-muted-foreground" />
-      </NativeSelect.Trigger>
-    </NativeSelect>
+      </select>
+      <ChevronDown className="pointer-events-none absolute right-2 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+    </div>
   );
 }
 
