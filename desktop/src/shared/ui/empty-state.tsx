@@ -1,5 +1,12 @@
 import type * as React from "react";
-import { EmptyState as HeroEmptyState } from "@heroui-pro/react";
+// Imported by subpath, not from the package root, and that is load-bearing for
+// the test suite rather than a style choice. The root barrel re-exports every
+// component, `sheet` among them, and `sheet/use-scale-background.js` calls
+// `window.matchMedia` at module scope. jsdom defines `window` but not
+// `matchMedia`, so any Node test whose import graph reaches a root import of
+// this package dies while loading — whichever component it actually wanted.
+// The subpath is in the package's `exports` map and pulls only this component.
+import { EmptyState as HeroEmptyState } from "@heroui-pro/react/empty-state";
 
 import { cn } from "@/shared/lib/cn";
 import { HERO_MUTED_SCOPE } from "@/shared/ui/heroMutedScope";

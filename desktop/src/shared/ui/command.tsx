@@ -1,5 +1,8 @@
 import type * as React from "react";
-import { Command as HeroCommand } from "@heroui-pro/react";
+// Subpath, not the package root: the root barrel pulls in `sheet`, whose
+// `use-scale-background.js` calls `window.matchMedia` at module scope, which
+// kills any Node test whose import graph reaches it. See empty-state.tsx.
+import { Command as HeroCommand } from "@heroui-pro/react/command";
 
 import { cn } from "@/shared/lib/cn";
 import { HERO_MUTED_SCOPE } from "@/shared/ui/heroMutedScope";

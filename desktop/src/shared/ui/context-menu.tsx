@@ -1,6 +1,9 @@
 import * as React from "react";
 import { Header } from "@heroui/react";
-import { ContextMenu as HeroContextMenu } from "@heroui-pro/react";
+// Subpath, not the package root: the root barrel pulls in `sheet`, whose
+// `use-scale-background.js` calls `window.matchMedia` at module scope, which
+// kills any Node test whose import graph reaches it. See empty-state.tsx.
+import { ContextMenu as HeroContextMenu } from "@heroui-pro/react/context-menu";
 import { mergeProps, mergeRefs } from "@react-aria/utils";
 import { Check, Circle } from "lucide-react";
 
