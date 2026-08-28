@@ -550,7 +550,7 @@ test("appearance groups theme and preferences into labeled rows", async ({
   await expect(themeStyleOptions).toBeVisible();
   await expect(
     themeCard.getByTestId("prominent-active-tab-toggle"),
-  ).toBeChecked();
+  ).toHaveAttribute("data-selected", "true");
   const glassBeforeProminent = await themeCard.evaluate((card) => {
     const glass = card.querySelector('[data-testid="glass-background-toggle"]');
     const prominent = card.querySelector(
@@ -1246,7 +1246,7 @@ test("prominent active tab is opt-in and switches selection surfaces", async ({
   const root = page.locator("html");
   const activeRow = page.getByTestId("settings-nav-appearance");
   const toggle = page.getByTestId("prominent-active-tab-toggle");
-  await expect(toggle).not.toBeChecked();
+  await expect(toggle).not.toHaveAttribute("data-selected", "true");
   await expect(root).not.toHaveAttribute("data-prominent-active-tab", "");
   await expect(activeRow).toHaveCSS("background-color", "rgba(0, 0, 0, 0.07)");
   const subtleTextStyle = await activeRow.evaluate((element) => {
@@ -1263,7 +1263,7 @@ test("prominent active tab is opt-in and switches selection surfaces", async ({
     .toBeNull();
 
   await toggle.click();
-  await expect(toggle).toBeChecked();
+  await expect(toggle).toHaveAttribute("data-selected", "true");
   await expect(root).toHaveAttribute("data-prominent-active-tab", "");
   await expect(activeRow).toHaveCSS(
     "background-color",
@@ -1550,7 +1550,7 @@ test("glass background keeps the content panel solid", async ({ page }) => {
   const opacitySlider = page.getByTestId("glass-opacity-slider");
   const root = page.locator("html");
   await expect(toggle).toBeEnabled();
-  await expect(toggle).not.toBeChecked();
+  await expect(toggle).not.toHaveAttribute("data-selected", "true");
   await expect
     .poll(() =>
       page.evaluate(
@@ -1567,7 +1567,7 @@ test("glass background keeps the content panel solid", async ({ page }) => {
   );
 
   await toggle.click();
-  await expect(toggle).toBeChecked();
+  await expect(toggle).toHaveAttribute("data-selected", "true");
   await expect(opacitySlider).toBeVisible();
   await expect(opacitySlider).toHaveClass(/buzz-avatar-framing-slider/);
   await expect(opacitySlider).toHaveAttribute("aria-valuenow", "65");

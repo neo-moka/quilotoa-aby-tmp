@@ -821,7 +821,7 @@ test("assigns distinct agent voices and exposes compact per-agent controls", asy
     voiceMenu.getByText("Agent text-to-speech", { exact: true }),
   ).toBeVisible();
   const ttsToggle = voiceMenu.getByTestId("huddle-agent-tts-toggle");
-  await expect(ttsToggle).toBeChecked();
+  await expect(ttsToggle).toHaveAttribute("data-selected", "true");
   await expect(
     voiceMenu.getByTestId("huddle-agent-voice-selector"),
   ).toContainText("Vera");
@@ -831,7 +831,7 @@ test("assigns distinct agent voices and exposes compact per-agent controls", asy
     voiceMenu.getByTestId("huddle-agent-voice-selector"),
   ).toHaveCount(0);
   await ttsToggle.click();
-  await expect(ttsToggle).toBeChecked();
+  await expect(ttsToggle).toHaveAttribute("data-selected", "true");
   const voiceSelector = voiceMenu.getByTestId("huddle-agent-voice-selector");
   await expect(voiceSelector).toBeEnabled();
   await voiceSelector.click();
