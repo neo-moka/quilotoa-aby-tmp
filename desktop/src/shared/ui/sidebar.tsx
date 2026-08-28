@@ -690,8 +690,9 @@ SidebarGroup.displayName = "SidebarGroup";
  * (dead code, tree-shaken) and breaks the next person following upstream docs.
  * `SidebarGroupAction` and `SidebarMenuSubButton` have no call sites at all.
  *
- * `Slot` therefore stays in this file regardless of the HeroUI migration — as
- * it does in `button.tsx`, `card.tsx` and `attachment.tsx`. See §6quater.
+ * `Slot` therefore stays in this file — as it does in `button.tsx` (whose
+ * `asChild` sites wrap an `<a>`, which HeroUI's `render` cannot produce),
+ * `card.tsx` and `attachment.tsx`. See §6quater.
  */
 const SidebarGroupLabel = React.forwardRef<
   HTMLDivElement,

@@ -1,17 +1,17 @@
 import assert from "node:assert/strict";
-import { after, before, test } from "node:test";
+import { after, afterEach, before, test } from "node:test";
 
 import { JSDOM } from "jsdom";
 
 /**
- * `button.tsx` stays on its own `<button>` rather than moving to HeroUI. The
- * reason is a prop contract, not a preference, so it is pinned here instead of
- * left as a comment: React Aria's `filterDOMProps` admits a fixed allowlist,
- * and every attribute outside it is dropped with no error.
+ * Two halves, and they only mean something together.
  *
- * These tests assert the *gap*. If one starts failing, HeroUI or React Aria has
- * begun forwarding that attribute and the conservation decision in `button.tsx`
- * should be revisited — that is the point of the file.
+ * The first group pins the gap in HeroUI's `Button`: React Aria's
+ * `filterDOMProps` is an allowlist, so attributes outside it vanish with no
+ * error. The second group pins that `button.tsx` closes that gap through the
+ * `render` escape hatch. If the first group starts failing, upstream has fixed
+ * the gap and the neutralising in the wrapper can be reconsidered; if the
+ * second group fails, the wrapper has stopped protecting 523 call sites.
  */
 const dom = new JSDOM("<!doctype html><html><body></body></html>", {
   url: "http://localhost",
@@ -26,6 +26,7 @@ before(() => {
     getComputedStyle: dom.window.getComputedStyle.bind(dom.window),
     HTMLElement: dom.window.HTMLElement,
     IS_REACT_ACT_ENVIRONMENT: true,
+    MouseEvent: dom.window.MouseEvent,
     Node: dom.window.Node,
     // React Aria narrows event targets with `target instanceof SVGElement`
     // while tearing press handlers down; without the global that throws from
@@ -35,43 +36,81 @@ before(() => {
   });
 });
 
+afterEach(async () => {
+  const { cleanup } = await import("@testing-library/react");
+  cleanup();
+});
+
 after(() => dom.window.close());
 
-/** Renders HeroUI's Button and hands back the DOM node it produced. */
+/** Renders raw HeroUI, i.e. what the wrapper has to compensate for. */
 async function renderHeroButton(props) {
   const React = await import("react");
   const { render } = await import("@testing-library/react");
   const { Button } = await import("@heroui/react");
 
   const view = render(React.createElement(Button, { ...props }, "Label"));
-  return { el: view.container.firstElementChild, view };
+  return view.container.firstElementChild;
 }
 
-test("HeroUI's button ignores `disabled` and stays clickable", async () => {
+/** Renders the app's wrapper. */
+async function renderButton(props) {
+  const React = await import("react");
+  const { render } = await import("@testing-library/react");
+  const { Button } = await import("./button.tsx");
+
+  const view = render(React.createElement(Button, { ...props }, "Label"));
+  return view.container.firstElementChild;
+}
+
+// ---------------------------------------------------------------------------
+// The gap in raw HeroUI.
+// ---------------------------------------------------------------------------
+
+test("raw HeroUI ignores `disabled` and stays clickable", async () => {
   const { fireEvent } = await import("@testing-library/react");
 
   let clicks = 0;
-  const { el } = await renderHeroButton({
+  const el = await renderHeroButton({
     disabled: true,
     onClick: () => {
       clicks += 1;
     },
   });
 
-  // 269 call sites pass `disabled`. React Aria reads `isDisabled`, so the
-  // attribute never lands and the handler still runs — a disabled destructive
-  // action would still fire.
   assert.equal(el.hasAttribute("disabled"), false);
   fireEvent.click(el);
   assert.equal(clicks, 1);
 });
 
-test("HeroUI's button honours `isDisabled`", async () => {
+test("raw HeroUI drops attributes outside React Aria's allowlist", async () => {
+  const el = await renderHeroButton({
+    "aria-busy": true,
+    "aria-selected": true,
+    role: "tab",
+    title: "native tooltip",
+  });
+
+  for (const attr of ["aria-busy", "aria-selected", "role", "title"]) {
+    assert.equal(el.getAttribute(attr), null, `expected ${attr} to be dropped`);
+  }
+});
+
+test("raw HeroUI overwrites a negative `tabIndex` with 0", async () => {
+  const el = await renderHeroButton({ tabIndex: -1 });
+  assert.equal(el.getAttribute("tabindex"), "0");
+});
+
+// ---------------------------------------------------------------------------
+// The wrapper closing it.
+// ---------------------------------------------------------------------------
+
+test("the wrapper honours `disabled` again", async () => {
   const { fireEvent } = await import("@testing-library/react");
 
   let clicks = 0;
-  const { el } = await renderHeroButton({
-    isDisabled: true,
+  const el = await renderButton({
+    disabled: true,
     onClick: () => {
       clicks += 1;
     },
@@ -82,65 +121,115 @@ test("HeroUI's button honours `isDisabled`", async () => {
   assert.equal(clicks, 0);
 });
 
-test("HeroUI's button drops attributes outside React Aria's allowlist", async () => {
-  const { el } = await renderHeroButton({
+test("the wrapper keeps the attributes React Aria drops", async () => {
+  const el = await renderButton({
     "aria-busy": true,
-    "aria-hidden": true,
     "aria-selected": true,
+    "data-testid": "probe",
     role: "tab",
+    tabIndex: -1,
     title: "native tooltip",
   });
 
-  // `title` (35 sites), `role` + `aria-selected` (6, all PulseTabBar),
-  // `aria-busy` (2) and `aria-hidden` (1) have no path through filterDOMProps.
-  for (const attr of [
-    "aria-busy",
-    "aria-hidden",
-    "aria-selected",
-    "role",
-    "title",
+  // PulseTabBar's six tabs depend on role + aria-selected together, and `pulse`
+  // emits no testids, so nothing else in the suite would notice them going.
+  assert.equal(el.getAttribute("role"), "tab");
+  assert.equal(el.getAttribute("aria-selected"), "true");
+  assert.equal(el.getAttribute("aria-busy"), "true");
+  assert.equal(el.getAttribute("title"), "native tooltip");
+  assert.equal(el.getAttribute("tabindex"), "-1");
+  assert.equal(el.getAttribute("data-testid"), "probe");
+});
+
+test("the wrapper defaults type to button and lets a caller override it", async () => {
+  assert.equal((await renderButton({})).getAttribute("type"), "button");
+  assert.equal(
+    (await renderButton({ type: "submit" })).getAttribute("type"),
+    "submit",
+  );
+});
+
+test("onClick receives a real DOM event, not a synthesised one", async () => {
+  const seen = [];
+  const el = await renderButton({
+    onClick: (event) => {
+      seen.push({
+        currentTarget: event.currentTarget?.tagName,
+        detail: event.detail,
+        preventDefault: typeof event.preventDefault,
+        stopPropagation: typeof event.stopPropagation,
+      });
+    },
+  });
+
+  el.dispatchEvent(
+    new dom.window.MouseEvent("click", { bubbles: true, detail: 1 }),
+  );
+
+  // `AgentsView` reads currentTarget and `ThreadViewModeToggle` reads detail to
+  // tell a keyboard activation from a click. Routing through `onPress` would
+  // hand them a synthesised MouseEvent with neither.
+  assert.deepEqual(seen, [
+    {
+      currentTarget: "BUTTON",
+      detail: 1,
+      preventDefault: "function",
+      stopPropagation: "function",
+    },
+  ]);
+});
+
+test("the wrapper neutralises HeroUI's own paint and geometry", async () => {
+  const el = await renderButton({ variant: "ghost" });
+  const className = el.getAttribute("class") ?? "";
+
+  // `.button` and `.button--*` still arrive from the app-wide HeroUI
+  // stylesheet, so the base has to cancel what would otherwise show through on
+  // the variants that set no background or colour of their own.
+  for (const util of [
+    "static",
+    "isolation-auto",
+    "[--button-bg:transparent]",
+    "[--button-fg:inherit]",
+    "active:scale-100",
   ]) {
-    assert.equal(el.getAttribute(attr), null, `expected ${attr} to be dropped`);
+    assert.ok(
+      className.includes(util),
+      `expected neutralising utility ${util}, got "${className}"`,
+    );
   }
 });
 
-test("HeroUI's button overwrites a negative `tabIndex` with 0", async () => {
-  const { el } = await renderHeroButton({ tabIndex: -1 });
+test("asChild still renders the caller's element through Slot", async () => {
+  const React = await import("react");
+  const { render } = await import("@testing-library/react");
+  const { Button } = await import("./button.tsx");
 
-  // Worse than dropping it: `useFocusable` always emits a tabIndex, so a button
-  // deliberately kept out of the tab order becomes tabbable. The supported
-  // spelling is `excludeFromTabOrder`.
-  assert.equal(el.getAttribute("tabindex"), "0");
-
-  const { el: excluded } = await renderHeroButton({
-    excludeFromTabOrder: true,
-  });
-  assert.equal(excluded.getAttribute("tabindex"), "-1");
-});
-
-test("HeroUI's button does forward data-testid, aria-label and type", async () => {
-  const { el } = await renderHeroButton({
-    "aria-label": "Label",
-    "data-testid": "probe",
-    type: "submit",
-  });
-
-  // The other half of the picture: these three do survive, so the gap above is
-  // specific rather than "HeroUI drops everything".
-  assert.equal(el.getAttribute("data-testid"), "probe");
-  assert.equal(el.getAttribute("aria-label"), "Label");
-  assert.equal(el.getAttribute("type"), "submit");
-});
-
-test("HeroUI's button paints itself with the unmapped --accent variant", async () => {
-  const { el } = await renderHeroButton({});
-
-  // `button--primary` resolves its background from `--accent`, which this app
-  // deliberately leaves unmapped (theming-contract §4). Adopting the component
-  // means overriding its variant layer, not consuming it.
-  const className = el.getAttribute("class") ?? "";
-  assert.ok(
-    className.includes("button--primary"),
-    `expected the default variant class, got "${className}"`,
+  const view = render(
+    React.createElement(
+      Button,
+      { asChild: true, variant: "outline" },
+      React.createElement("a", { href: "https://example.com" }, "Open"),
+    ),
   );
+  const el = view.container.firstElementChild;
+
+  // `render` only legitimately returns a <button>; the six asChild sites wrap
+  // an anchor, so they keep Slot.
+  assert.equal(el.tagName, "A");
+  assert.equal(el.getAttribute("href"), "https://example.com");
+  assert.ok((el.getAttribute("class") ?? "").includes("border"));
+});
+
+test("a forwarded ref still reaches the DOM node", async () => {
+  const React = await import("react");
+  const { render } = await import("@testing-library/react");
+  const { Button } = await import("./button.tsx");
+
+  const ref = React.createRef();
+  render(React.createElement(Button, { ref }, "Label"));
+
+  // React Aria needs its own ref on that node too, so the wrapper merges them;
+  // if the merge regressed, this is null and every `.focus()` call site breaks.
+  assert.ok(ref.current instanceof dom.window.HTMLButtonElement);
 });
