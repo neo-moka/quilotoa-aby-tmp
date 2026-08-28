@@ -224,13 +224,33 @@ esperando que falle algo.
 - `AlertDialog` de HeroUI **sí emite `role="alertdialog"`**
   (`@heroui/react/dist/components/alert-dialog/alert-dialog.js:154`), así que
   las 48 aserciones sobre ese rol sobrevivirían. Es el candidato más limpio:
-  29 de sus 30 consumidores no tocan foco. El único que lo hace es
+  **29 de sus 30 consumidores no tocan el foco.** El único que lo hace es
   `AgentDefaultsDialog.tsx:122`, y no hace `preventDefault` a secas — redirige
-  el foco a un botón concreto. Migrarlo es una decisión de producto, no un
-  refactor.
+  el foco a un botón concreto. Si algún día se resuelve el hueco de foco,
+  empezar por acá.
 - `ChannelManagementSheet.tsx` tiene un bloqueo aparte: en split layout
   renderiza su panel **sin portal y no-modal**, para quedar acoplado al flujo
   del layout. El `Overlay` de React Aria siempre hace `createPortal`.
+
+### Migrar `AlertDialog` solo: evaluado y descartado
+
+Se consideró migrar únicamente `alert-dialog.tsx`, por ser el de mejor encaje.
+**Se decidió que no.** Queda registrado para que no se re-litigue:
+
+1. Ese 1 de 30 no es un caso menor por ser minoría — es *más* peligroso,
+   porque una regresión de teclado en un solo diálogo no la ve nadie.
+2. **Mezclar los dos sistemas reinstala la trampa de la animación.** Si
+   `alert-dialog.tsx` pasa a React Aria y `dialog.tsx` se queda en Radix,
+   `modalMotion.ts` tendría que servir a dos vocabularios de atributos a la vez
+   (`data-state` y `data-entering`/`data-exiting`). Es exactamente el desajuste
+   que dejó todos los diálogos sin animación en silencio y que ningún gate
+   detectó.
+3. El beneficio es chico: se gana un archivo a cambio de una regresión y una
+   superficie mixta, con el resto de los overlays igual en Radix.
+
+**Corolario para cualquier migración parcial:** antes de mover un wrapper solo,
+mirá qué módulos compartidos quedan sirviendo a dos vocabularios de atributos.
+`modalMotion.ts` y `popoverSurface.ts` son los dos que hoy tienen ese riesgo.
 
 ### Consecuencia para el Lote B
 
