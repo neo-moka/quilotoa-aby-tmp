@@ -797,7 +797,7 @@ Dos cosas, y las dos ya estaban dichas en otras partes de este documento:
 | `chat-loader` | **Descartado** | `ChatLoader.Dots` dice *que* algo carga; `TypingIndicatorRow` dice **quién** (avatares apilados + nombres). Y `ChatLoader.Skeleton` es un bloque fijo, mientras `TimelineSkeleton` cachea la forma de las filas en `localStorage` (`buzz-timeline-skeleton-shape.v1`) para imitar la conversación real. |
 | `chat-source` | **Descartado** | Trae favicons desde `google.com/s2/favicons`: **pedido externo bajo el CSP de Tauri, y le filtra a un tercero qué links ve el usuario.** Eso solo ya lo saca, sin evaluar el resto. |
 | `emoji-reaction-button` | **Descartado**, y por un motivo distinto del que parecía | Era el mejor calce: es el único de la evaluación que Pro **no** clasifica bajo "AI". `filterDOMProps` descarta `title` (el nombre del emoji), pero **eso no es lo que lo bloquea**: `render` lo recupera, la misma escotilla que usa `button.tsx` — aunque la doc de Pro no liste esa prop para este componente, el root reenvía sus rest props al `ToggleButton` de React Aria, que sí la honra. Lo que lo bloquea es `isReadOnly`, que era **la única razón para adoptarlo** (eliminar el `<span>` que delega hover/focus alrededor de un botón `disabled` en `MessageReactions`): su CSS trae `[data-readonly=true]{pointer-events:none}` y el root fuerza `excludeFromTabOrder`, o sea ni hovereable ni tabulable. El span se queda, y con él se cae el motivo. Encima el estado seleccionado resuelve de `--accent` (necesita `HERO_ACCENT_SCOPE`) y su geometría `--md` hay que pisarla. Ganancia neta: una animación de press. Los cinco hechos están fijados en `shared/ui/emojiReactionButtonHeroUiGap.test.mjs`. |
-| `hover-card` | **Descartado**, y es el que más dolía | Hay **seis** implementaciones a mano del mismo patrón (`DEFAULT_POPOVER_HOVER_OPEN_DELAY_MS` + timer de cierre): `MessageReactions`, `ChannelActivityPopover`, `UserProfilePopover`, `BotActivityBar`, `PubKey`, `InlineEmojiPopover`. Pro lo trae con `openDelay`/`closeDelay` y hasta resuelve el Escape de §6ter con un listener a nivel `document`. Pero pasa `isNonModal: true` a `Popover` de RAC, y con eso `usePopover` le da `onClose: state.close` a `useOverlayPosition`, que **sí** importa `useCloseOnScroll`. O sea: el hover card se cierra cuando scrollea cualquier ancestro del trigger — y casi todos estos sitios viven dentro del timeline, que auto-scrollea al llegar un mensaje. |
+| `hover-card` | **Descartado**, y es el que más dolía | Hay **seis** implementaciones a mano del mismo patrón (`DEFAULT_POPOVER_HOVER_OPEN_DELAY_MS` + timer de cierre): `MessageReactions`, `ChannelActivityPopover`, `UserProfilePopover`, `BotActivityBar`, `PubKey`, `InlineEmojiPopover`. Pro lo trae con `openDelay`/`closeDelay` y hasta resuelve el Escape de §6ter con un listener a nivel `document`. Pero pasa `isNonModal: true` a `Popover` de RAC, y con eso `usePopover` le da `onClose: state.close` a `useOverlayPosition`, que **sí** importa `useCloseOnScroll`. O sea: el hover card se cierra cuando scrollea cualquier ancestro del trigger — y casi todos estos sitios viven dentro del timeline, que auto-scrollea al llegar un mensaje. **El hueco se cerró igual, con un primitivo propio sobre Radix** (`shared/ui/useHoverPopover.ts`); ver abajo. |
 | `emoji-picker` | **Descartado** | Es un `Select` + `ListBox` + `Popover` de RAC: **es dueño del foco y del teclado**, contra el contrato del composer (`ComposerEmojiPicker` hace `onOpenAutoFocus={e => e.preventDefault()}` y un `MutationObserver` que le da el foco al input de búsqueda en shadow DOM). Además habría que reconstruir la capa de datos de emoji-mart: `buildCustomEmojiCategory(useCustomEmoji())` mete los **emoji custom del relay**, y la selección se normaliza para que resuelvan a `emojiUrl`. |
 | `drop-zone` | **Descartado** | `DropZone` de RAC está construido sobre el sistema de drag-and-drop de React Aria; el composer necesita `File` crudos de un drag del sistema operativo y usa un contador de profundidad (`dragDepthRef` en `useMediaUpload`) para el problema clásico de `dragenter`/`dragleave` anidados. Es reescribir algo que funciona por equivalente. |
 | `text-shimmer` | **Descartado** | `shared/ui/Shimmer` son 26 líneas y hace lo mismo. |
@@ -831,12 +831,45 @@ Dos cosas, y las dos ya estaban dichas en otras partes de este documento:
   `HoverCard` y `TextShimmer`. Solo son subpath-only las entradas que el MCP
   lista **con** una ruta (`rich-text-editor`, `code-block`, `markdown`, …).
 
-### Lo que sí queda como trabajo
+### El hueco del hover card, cerrado con un primitivo propio
 
-El hueco de los seis hover cards a mano es real y sigue abierto — pero el motor
-correcto es Radix, no Pro, por el cierre-por-scroll. Un wrapper propio en
-`shared/ui/` que encapsule el par de timers valdría la pena; no es parte de esta
-migración.
+El descarte de `hover-card` dejó el hueco abierto, y se cerró con
+`shared/ui/useHoverPopover.ts` sobre Radix. Al abrirlo apareció que la deuda era
+mayor: el delay de apertura estaba compartido, pero el de cierre no, y había
+derivado a **tres valores en cinco constantes declaradas por separado** —
+150ms en `MessageReactions`, 180ms en `ChannelActivityPopover` y
+`BotActivityBar`, 200ms en `PubKey` y `UserProfilePopover`. Ninguno fue elegido.
+
+Es un **hook y no un componente** porque los seis sitios no comparten forma:
+unos cuelgan los handlers de `PopoverTrigger`, `UserProfilePopover` usa
+`PopoverAnchor` porque su trigger también tiene click y teclado, y
+`MessageReactions` los cuelga de un `<span>` que envuelve un botón que puede
+estar `disabled` — y un botón deshabilitado no emite eventos de puntero. Un
+componente tendría que imponerle una de esas formas a las otras cinco.
+
+`MessageReactions` ya está migrado conservando sus 150ms exactos, para que el
+movimiento sea un refactor puro. Quedan cinco sitios, y **converger los delays
+en un solo valor es una decisión aparte**, no un efecto colateral del refactor.
+El comportamiento está fijado en `shared/ui/useHoverPopover.test.mjs`: ningún
+gate lo ve, porque un hover card que abre al instante, que no cierra nunca o que
+cierra con el puntero adentro pasa typecheck, lint y build.
+
+### Pendiente, con su advertencia
+
+**El fade con `mask-image` arriba y abajo del scroll** (lo que hace
+`chat-conversation` de Pro) no existe en el timeline y es la única idea visual
+de la suite que valdría la pena portar — el botón sticky de "ir al final" ya
+existe, y con contador de mensajes nuevos, en `MessageThreadPanel`.
+
+No se hizo, y no debería hacerse a ciegas: `mask-image` sobre el contenedor de
+scroll fuerza una capa de composición que se repinta en cada frame, y ese
+contenedor es una lista **virtualizada que recicla filas constantemente**, en la
+superficie más sensible a performance del producto. Que Pro necesite una segunda
+capa de máscara (`--chat-conversation-scrollbar-mask-size`) solo para que no se
+le desvanezca la scrollbar indica que es más frágil de lo que aparenta. Es paint
+y no layout, así que no toca a virtua ni a su parche — pero pedirlo sin
+validación visual ni de performance es pedir una regresión que ningún gate
+detecta. Dejarlo para cuando haya una.
 
 ## 7. Reglas duras para todo agente de este trabajo
 
