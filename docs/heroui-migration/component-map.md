@@ -85,6 +85,39 @@ no tiene ese patrón. Hay **285 usos de `asChild`**, concentrados en:
 Cada uno requiere decisión: o el componente de HeroUI acepta el rol
 directamente, o se usa su render prop, o se conserva un wrapper propio.
 
+### El estado de selección es de la colección, no del item
+
+Verificado en `react-aria@3.51.0` (`private/menu/useMenu.mjs:45`,
+`useMenuItem.mjs:60-64`), no en documentación.
+
+**Los roles ARIA se preservan**: HeroUI emite `menu`, `menuitem`,
+`menuitemradio` y `menuitemcheckbox`, igual que Radix — no `listbox`/`option`.
+Las 236 aserciones de los specs sobre esos roles sobreviven.
+
+Pero el rol **no se elige por item**: se deriva del `selectionMode` del
+selection manager que el item tiene en contexto. Radix lo declara por item
+(`RadioItem`, `CheckboxItem`); React Aria lo declara por colección.
+
+Se resuelve porque `MenuSection` acepta su propio `selectionMode`
+(`dist/types/src/Menu.d.ts:59`), y crea un `GroupSelectionManager` propio
+(`dist/private/Menu.mjs:337`). Mapeo correcto:
+
+| Radix | HeroUI |
+|---|---|
+| `DropdownMenuRadioGroup value onValueChange` | `Section selectionMode="single" selectedKeys onSelectionChange` |
+| `DropdownMenuCheckboxItem checked` | `Section selectionMode="multiple"` |
+| items sueltos | sin `selectionMode` → `menuitem` |
+
+> **Trampa.** Poner `selectionMode` en el `Menu` raíz en vez de en la
+> `Section` convierte **todos** los items en `menuitemradio`, incluidos los
+> planos. En este repo hay 23 `RadioGroup` conviviendo con 110 items planos en
+> los mismos menús. **Ni typecheck ni build lo detectan** — solo los specs, y
+> los specs no corren en `just ci`.
+
+El mismo principio aplica a cualquier componente de colección de React Aria
+(`Tabs`, `ListBox`, `Select`, `CheckboxGroup`): el estado vive en la colección.
+Antes de migrar uno, verificá dónde queda declarado.
+
 ### `onClick` → `onPress`
 
 HeroUI v3 usa `onPress` (react-aria) en elementos interactivos. Hay **963
