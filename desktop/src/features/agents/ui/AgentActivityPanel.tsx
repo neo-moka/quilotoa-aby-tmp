@@ -3,6 +3,7 @@ import { X } from "lucide-react";
 
 import { useActiveAgentTurnsByChannel } from "@/features/agents/activeAgentTurnsStore";
 import { useManagedAgentsQuery } from "@/features/agents/hooks";
+import { useChannelsQuery } from "@/features/channels/hooks";
 import { isManagedAgentActive } from "@/features/agents/lib/managedAgentControlActions";
 import type { UserProfileLookup } from "@/features/profile/lib/identity";
 import {
@@ -15,6 +16,7 @@ import {
 } from "@/shared/layout/AuxiliaryPanel";
 import { Button } from "@/shared/ui/button";
 import { resolveActivityAgentPubkey } from "./agentActivitySelection";
+import { AgentActivitySettingsMenu } from "./AgentActivitySettingsMenu";
 import {
   AgentActivitySelector,
   type AgentActivityCandidate,
@@ -57,6 +59,23 @@ export function AgentActivityPanel({
 }) {
   const managedAgentsQuery = useManagedAgentsQuery();
   const activeChannelTurns = useActiveAgentTurnsByChannel();
+  const channelsQuery = useChannelsQuery();
+
+  // Raw is view state for one agent, not a device preference like the other two
+  // toggles, and the channel panel already resets it when its scope changes.
+  // Keying it to the agent keeps that: switching agents starts on the polished
+  // transcript rather than inheriting the previous agent's raw view.
+  const [rawState, setRawState] = React.useState<{
+    pubkey: string | null;
+    show: boolean;
+  }>({ pubkey: null, show: false });
+
+  const channelNameFor = React.useCallback(
+    (channelId: string) =>
+      channelsQuery.data?.find((channel) => channel.id === channelId)?.name ??
+      null,
+    [channelsQuery.data],
+  );
 
   const agents = React.useMemo<AgentActivityCandidate[]>(
     () => (managedAgentsQuery.data ?? []).filter(isManagedAgentActive),
@@ -80,6 +99,20 @@ export function AgentActivityPanel({
   const selectedAgent =
     agents.find((agent) => agent.pubkey === resolvedPubkey) ?? null;
 
+  const showRaw = rawState.pubkey === resolvedPubkey && rawState.show;
+  const activeTurns = React.useMemo(
+    () =>
+      resolvedPubkey
+        ? activeChannelTurns
+            .filter((channel) => channel.agentPubkeys.includes(resolvedPubkey))
+            .map((channel) => ({
+              anchorAt: channel.anchorAt,
+              channelId: channel.channelId,
+            }))
+        : [],
+    [activeChannelTurns, resolvedPubkey],
+  );
+
   return (
     <AuxiliaryPanel
       canResetWidth={canResetWidth}
@@ -89,6 +122,18 @@ export function AgentActivityPanel({
             <AuxiliaryPanelTitle>Agent activity</AuxiliaryPanelTitle>
           </AuxiliaryPanelHeaderGroup>
           <AuxiliaryPanelHeaderActions>
+            {selectedAgent ? (
+              <AgentActivitySettingsMenu
+                activeTurns={activeTurns}
+                agentName={selectedAgent.name}
+                agentPubkey={selectedAgent.pubkey}
+                channelNameFor={channelNameFor}
+                onShowRawChange={(next) =>
+                  setRawState({ pubkey: resolvedPubkey, show: next })
+                }
+                showRaw={showRaw}
+              />
+            ) : null}
             <Button
               aria-label="Close agent activity"
               data-testid="agent-activity-panel-close"
@@ -136,6 +181,7 @@ export function AgentActivityPanel({
                 emptyDescription="This agent has not started a turn yet."
                 key={selectedAgent.pubkey}
                 profiles={profiles}
+                showRaw={showRaw}
               />
             ) : null}
           </div>
