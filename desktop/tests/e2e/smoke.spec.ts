@@ -96,7 +96,7 @@ test("loads the app shell with mocked channels", async ({ page }) => {
 async function chooseSharedComputeProvider(
   page: import("@playwright/test").Page,
 ) {
-  await page.getByRole("tab", { name: "Customize for this agent" }).click();
+  await page.getByTestId("agent-ai-configuration-mode-custom").click();
   const provider = page.locator("#persona-llm-provider");
   await expect(provider).toBeVisible({ timeout: 10_000 });
   await provider.press("Enter");
@@ -149,7 +149,7 @@ test("ABY shared compute explains automatic model selection", async ({
       ),
     )
     .toContain("discover_agent_models");
-  await expect(page.locator("#persona-model")).toContainText("Automatic");
+  await expect(page.locator("#persona-model")).toHaveValue("Automatic");
   await expect(
     page.getByText(
       "Auto uses Mesh collective intelligence when two or more models stay available, otherwise it chooses one available model.",
@@ -171,7 +171,7 @@ test("create agent persists ABY shared compute with auto model", async ({
   await chooseSharedComputeProvider(page);
 
   const model = page.locator("#persona-model");
-  await expect(model).toContainText("Automatic");
+  await expect(model).toHaveValue("Automatic");
   await page.getByTestId("persona-dialog-submit").click();
   const createdToast = page
     .locator("[data-sonner-toast][data-removed='false']")
@@ -220,7 +220,7 @@ test("create agent supports parallelism and system prompt overrides", async ({
 
   // The buzz-agent runtime auto-selects once the ACP runtime catalog loads;
   // Customize reveals the per-agent LLM provider and model fields.
-  await page.getByRole("tab", { name: "Customize for this agent" }).click();
+  await page.getByTestId("agent-ai-configuration-mode-custom").click();
   const llmProvider = page.locator("#persona-llm-provider");
   await expect(llmProvider).toBeVisible({ timeout: 10_000 });
   await llmProvider.press("Enter");
@@ -230,7 +230,7 @@ test("create agent supports parallelism and system prompt overrides", async ({
   const model = page.locator("#persona-model");
   await model.click();
   await page
-    .getByRole("button", { name: "Custom model...", exact: true })
+    .getByRole("option", { name: "Custom model...", exact: true })
     .click();
   await page.getByLabel("Custom model ID").fill("claude-opus-4-5");
   await page.getByLabel("Anthropic API Key").fill("sk-test-api-key-for-e2e");
