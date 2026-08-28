@@ -304,8 +304,13 @@ funcionalidad de usuario, no un test:
 
 - **1121 testids, 7597 `getByTestId`, 156 specs** — y **ni `just ci` ni
   `just check` corren Playwright**. Solo CI, en 6 shards.
-- **0 `toHaveScreenshot`**: no hay regresión visual de píxeles. Espaciado,
-  pesos, sombras y radios pueden cambiar en toda la app sin fallar nada.
+- **Casi no hay regresión visual de píxeles.** Cero `toHaveScreenshot` — pero
+  eso no es lo mismo que cero comparación de píxeles: `workflow-local-controls.spec.ts:148`
+  usa `toMatchSnapshot` sobre un Buffer PNG
+  (`workflow-template-variable-autocomplete-smoke-darwin.png`), que sí compara
+  imagen contra imagen. Es la única, y ya está desactualizada respecto de la
+  base. Fuera de ella, espaciado, pesos, sombras y radios pueden cambiar en
+  toda la app sin fallar nada.
 - **153 `toHaveClass` sobre clases Tailwind literales** (`h-11`, `rounded-xl`,
   `-ml-5`, `bg-emerald-500`, `grid-flow-col`, `line-clamp-3`) y **98
   `.locator(".clase")`**, incluidos `.font-semibold`, `.truncate`, `.sr-only` y

@@ -58,11 +58,26 @@
 /* Unlayered on purpose: beats HeroUI's `layer(theme)` defaults without
    `!important`, the same trick theme.css uses for the Buzz sidebar gradient. */
 :root {
-  /* Surfaces */
+  /* Surfaces.
+   *
+   * The `-secondary` and `-tertiary` steps are not optional extras: left
+   * unmapped they keep HeroUI's own oklch, and `--surface-secondary`'s
+   * `oklch(0.9524 0.0013 286.37)` is exactly the `rgb(240, 240, 240)` that
+   * turned up in a failing tooltip assertion — a foreign grey with no relation
+   * to any of the app's 61 themes, leaking through whichever utility names it. */
   --surface: var(--card);
   --surface-foreground: var(--card-foreground);
+  --surface-secondary: var(--muted);
+  --surface-secondary-foreground: var(--foreground);
+  --surface-tertiary: var(--secondary);
+  --surface-tertiary-foreground: var(--secondary-foreground);
   --overlay: var(--popover);
   --overlay-foreground: var(--popover-foreground);
+
+  /* Segmented surfaces and the two status colours the app does own. */
+  --segment: var(--muted);
+  --segment-foreground: var(--muted-foreground);
+  --warning: var(--ui-warning);
 
   /* Neutral action — HeroUI's `default` is a button surface, i.e. `secondary` */
   --default: var(--secondary);
