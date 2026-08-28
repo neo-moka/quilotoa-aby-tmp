@@ -623,6 +623,120 @@ tests dan verde sobre código previo.
 archivos `.tsx`). `pulse` y `terminal` no emiten ninguno. Ahí una regresión
 pasa entera sin ser detectada — hay que verificar a mano.
 
+## 6quinquies. El shell no adopta Pro — cuatro veredictos con su evidencia
+
+Resultado del lote del shell (`app-layout`, `navbar`, `sidebar`, `command`,
+`resizable`). Verificado contra el `dist` realmente instalado de
+`@heroui-pro/react@1.0.0-beta.8`, no contra la documentación del MCP —  que en
+dos puntos no coincide con el código (abajo).
+
+### El número que decide tres de los cuatro
+
+`theme.css` tiene **67 selectores `[data-testid]`, y los 13 testids distintos
+son todos del shell**. No es una concentración: es el total.
+
+| Ocurrencias | testid |
+|---|---|
+| 36 | `app-sidebar` |
+| 10 | `settings-sidebar` |
+| 5 | `sidebar-pinned-header` |
+| 4 | `open-search` |
+| 2 c/u | `stream-list`, `starred-list`, `dm-list` |
+| 1 c/u | `sidebar-profile-card`, `sidebar-primary-menu`, `community-rail`, `app-top-chrome`, `global-back`, `global-forward` |
+
+Encima hay **27 selectores `[data-sidebar="…"]`** sobre siete valores:
+`sidebar` (6), `menu-button` (7), `menu-sub-button` (5), `footer` (5),
+`group-label` (2), `menu-item` (1), `trigger` (1).
+
+### `sidebar` — no se adopta
+
+El Sidebar de Pro emite otro vocabulario. Barrido sobre
+`node_modules/@heroui-pro/react/dist/components/sidebar/sidebar.js`:
+
+```
+data-sidebar : "label", "menu", "provider"          ← los tres únicos valores
+data-slot    : "sidebar-menu-item", "sidebar-menu-label", … (28 valores)
+```
+
+**Intersección con los siete valores que consume `theme.css`: vacía.** No es
+que el tema corra riesgo de perderse en algún nodo — se pierden los 27
+selectores de una vez, y el resultado sigue siendo "visible", así que ningún
+gate lo ve.
+
+Y no sería un cambio de marcado sino de modelo: `Sidebar.Menu` es un `Tree` de
+RAC y `Sidebar.MenuItem` un `TreeItem` (colección, con su propio pase oculto en
+`<template>` — §4). El sidebar de esta app tiene filas ordenables con dnd-kit,
+context menu por fila y secciones reordenables; nada de eso sobrevive al modelo
+de colección.
+
+Detalle menor pero real: acá el atajo es `SIDEBAR_KEYBOARD_SHORTCUT = "s"`;
+`Sidebar.Provider` de Pro trae `toggleShortcut: "mod+b"` por defecto. Cambiaría
+en silencio.
+
+### `app-layout` — no se adopta, y no es una decisión independiente
+
+La documentación es explícita: *"Under the hood `AppLayout` renders a
+`Sidebar.Provider`"* y *"Do not wrap `AppLayout` with your own
+`Sidebar.Provider`"*. Adoptarlo **obliga** a adoptar el Sidebar de Pro, o sea el
+veredicto anterior. Además `AppShell.tsx` monta `CommunityRail` y
+`AppHuddleShell` por fuera del provider, una topología que el scaffold no
+modela.
+
+### `navbar` — no se adopta porque no hay navbar
+
+`AppTopChrome.tsx` no es navegación: es la barra de título de la ventana Tauri
+(`data-tauri-drag-region`, padding en px para despejar los semáforos de macOS,
+y el portal `#app-top-chrome-content`). Meterlo en un landmark `<nav>` empeora
+la a11y, y los atributos de arrastre tienen que caer en nodos concretos que el
+compound de Pro no expone.
+
+### `resizable` — no se adopta para el rail, y trae dos trampas para todos
+
+Hoy hay tres resizers a mano y ninguno usa `react-resizable-panels` (que está
+en `package.json` **sin un solo import**: entró como peer requerido de Pro):
+`SidebarRail` en `sidebar.tsx`, `useThreadPanelWidth.ts` +
+`AuxiliaryPanelShell.tsx` (5 consumidores) y `useResizableInboxListWidth.ts`.
+
+Leyendo `dist/components/resizable/resizable.js` y su `.d.ts`, dos cosas que
+valen para cualquier lote que toque este componente:
+
+1. **`Resizable.Panel` y `Resizable.Handle` no hacen spread del resto de las
+   props.** No es la allowlist de `filterDOMProps` (§3): directamente no existe
+   un `...rest` en la firma. Un `data-testid` o un `ref` puesto sobre un Panel o
+   un Handle **se descarta sin error ni aviso de tipos**.
+2. **`onDragging` está documentado en la API de `Resizable.Handle` y no existe
+   en la implementación** — cero ocurrencias en el `.js` y en el `.d.ts`. Quien
+   lo pase se come un no-op silencioso.
+
+   Menor: la doc llama `onLayout` a la prop del root; el código destructura
+   `onLayoutChange`.
+
+Para el rail en concreto, además se perdería el imán a 300px con háptica
+(`performSidebarDefaultHaptic`), el atributo `data-sidebar="rail"` y el
+contrato `--sidebar-width` en px que leen ~10 clases Tailwind — Pro maneja los
+tamaños como porcentaje interno, no como variable CSS.
+
+### `command` — el único hueco real, y queda abierto
+
+No hay paleta de comandos. Cmd+K vive en
+`app/useAppShellKeyboardShortcuts.ts:73` y abre
+`features/search/ui/TopbarSearch.tsx`, un `Dialog` de Radix con listbox propio.
+`Command` de Pro aportaría fuzzy search, navegación por teclado y grupos.
+
+Queda sin hacer por alcance, no por veredicto: el archivo es de
+`features/search`, está en **999 de 1000 líneas** (no admite una línea más sin
+partirlo) y un diálogo pisa el lote de overlays. El trigger `open-search` no lo
+afecta un cambio de diálogo.
+
+### Un riesgo de runtime que no estaba anotado en §6bis
+
+`projectsSectionMeta.ts:31` no solo lee el testid: hace
+`querySelector<HTMLButtonElement>('[data-testid="open-search"]')?.click()`. O
+sea que `open-search` tiene que seguir siendo **un `<button>` nativo**, no solo
+existir. Si un componente lo re-emite sobre un `div` con `role="button"`, el
+tipo resuelve a `null` y el botón de búsqueda de la toolbar de Projects deja de
+hacer nada, sin error en consola.
+
 ## 7. Reglas duras para todo agente de este trabajo
 
 1. **No se toca `crates/`, el relay, el CLI ni ningún contrato de API o de
