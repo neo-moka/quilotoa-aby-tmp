@@ -90,6 +90,14 @@ export function NsecMaskedDisplay({
   // explicit break opportunity the masked key overflows its container. The mask
   // is decorative and non-selectable, and copy uses the raw nsec, so the
   // injected ZWSP is never surfaced.
+  //
+  // The two states wrap by different means, and both are needed: the mask by
+  // its ZWSPs, the revealed key by `break-all` on the paragraph. An nsec is 63
+  // unbroken characters, so without that class its min-content width is the
+  // whole string — and `AlertDialogContent` is a grid, whose items default to
+  // `min-width: auto`, so that width pushes the track past `max-w-md` and the
+  // dialog's description, checkbox and buttons all spill out of the panel.
+  // Revealing the key was enough to do it; the masked state hid the bug.
   const maskedNsec = React.useMemo(
     () => Array.from(nsec, () => "•").join("\u200b"),
     [nsec],
@@ -118,7 +126,9 @@ export function NsecMaskedDisplay({
         <div className="min-w-0 flex-1">
           <p
             className={`${
-              isBare ? ONBOARDING_KEY_TEXT_CLASS : "text-xs leading-5"
+              isBare
+                ? ONBOARDING_KEY_TEXT_CLASS
+                : "break-all [overflow-wrap:anywhere] text-xs leading-5"
             } ${
               isRevealed
                 ? `select-text ${isBare ? "" : "text-foreground"}`
