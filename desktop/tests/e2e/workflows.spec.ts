@@ -15,6 +15,30 @@ async function navigateToWorkflows(page: import("@playwright/test").Page) {
   await expect(page.getByTestId("workflows-view")).toBeVisible();
 }
 
+/**
+ * Addresses a HeroUI switch by its field wrapper so it can be clicked.
+ *
+ * `role="switch"` sits on the visually hidden input React Aria renders inside
+ * `VisuallyHidden` (`clip-path: inset(50%)`, 1x1px). The clip takes that input
+ * out of hit-testing, so Playwright's "receives pointer events" check never
+ * settles on it and `.click()` times out. The field `div` is what a user
+ * actually clicks. Scoping by the inner role keeps the accessible name as the
+ * thing being selected on; `WorkflowCard`'s `Switch` has no `data-testid` to
+ * use instead.
+ *
+ * Assertions may keep targeting the input directly — it is a native checkbox,
+ * so `toBeChecked()` still reads correctly there.
+ */
+function workflowSwitchField(
+  page: import("@playwright/test").Page,
+  scope: import("@playwright/test").Locator,
+  name: string,
+) {
+  return scope
+    .locator('[data-slot="switch"]')
+    .filter({ has: page.getByRole("switch", { name }) });
+}
+
 async function selectWorkflowChannel(
   page: import("@playwright/test").Page,
   dialog: import("@playwright/test").Locator,
@@ -374,12 +398,12 @@ test("enables and disables a workflow from its card status toggle", async ({
     name: "Disable workflow",
   });
   await expect(disable).toBeChecked();
-  await disable.click();
+  await workflowSwitchField(page, workflowCard(), "Disable workflow").click();
   const enable = workflowCard().getByRole("switch", {
     name: "Enable workflow",
   });
   await expect(enable).not.toBeChecked();
-  await enable.click();
+  await workflowSwitchField(page, workflowCard(), "Enable workflow").click();
   const activationConfirmation = page.getByRole("alertdialog", {
     name: "This workflow may run often",
   });
@@ -437,7 +461,7 @@ test("rejects a stale card toggle without overwriting a newer edit", async ({
     });
   }, workflowName);
 
-  await workflowCard.getByRole("switch", { name: "Disable workflow" }).click();
+  await workflowSwitchField(page, workflowCard, "Disable workflow").click();
 
   await expect(
     page
@@ -477,7 +501,7 @@ test("reports a rejected workflow status change", async ({ page }) => {
     .locator('[data-testid^="workflow-card-"]')
     .filter({ hasText: workflowName })
     .first();
-  await workflowCard.getByRole("switch", { name: "Disable workflow" }).click();
+  await workflowSwitchField(page, workflowCard, "Disable workflow").click();
 
   const errorToast = page
     .locator("[data-sonner-toast][data-removed='false']")
