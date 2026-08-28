@@ -1,6 +1,7 @@
 import * as React from "react";
 
 import { useAppNavigation } from "@/app/navigation/useAppNavigation";
+import { AgentActivityPanel } from "@/features/agents/ui/AgentActivityPanel";
 import { usePersonasQuery } from "@/features/agents/hooks";
 import { useOpenDmMutation } from "@/features/channels/hooks";
 import {
@@ -32,6 +33,8 @@ type ProfilePanelTarget =
   | { kind: "persona"; persona: AgentPersona };
 
 const AGENTS_PROFILE_SEARCH_KEYS = [
+  "activity",
+  "activityAgent",
   "profile",
   "profilePersona",
   "profileTab",
@@ -66,9 +69,33 @@ export function AgentsScreen() {
   const openDmMutation = useOpenDmMutation();
   const { goChannel } = useAppNavigation();
 
+  // The activity panel and the profile panel are both the right pane, so
+  // opening either closes the other rather than stacking two panels.
+  const isActivityPanelOpen = values.activity === "1";
+
+  const handleOpenActivityPanel = React.useCallback(() => {
+    applyPatch({
+      activity: "1",
+      profile: null,
+      profilePersona: null,
+      profileTab: null,
+      profileView: null,
+    });
+  }, [applyPatch]);
+
+  const handleCloseActivityPanel = React.useCallback(() => {
+    applyPatch({ activity: null, activityAgent: null });
+  }, [applyPatch]);
+
+  const handleSelectActivityAgent = React.useCallback(
+    (pubkey: string) => applyPatch({ activityAgent: pubkey }),
+    [applyPatch],
+  );
+
   const handleOpenProfilePanel = React.useCallback(
     (pubkey: string, options?: ProfilePanelOpenOptions) => {
       applyPatch({
+        activity: null,
         profile: pubkey,
         profilePersona: null,
         profileTab: options?.tab === "info" ? null : (options?.tab ?? null),
@@ -124,8 +151,19 @@ export function AgentsScreen() {
       <div className="relative flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden">
         <div className="flex min-h-0 min-w-0 flex-1 flex-row overflow-hidden">
           <React.Suspense fallback={<ViewLoadingFallback kind="agents" />}>
-            <AgentsView />
+            <AgentsView onOpenActivityPanel={handleOpenActivityPanel} />
           </React.Suspense>
+          {isActivityPanelOpen ? (
+            <AgentActivityPanel
+              canResetWidth={threadPanelWidth.canReset}
+              onClose={handleCloseActivityPanel}
+              onResetWidth={threadPanelWidth.onResetWidth}
+              onResizeStart={threadPanelWidth.onResizeStart}
+              onSelectAgent={handleSelectActivityAgent}
+              selectedPubkey={values.activityAgent ?? null}
+              widthPx={threadPanelWidth.widthPx}
+            />
+          ) : null}
           {profilePanelTarget ? (
             <UserProfilePanel
               canResetWidth={threadPanelWidth.canReset}

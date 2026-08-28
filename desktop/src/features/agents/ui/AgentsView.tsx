@@ -1,5 +1,5 @@
 import * as React from "react";
-import { EllipsisVertical, OctagonX, Settings2 } from "lucide-react";
+import { EllipsisVertical, OctagonX, Radio, Settings2 } from "lucide-react";
 import {
   consumePendingSnapshotImport,
   subscribeSnapshotImport,
@@ -37,7 +37,12 @@ import {
 import { PageHeader } from "@/shared/ui/PageHeader";
 import { getInheritedAgentDefaults } from "./bakedEnvHelpers";
 
-export function AgentsView() {
+export function AgentsView({
+  onOpenActivityPanel,
+}: {
+  /** Opens the right-side agent activity panel. Omitted, the button hides. */
+  onOpenActivityPanel?: () => void;
+}) {
   const { openPersonaProfilePanel, openProfilePanel } = useProfilePanel();
   const { globalConfig } = useGlobalAgentConfig();
   const { data: bakedEnv } = useBakedBuildEnvQuery({ enabled: true });
@@ -137,6 +142,17 @@ export function AgentsView() {
             action={
               <>
                 <div className="flex flex-wrap justify-end gap-2 [@container(max-width:40rem)]:hidden">
+                  {onOpenActivityPanel ? (
+                    <Button
+                      data-testid="open-agent-activity-panel"
+                      onClick={onOpenActivityPanel}
+                      size="sm"
+                      variant="outline"
+                    >
+                      <Radio />
+                      Activity
+                    </Button>
+                  ) : null}
                   <Button
                     data-testid="agent-defaults-button"
                     ref={fullAiDefaultsTriggerRef}
