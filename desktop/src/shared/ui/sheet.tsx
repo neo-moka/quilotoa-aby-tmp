@@ -9,6 +9,14 @@ import { cn } from "@/shared/lib/cn";
 import { useTheme } from "@/shared/theme/ThemeProvider";
 import { MODAL_BACKDROP_BLUR_CLASS } from "@/shared/ui/modalBackdrop";
 
+/**
+ * Still Radix, and the smallest of the four wrappers to move: two consumers,
+ * and its single focus override (`ProjectsView.tsx:968`, forwarded through
+ * `ProjectsOverviewContextSheet`) redirects focus rather than suppressing it,
+ * which React Aria can express. Nothing here has `popover.tsx`'s dismissal
+ * problem — a sheet is modal, and so is React Aria's `Modal`. See
+ * `docs/heroui-migration/component-map.md` §6ter.
+ */
 const Sheet = SheetPrimitive.Root;
 
 const SheetTrigger = SheetPrimitive.Trigger;

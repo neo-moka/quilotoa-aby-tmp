@@ -16,6 +16,16 @@ import {
   MODAL_OVERLAY_MOTION_CLASS,
 } from "@/shared/ui/modalMotion";
 
+/**
+ * Still Radix, but unlike `popover.tsx` nothing here is blocked: a Radix dialog
+ * is modal and so is React Aria's `ModalOverlay`, so dismissal, focus
+ * containment and Escape all line up. The one focus override this file has
+ * (`AgentDefaultsDialog.tsx:122`) redirects focus rather than suppressing it,
+ * which React Aria can express. What it needs is to move together with
+ * `dialog.tsx`, because `modalMotion.ts` cannot serve Radix's `data-state` and
+ * React Aria's `data-entering`/`data-exiting` at once. See
+ * `docs/heroui-migration/component-map.md` §6ter.
+ */
 const AlertDialog = AlertDialogPrimitive.Root;
 const AlertDialogTrigger = AlertDialogPrimitive.Trigger;
 const AlertDialogPortal = AlertDialogPrimitive.Portal;
