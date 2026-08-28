@@ -72,6 +72,33 @@ No alcanza con renombrar imports.
 
 ### `asChild` → composición
 
+#### Inventario de `sidebar.tsx`
+
+Vivía como comentario de 17 líneas dentro del archivo, que ya estaba en el
+techo de 1000 líneas y **hacía fallar el ratchet de tamaño**. Se movió acá; el
+archivo conserva un puntero de una línea.
+
+Cinco componentes declaran `asChild` y **solo `SidebarGroupLabel` tiene sitios
+de llamada** — cinco: `CustomChannelSection` (×2), `SidebarProjectsSection`,
+`SidebarSection` y `sidebarLoadingSkeleton`.
+
+La prop está muerta en `SidebarMenuButton` (5 consumidores) y
+`SidebarMenuAction` (1), y **se conserva a propósito**: esto es shadcn
+vendorizado, donde `<SidebarMenuButton asChild><a … /></SidebarMenuButton>` es
+la forma documentada upstream de renderizar una fila como link. Sacarla no gana
+nada en runtime —es código muerto, se tree-shakea— y rompe al próximo que siga
+la doc de upstream.
+
+`SidebarMenuSubButton` no tiene ningún sitio de llamada, pero **se conserva**:
+`theme.css` tiene cinco reglas apuntando a su `data-sidebar="menu-sub-button"`.
+
+`SidebarGroupAction` **se eliminó**: cero sitios de llamada y su
+`data-sidebar="group-action"` no lo lee ninguna regla de `theme.css`, así que
+no dejó CSS huérfano.
+
+`Slot` se queda en este archivo pase lo que pase con la migración a HeroUI —
+igual que en `button.tsx`, `card.tsx` y `attachment.tsx`. Ver §6quater.
+
 Radix usa `Slot` para fusionar props en un hijo arbitrario. HeroUI/react-aria
 no tiene ese patrón.
 
