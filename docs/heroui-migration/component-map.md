@@ -157,7 +157,7 @@ Lotes independientes, un agente cada uno:
 
 | Lote | Archivos | Notas |
 |---|---|---|
-| **A — Overlays** | `dialog.tsx`, `alert-dialog.tsx`, `sheet.tsx`, `popover.tsx` | **BLOQUEADO — se conserva Radix. Ver §6ter.** React Aria no puede expresar el control de foco del que dependen 34 sitios de llamada. |
+| **A — Overlays** | `dialog.tsx`, `alert-dialog.tsx`, `sheet.tsx`, `popover.tsx` | **BLOQUEADO — se conserva Radix. Ver §6ter.** El foco sí tiene salida; lo que no la tiene es el descarte del popover no-modal. La familia modal es el candidato para un próximo intento. |
 | **B — Menús** | `dropdown-menu.tsx`, `context-menu.tsx` | `context-menu` viene de Pro, no de OSS. |
 | **C — Controles de formulario** | `switch.tsx`, `checkbox.tsx`, `toggle.tsx`, `input.tsx`, `textarea.tsx` | |
 | **D — Display** | `tooltip.tsx`, `avatar.tsx`, `separator.tsx`, `badge.tsx`, `card.tsx`, `skeleton.tsx` | El más mecánico. |
@@ -167,98 +167,176 @@ Lotes independientes, un agente cada uno:
 
 Los lotes A–E y G son paralelos entre sí. F depende de todos.
 
-## 6ter. El control de foco no tiene equivalente en React Aria
+## 6ter. Los overlays se quedan en Radix — el motivo, re-auditado
 
-Resultado del Lote A. **Los cuatro overlays se conservan en Radix.** No es una
-preferencia: es una capacidad que la librería no expone.
+Resultado del Lote A, verificado dos veces. La segunda pasada leyó el código
+realmente instalado (`react-aria@3.51.0`, `react-aria-components@1.20.0`,
+`@heroui/react@3.2.4`), no esta documentación. **La decisión se sostiene, pero
+el motivo que estaba escrito acá era incorrecto**, y el motivo real es otro.
 
-### Lo que Radix da y React Aria no
+### Punto por punto contra lo instalado
 
-`Dialog.Content` de Radix emite dos eventos cancelables — `onOpenAutoFocus` y
-`onCloseAutoFocus` — que permiten decir "abrí este overlay **sin** mover el
-foco" y "cerralo **sin** devolver el foco al trigger". React Aria no tiene
-ninguno de los dos, y no por omisión de la API pública:
+| Afirmación del veredicto anterior | Verificado en | Resultado |
+|---|---|---|
+| `Overlay` envuelve todo en un `FocusScope` con `restoreFocus: true` hardcodeado | `react-aria/dist/private/overlays/Overlay.mjs:44-47` | **Confirmado.** |
+| `Modal` nunca reenvía `disableFocusManagement` | `react-aria-components/dist/private/Modal.mjs:139-141` | **Confirmado** — pasa solo `isExiting` y `portalContainer`. |
+| `Popover` tampoco lo reenvía | `react-aria-components/dist/private/Popover.mjs:206-210` y `227-231` | **Falso.** Hace `{...props}` sobre `Overlay`: cualquier prop puesta en el `Popover` llega. `PopoverContent` de HeroUI también hace `{...props}` (`@heroui/react/dist/components/popover/popover.js:38-60`). |
+| `Dialog` usa `useDialog`, que mueve el foco al montar sin opt-out | `Dialog.mjs:91` → `react-aria/dist/private/dialog/useDialog.mjs:32-34` | **Confirmado.** |
 
-| Verificado en | Qué dice |
-|---|---|
-| `react-aria/dist/private/overlays/Overlay.mjs` | Todo overlay se envuelve en `FocusScope` con **`restoreFocus: true` hardcodeado**. El único escape es `disableFocusManagement`. |
-| `react-aria-components/dist/private/Modal.mjs` | Llama a `Overlay` pasando solo `isExiting` y `portalContainer`. Nunca `disableFocusManagement`. |
-| `react-aria-components/dist/private/Popover.mjs:206,228` | Igual: solo pasa `shouldContainFocus`. Nunca `disableFocusManagement`. |
-| `react-aria-components/dist/private/Dialog.mjs` | Usa `useDialog`, que mueve el foco al montar. Sin prop de opt-out. |
+Y `disableFocusManagement` no es un resquicio privado: está documentado en
+`OverlayProps` (`react-aria/dist/types/src/overlays/Overlay.d.ts:16`) y la
+propia React Aria lo compone dentro de `popoverProps` para los submenús
+(`react-aria/dist/types/src/menu/useSubmenuTrigger.d.ts:46`). Es el camino
+previsto.
 
-HeroUI construye `Modal`, `AlertDialog`, `Drawer` y `Popover` sobre esos
-componentes, así que hereda el hueco entero. No hay prop, contexto ni render
-prop que lo puentee.
+**O sea: el hueco de foco del popover sí tiene salida, y funciona.** Se
+implementó completo: un `popover.tsx` sobre `PopoverContent` de HeroUI que pasa
+`disableFocusManagement`, no renderiza un `Dialog` de React Aria adentro (para
+que su `isDialog` quede en falso y `Popover.mjs:133` no llame a `focusSafely`),
+y reimplementa el contrato de Radix a mano. Con eso los 18
+`onOpenAutoFocus={e => e.preventDefault()}` siguen funcionando y el caret se
+queda en el composer — comprobado, no supuesto.
 
-### Cuánto pesa
+### El bloqueo real: el popover no-modal de React Aria no se descarta
 
-Sitios de llamada que hoy dependen de esos dos eventos, por wrapper:
+Destrabado el foco aparece lo que el intento anterior no llegó a ver.
+`usePopover` **deriva** la capacidad de descarte del modo, no la recibe:
+
+```
+react-aria/dist/private/overlays/usePopover.mjs:31
+  isDismissable: !isNonModal || isSubmenu
+```
+
+- **Con `isNonModal`** — que es el equivalente al default de Radix y lo que usan
+  los 34 sitios — `isDismissable` queda en falso, así que `useInteractOutside`
+  no se cablea y **un click afuera no cierra el popover**. Y el Escape de
+  `useOverlay` viaja en `keyboardProps` sobre el elemento del overlay
+  (`useOverlay.mjs:60-70`), o sea que **solo dispara con el foco adentro** —
+  exactamente lo que los 18 sitios del composer evitan. Verificado en jsdom: ni
+  un `pointerdown` afuera ni un Escape desde el composer producen un solo
+  `onOpenChange`.
+- **Sin `isNonModal`**, `usePopover` aplica `usePreventScroll` y
+  `ariaHideOutside([...], { shouldUseInert: true })` (`usePopover.mjs:43-52`):
+  **el composer queda inerte** mientras el emoji picker está abierto. Peor.
+
+No hay tercera opción; `isDismissable` no es una prop.
+
+### Y una diferencia que no se tapa desde afuera
+
+Un popover no-modal de React Aria **se cierra al scrollear cualquier ancestro
+del trigger** (`useCloseOnScroll.mjs:23-36`, cableado desde `usePopover.mjs:41`).
+Radix reposiciona y lo deja abierto. En un cliente de chat eso significa que el
+picker de reacciones se cierra solo cuando llega un mensaje y el timeline hace
+auto-scroll.
+
+### Por qué eso decide
+
+Para conservar el comportamiento habría que dejar a React Aria solo como motor
+de posicionamiento y que el wrapper se hiciera cargo de: el foco de apertura y
+de cierre, el Escape con su pila de capas, el descarte por pointer afuera con
+su predicado, el descarte por foco afuera, y encima suprimir el cierre por
+scroll que React Aria hace por su cuenta. Eso es reimplementar
+`DismissableLayer` y `FocusScope` de Radix arriba de un posicionador: **más**
+código de interacción propio que el wrapper que reemplaza, sobre la superficie
+más usada de la app, sin browser para validarlo.
+
+**Los cuatro overlays se quedan en Radix.**
+
+### Cuánto pesa el contrato que hay que conservar
 
 | Wrapper | `onOpenAutoFocus` | `onCloseAutoFocus` | `onInteractOutside` | Consumidores |
 |---|---|---|---|---|
-| `popover.tsx` | 17 | 8 | 6 | 34 |
-| `dialog.tsx` | 3 | 3 | — | 60 |
-| `sheet.tsx` | — | 2 | — | 2 |
+| `popover.tsx` | 18 | 8 | 6 | 34 |
+| `dialog.tsx` | 5 (3 directos + 2 vía `ChooserDialogContent`) | 3 | — | 59 |
 | `alert-dialog.tsx` | — | 1 | — | 30 |
+| `sheet.tsx` | — | 1 (reenviada desde `ProjectsView`) | — | 2 |
+| `DialogPrimitive` directo | — | — | 3 | 3 |
 
-**34 sitios sin traducción posible.** No son detalles cosméticos: el patrón
-`onOpenAutoFocus={e => e.preventDefault()}` es lo que mantiene el foco y el
-caret en el composer mientras se abre un popover. Si el foco se va, el emoji
-picker, las menciones y los tres combobox de typeahead **dejan de aceptar
-teclado** — no se degradan, se rompen.
+`onInteractOutside` **sí** es mapeable a `shouldCloseOnInteractOutside(element)
+=> boolean` (`AriaPopoverProps`), con otra forma: un predicado sobre el
+elemento en vez de un evento cancelable. Los 9 sitios lo permiten — todos son
+predicados puros sobre el target.
 
-`onInteractOutside` sí es mapeable a `shouldCloseOnInteractOutside(element) =>
-boolean` (`AriaPopoverProps`), pero con otra forma: es un predicado sobre el
-elemento, no un evento cancelable.
+### La red que faltaba ya existe
 
-### Por qué esto no lo agarra ningún comando
+El veredicto anterior decía, con razón, que ningún comando agarra esto: `just
+ci` no corre Playwright y no había una sola aserción de foco en los specs. Eso
+ya no es cierto: `desktop/src/shared/ui/popoverFocusContract.test.mjs` corre en
+`pnpm test` (jsdom) y pinea las cinco piezas del contrato — abrir con el evento
+cancelado deja el caret donde estaba, abrir sin cancelarlo enfoca el primer
+control de adentro, cerrar devuelve el foco al trigger, cancelar el cierre no lo
+mueve, y un popover que nunca tomó el foco igual se cierra con Escape y con un
+click afuera. **Cualquier port futuro que rompa el composer o deje un popover
+sin descartar ahora falla en `pnpm test`.** Ese archivo es el punto de partida
+del próximo intento, no esta sección.
 
-Ni `just ci` ni `just check` corren Playwright, no hay `toHaveScreenshot`, y no
-hay una sola aserción de foco en los 156 specs. Un overlay migrado que roba el
-foco **pasa typecheck, lint, build y CI en verde** y se rompe recién en las
-manos del usuario. Por eso la decisión se toma leyendo el upstream y no
-esperando que falle algo.
+(Detalle del arnés, porque cuesta media hora encontrarlo: Node trae sus propios
+globals `CustomEvent`/`Event`, el loop que espeja `dom.window` sobre
+`globalThis` saltea lo que ya existe, y jsdom rechaza como ajenos los eventos
+que Radix construye. Hay que asignar los dos explícitamente.)
 
-### Lo que sí encaja, para cuando se destrabe
+### La familia modal es otra historia, y mejor
 
-- `AlertDialog` de HeroUI **sí emite `role="alertdialog"`**
-  (`@heroui/react/dist/components/alert-dialog/alert-dialog.js:154`), así que
-  las 48 aserciones sobre ese rol sobrevivirían. Es el candidato más limpio:
-  **29 de sus 30 consumidores no tocan el foco.** El único que lo hace es
-  `AgentDefaultsDialog.tsx:122`, y no hace `preventDefault` a secas — redirige
-  el foco a un botón concreto. Si algún día se resuelve el hueco de foco,
-  empezar por acá.
-- `ChannelManagementSheet.tsx` tiene un bloqueo aparte: en split layout
-  renderiza su panel **sin portal y no-modal**, para quedar acoplado al flujo
-  del layout. El `Overlay` de React Aria siempre hace `createPortal`.
+Vale la pena registrarlo porque contradice lo que decía la versión anterior de
+esta sección. Los overrides de foco de `dialog.tsx`, `alert-dialog.tsx` y
+`sheet.tsx` son nueve, y **los nueve redirigen el foco; ninguno lo suprime**:
 
-### Migrar `AlertDialog` solo: evaluado y descartado
+- Apertura (`ChannelBrowserDialog.tsx:423`, `MembersSidebar.tsx:716`,
+  `TopbarSearch.tsx:970`, `PersonaCatalogDialog.tsx:202`,
+  `HarnessCatalogDialog.tsx:133`) — todos hacen `preventDefault()` y después
+  enfocan un ref de adentro del diálogo. React Aria lo expresa: `useDialog`
+  **no** mueve el foco si ya hay foco adentro (`useDialog.mjs:33`), así que un
+  hijo con `autoFocus` gana. La única rama sin redirección es
+  `ChannelBrowserDialog.tsx:423` en modo `create`; ahí React Aria enfocaría el
+  contenedor del diálogo, que es el default correcto de accesibilidad y no
+  rompe el teclado.
+- Cierre (`AgentDefaultsDialog.tsx:83` y `:122`,
+  `CommunityOnboardingFlow.tsx:638`, `TopbarSearch.tsx:974`,
+  `ProjectsView.tsx:968` vía `ProjectsOverviewContextSheet`) — todos enfocan un
+  elemento concreto en vez del trigger. Eso es el mismo shim que el Lote B ya
+  tiene funcionando en `dropdown-menu.tsx:88-103`: parkear el foco fuera del
+  scope antes del desmontaje hace que `FocusScope` saltee su restore.
 
-Se consideró migrar únicamente `alert-dialog.tsx`, por ser el de mejor encaje.
-**Se decidió que no.** Queda registrado para que no se re-litigue:
+Además, a diferencia del popover, acá los modos coinciden: un diálogo de Radix
+es modal, y `ModalOverlay` de React Aria es modal, con descarte por click
+afuera y Escape que funcionan porque el foco está contenido adentro. Si alguien
+retoma el Lote A, **el candidato es la familia modal, no el popover** — lo
+contrario de lo que decía esta sección.
 
-1. Ese 1 de 30 no es un caso menor por ser minoría — es *más* peligroso,
-   porque una regresión de teclado en un solo diálogo no la ve nadie.
-2. **Mezclar los dos sistemas reinstala la trampa de la animación.** Si
-   `alert-dialog.tsx` pasa a React Aria y `dialog.tsx` se queda en Radix,
-   `modalMotion.ts` tendría que servir a dos vocabularios de atributos a la vez
-   (`data-state` y `data-entering`/`data-exiting`). Es exactamente el desajuste
-   que dejó todos los diálogos sin animación en silencio y que ningún gate
-   detectó.
-3. El beneficio es chico: se gana un archivo a cambio de una regresión y una
-   superficie mixta, con el resto de los overlays igual en Radix.
+Dos cosas a resolver ahí antes de empezar:
 
-**Corolario para cualquier migración parcial:** antes de mover un wrapper solo,
-mirá qué módulos compartidos quedan sirviendo a dos vocabularios de atributos.
-`modalMotion.ts` y `popoverSurface.ts` son los dos que hoy tienen ese riesgo.
+1. **`modalMotion.ts` no puede servir dos vocabularios.** Sus dos constantes
+   tienen exactamente dos consumidores, `dialog.tsx` y `alert-dialog.tsx`: hay
+   que mover los dos juntos y reescribir `data-state` a
+   `data-entering`/`data-exiting` en el mismo cambio, o los diálogos se quedan
+   sin animación en silencio. (`popoverSurface.ts` tiene el mismo riesgo: sus
+   dos constantes `POPOVER_RADIX_*` solo las usa `popover.tsx`.) El Lote B ya
+   resolvió esto bien: dejó las clases de menú en `menuCollection.ts` con el
+   vocabulario de React Aria y no tocó las de Radix.
+2. **`ChannelManagementSheet.tsx`** no pasa por ningún wrapper: importa
+   `@radix-ui/react-dialog` directo y en split layout renderiza su panel **sin
+   portal y no-modal**, para quedar acoplado al flujo del layout. El `Overlay`
+   de React Aria siempre hace `createPortal`; lo más cerca es
+   `UNSTABLE_portalContainer` apuntando al padre del anchor. Los otros dos
+   consumidores directos de `DialogPrimitive` (`ComposerAttachments.tsx:386`,
+   `SimpleImageLightbox.tsx:31`) solo usan `onInteractOutside`, que sí es
+   mapeable.
 
-### Consecuencia para el Lote B
+`AlertDialog` de HeroUI **sí emite `role="alertdialog"`**
+(`@heroui/react/dist/components/alert-dialog/alert-dialog.js:154`), así que las
+48 aserciones sobre ese rol sobreviven. Sus 33 `asChild` sobre
+`AlertDialogAction`/`AlertDialogCancel` se absorben dentro del wrapper con
+`Pressable`, igual que hizo el Lote B, sin tocar los sitios de llamada.
 
-Los menús viven sobre las mismas primitivas y usan el mismo patrón, con más
-peso todavía: **20 `onCloseAutoFocus` sobre `DropdownMenuContent`, repartidos
-en 20 archivos.** Devolver el foco al trigger después de elegir un item es
-justamente lo que esos sitios cancelan. El veredicto del §6ter les aplica
-igual; conviene resolverlo antes de invertir en la migración de menús.
+### Nota sobre el Lote B
+
+La versión anterior de esta sección decía que el veredicto le aplicaba igual a
+los menús y que convenía no invertir ahí. **Eso quedó desmentido por los
+hechos**: el Lote B migró `dropdown-menu.tsx` y `context-menu.tsx` y está en
+`heroui-integration` (`0aab9963d`). Los 20 `onCloseAutoFocus` se conservan con
+el shim de `applyCloseAutoFocus`. Los menús no tenían el problema de descarte
+del popover porque son modales por default, que es la rama donde React Aria sí
+cablea `isDismissable`.
 
 ## 6quater. Cierre de wrappers: `separator` y `carousel`
 
