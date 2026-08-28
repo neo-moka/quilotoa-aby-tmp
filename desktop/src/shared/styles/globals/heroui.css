@@ -27,6 +27,15 @@
 @import "@heroui/styles/utilities";
 @import "@heroui/styles/variants";
 
+/* The Pro layer, one component at a time. `@heroui-pro/react/css` is a 350 kB
+   bundle carrying every Pro component plus its own Tailwind build and a
+   `--chart-1..5` ramp derived from `--accent`; the per-component files are a few
+   kB and carry nothing but the component. `layer(components)` is not optional:
+   these files ship unlayered, and unlayered rules outrank every Tailwind
+   utility, so `.context-menu__popover`'s padding would beat the app's classes
+   on the very elements those classes exist to restyle. */
+@import "@heroui-pro/react/css/components/context-menu.css" layer(components);
+
 /* Unlayered on purpose: beats HeroUI's `layer(theme)` defaults without
    `!important`, the same trick theme.css uses for the Buzz sidebar gradient. */
 :root {

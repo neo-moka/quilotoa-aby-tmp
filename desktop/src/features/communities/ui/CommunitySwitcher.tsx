@@ -396,7 +396,7 @@ export function CommunitySwitcher({
       </DropdownMenuTrigger>
       <DropdownMenuContent
         align="start"
-        className="w-(--radix-dropdown-menu-trigger-width) min-w-[220px]"
+        className="w-(--trigger-width) min-w-[220px]"
         onCloseAutoFocus={(e) => e.preventDefault()}
         side={variant === "profile" ? "top" : "bottom"}
         sideOffset={4}

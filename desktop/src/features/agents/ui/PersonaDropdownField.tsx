@@ -62,37 +62,36 @@ export function PersonaDropdownField({
         </DropdownMenuTrigger>
         <DropdownMenuContent
           align="start"
-          className={cn("overflow-hidden", contentClassName)}
+          // The popover is the scroll container now: a wrapper element inside
+          // the menu would discard the whole collection. React Aria already
+          // caps the popover at the available height.
+          className={cn("max-h-64 overscroll-contain", contentClassName)}
           onCloseAutoFocus={(event) => event.preventDefault()}
+          onTouchMoveCapture={(event) => event.stopPropagation()}
+          onWheelCapture={(event) => event.stopPropagation()}
           sideOffset={5}
           style={{
-            minWidth: "var(--radix-dropdown-menu-trigger-width)",
-            width: "var(--radix-dropdown-menu-trigger-width)",
+            minWidth: "var(--trigger-width)",
+            width: "var(--trigger-width)",
           }}
         >
-          <div
-            className="max-h-[min(16rem,var(--radix-dropdown-menu-content-available-height))] overflow-y-auto overscroll-contain"
-            onTouchMoveCapture={(event) => event.stopPropagation()}
-            onWheelCapture={(event) => event.stopPropagation()}
+          <DropdownMenuRadioGroup
+            onValueChange={(nextValue) => {
+              onValueChange(nextValue);
+              setOpen(false);
+            }}
+            value={value}
           >
-            <DropdownMenuRadioGroup
-              onValueChange={(nextValue) => {
-                onValueChange(nextValue);
-                setOpen(false);
-              }}
-              value={value}
-            >
-              {options.map((option) => (
-                <DropdownMenuRadioItem
-                  disabled={option.disabled}
-                  key={option.value}
-                  value={option.value}
-                >
-                  <span className="truncate">{option.label}</span>
-                </DropdownMenuRadioItem>
-              ))}
-            </DropdownMenuRadioGroup>
-          </div>
+            {options.map((option) => (
+              <DropdownMenuRadioItem
+                disabled={option.disabled}
+                key={option.value}
+                value={option.value}
+              >
+                <span className="truncate">{option.label}</span>
+              </DropdownMenuRadioItem>
+            ))}
+          </DropdownMenuRadioGroup>
         </DropdownMenuContent>
       </DropdownMenu>
     </div>

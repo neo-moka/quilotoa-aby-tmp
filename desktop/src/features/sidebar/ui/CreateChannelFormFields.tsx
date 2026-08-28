@@ -177,7 +177,7 @@ export function CreateChannelFormFields({
             align="end"
             onCloseAutoFocus={(event) => event.preventDefault()}
             style={{
-              minWidth: "var(--radix-dropdown-menu-trigger-width)",
+              minWidth: "var(--trigger-width)",
             }}
           >
             <DropdownMenuRadioGroup
