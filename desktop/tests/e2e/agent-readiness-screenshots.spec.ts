@@ -45,7 +45,7 @@ async function selectProvider(
   page: import("@playwright/test").Page,
   providerName: string,
 ) {
-  await page.getByRole("tab", { name: "Customize for this agent" }).click();
+  await page.getByTestId("agent-ai-configuration-mode-custom").click();
   await selectDropdownOption(
     page,
     page.locator("#persona-llm-provider"),
@@ -141,8 +141,8 @@ test.describe("agent readiness gate screenshots", () => {
     await openCreateDialog(page);
 
     await expect(
-      page.getByRole("tab", { name: "Use agent defaults" }),
-    ).toHaveAttribute("data-state", "active");
+      page.getByTestId("agent-ai-configuration-mode-defaults"),
+    ).toHaveAttribute("aria-pressed", "true");
     await expect(page.locator("#persona-llm-provider")).not.toBeVisible();
     await expect(page.locator("#persona-model")).not.toBeVisible();
     await expect(page.getByTestId("persona-dialog-submit")).toBeEnabled({
@@ -263,7 +263,7 @@ test.describe("agent readiness gate screenshots", () => {
     });
 
     await openCreateDialog(page);
-    await page.getByRole("tab", { name: "Customize for this agent" }).click();
+    await page.getByTestId("agent-ai-configuration-mode-custom").click();
 
     // Switch the auto-selected buzz-agent runtime to Claude Code.
     await selectDropdownOption(
@@ -317,7 +317,7 @@ test.describe("agent readiness gate screenshots", () => {
 
     // Opt into per-agent customization, then switch to goose to confirm a
     // genuinely incomplete customized configuration remains blocked.
-    await page.getByRole("tab", { name: "Customize for this agent" }).click();
+    await page.getByTestId("agent-ai-configuration-mode-custom").click();
     await expect(page.locator("#persona-llm-provider")).toBeVisible({
       timeout: 10_000,
     });

@@ -96,7 +96,7 @@ test("loads the app shell with mocked channels", async ({ page }) => {
 async function chooseSharedComputeProvider(
   page: import("@playwright/test").Page,
 ) {
-  await page.getByRole("tab", { name: "Customize for this agent" }).click();
+  await page.getByTestId("agent-ai-configuration-mode-custom").click();
   const provider = page.locator("#persona-llm-provider");
   await expect(provider).toBeVisible({ timeout: 10_000 });
   await provider.press("Enter");
@@ -220,7 +220,7 @@ test("create agent supports parallelism and system prompt overrides", async ({
 
   // The buzz-agent runtime auto-selects once the ACP runtime catalog loads;
   // Customize reveals the per-agent LLM provider and model fields.
-  await page.getByRole("tab", { name: "Customize for this agent" }).click();
+  await page.getByTestId("agent-ai-configuration-mode-custom").click();
   const llmProvider = page.locator("#persona-llm-provider");
   await expect(llmProvider).toBeVisible({ timeout: 10_000 });
   await llmProvider.press("Enter");

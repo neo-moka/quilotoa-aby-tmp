@@ -316,7 +316,7 @@ test("persona model options follow the selected LLM provider", async ({
   await page.getByTestId("new-agent-card").click();
 
   const provider = page.locator("#persona-runtime");
-  await page.getByRole("tab", { name: "Customize for this agent" }).click();
+  await page.getByTestId("agent-ai-configuration-mode-custom").click();
   const llmProvider = page.locator("#persona-llm-provider");
   const model = page.locator("#persona-model");
   await expect(provider).toContainText("ABY Agent (default)");
@@ -346,7 +346,7 @@ test("persona model options follow the selected LLM provider", async ({
 
   // Switch back to inherited defaults — per-agent provider, credential, and
   // model controls disappear together.
-  await page.getByRole("tab", { name: "Use agent defaults" }).click();
+  await page.getByTestId("agent-ai-configuration-mode-defaults").click();
   await expect(llmProvider).not.toBeVisible();
   await expect(dialog.getByLabel("Anthropic API Key")).not.toBeVisible();
   await expect(model).not.toBeVisible();
