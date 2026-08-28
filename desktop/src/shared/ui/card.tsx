@@ -26,6 +26,20 @@ export function texturedSurfaceClasses({
 }
 
 /**
+ * Deliberately not HeroUI's `Card`, despite the matching anatomy
+ * (Header/Title/Description/Content/Footer). Three blockers:
+ *
+ * 1. Padding model. HeroUI's `.card` carries `p-4 gap-3` on the root, while
+ *    this one keeps the root padding-free and pads in `CardHeader` /
+ *    `CardContent` / `CardFooter` (`p-6`). Adopting it double-pads every card
+ *    unless each call site cancels the root's own spacing.
+ * 2. Element semantics. `Card.Title` renders `h3` and `Card.Description`
+ *    renders `p`, against the `div`s used here. That adds headings to the
+ *    accessibility tree and makes any block-level child of a description
+ *    invalid HTML.
+ * 3. `variant="textured"` below has no HeroUI equivalent — it is brand
+ *    identity, baked into a nine-slice asset (`card-texture.css`).
+ *
  * `variant="textured"` renders the baked nine-slice powder texture
  * (`card-texture.css`). The asset bakes the card surface INTO the image:
  * a solid white center that feathers out into speckle, with a transparent

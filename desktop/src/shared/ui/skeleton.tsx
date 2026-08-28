@@ -2,6 +2,19 @@ import * as React from "react";
 
 import { cn } from "@/shared/lib/cn";
 
+/**
+ * Deliberately not HeroUI's `Skeleton`. Its `pulse` and `shimmer` variants
+ * animate unconditionally and forever, with no way to stop them once the real
+ * content arrives. `skeleton.css` stops this one on reveal
+ * (`.t-skel.is-revealed … { animation: none }`) and under
+ * `prefers-reduced-motion`. That difference is not cosmetic: a never-settling
+ * animation hangs `waitForAnimations`, which every screenshot spec awaits, so
+ * adopting HeroUI's would stall captures rather than fail them.
+ *
+ * `SkeletonReveal` has no HeroUI counterpart at all — HeroUI's skeleton is a
+ * single styled `div`, with none of the crossfade choreography below.
+ */
+
 type SkeletonProps = React.HTMLAttributes<HTMLDivElement> & {
   pulsing?: boolean;
 };
