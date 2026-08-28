@@ -1,3 +1,18 @@
+/**
+ * Vendored shadcn, deliberately **not** replaced by Pro's `Sidebar` — nor by
+ * `AppLayout`, which renders a `Sidebar.Provider` internally and forbids
+ * wrapping it in your own.
+ *
+ * `theme.css` styles this navigation through seven `data-sidebar` values across
+ * 27 selectors (`sidebar`, `menu-button`, `menu-sub-button`, `footer`,
+ * `group-label`, `menu-item`, `trigger`). Pro's sidebar emits exactly three:
+ * `label`, `menu`, `provider`. The intersection is empty, so adopting it drops
+ * the theme in one step, into something that still renders — which no gate
+ * catches. And `Sidebar.Menu` is a React Aria `Tree`, which the dnd-kit rows and
+ * per-row context menus here do not survive.
+ *
+ * Full write-up: `docs/heroui-migration/component-map.md` §6quinquies.
+ */
 import * as React from "react";
 import { Slot } from "@radix-ui/react-slot";
 import { cva, type VariantProps } from "class-variance-authority";
@@ -676,24 +691,7 @@ const SidebarGroup = React.forwardRef<
 });
 SidebarGroup.displayName = "SidebarGroup";
 
-/**
- * `asChild` inventory for this file, from Lote F (component-map §4). Five
- * components here declare the prop and only this one has call sites — five of
- * them: `CustomChannelSection` (×2), `SidebarProjectsSection`, `SidebarSection`
- * and `sidebarLoadingSkeleton`.
- *
- * The prop is dead on `SidebarGroupAction`, `SidebarMenuButton`,
- * `SidebarMenuAction` and `SidebarMenuSubButton`, and it is kept deliberately
- * rather than trimmed. This is vendored shadcn, where
- * `<SidebarMenuButton asChild><a … /></SidebarMenuButton>` is the documented
- * way to render a sidebar row as a link; dropping it buys nothing at runtime
- * (dead code, tree-shaken) and breaks the next person following upstream docs.
- * `SidebarGroupAction` and `SidebarMenuSubButton` have no call sites at all.
- *
- * `Slot` therefore stays in this file — as it does in `button.tsx` (whose
- * `asChild` sites wrap an `<a>`, which HeroUI's `render` cannot produce),
- * `card.tsx` and `attachment.tsx`. See §6quater.
- */
+/** `asChild` inventory and why `Slot` stays: component-map.md §4. */
 const SidebarGroupLabel = React.forwardRef<
   HTMLDivElement,
   React.ComponentProps<"div"> & { asChild?: boolean }
@@ -714,28 +712,6 @@ const SidebarGroupLabel = React.forwardRef<
   );
 });
 SidebarGroupLabel.displayName = "SidebarGroupLabel";
-
-const SidebarGroupAction = React.forwardRef<
-  HTMLButtonElement,
-  React.ComponentProps<"button"> & { asChild?: boolean }
->(({ className, asChild = false, ...props }, ref) => {
-  const Comp = asChild ? Slot : "button";
-
-  return (
-    <Comp
-      ref={ref}
-      data-sidebar="group-action"
-      className={cn(
-        "absolute right-3 top-3.5 z-10 flex size-6 items-center justify-center rounded-[4px] p-1 text-sidebar-foreground outline-hidden ring-sidebar-ring transition-colors hover:bg-sidebar-border/35 hover:text-sidebar-foreground focus-visible:bg-sidebar-border/35 focus-visible:ring-2 [&>svg]:size-4 [&>svg]:shrink-0",
-        MOBILE_ACTION_HIT_AREA,
-        "group-data-[collapsible=icon]:hidden",
-        className,
-      )}
-      {...props}
-    />
-  );
-});
-SidebarGroupAction.displayName = "SidebarGroupAction";
 
 const SidebarGroupContent = React.forwardRef<
   HTMLDivElement,
@@ -1004,7 +980,6 @@ export {
   SidebarContent,
   SidebarFooter,
   SidebarGroup,
-  SidebarGroupAction,
   SidebarGroupContent,
   SidebarGroupLabel,
   SidebarHeader,

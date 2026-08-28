@@ -1,56 +1,76 @@
 import type * as React from "react";
-import { Command as HeroCommand } from "@heroui-pro/react";
+// Subpath, not the package root: the root barrel pulls in `sheet`, whose
+// `use-scale-background` calls `window.matchMedia` at module scope and throws
+// under jsdom. Bundler and `tsc` are fine either way; this keeps the unit test
+// importable.
+import {
+  CommandBackdrop,
+  CommandContainer,
+  CommandDialog,
+  CommandFooter,
+  CommandGroup,
+  CommandHeader,
+  CommandInputGroup,
+  CommandInputGroupClearButton,
+  CommandInputGroupInput,
+  CommandInputGroupPrefix,
+  CommandInputGroupSuffix,
+  CommandItem,
+  CommandList,
+  CommandRoot,
+  CommandSeparator,
+} from "@heroui-pro/react/command";
 
 import { cn } from "@/shared/lib/cn";
 import { HERO_MUTED_SCOPE } from "@/shared/ui/heroMutedScope";
 
 /**
- * Surface over HeroUI Pro's `Command`, carrying the three adjustments this app
- * needs before the palette is usable. Nothing here changes Pro's DOM: every
- * part still renders Pro's element with Pro's `data-slot`, so `command.css`
- * keeps applying.
+ * Surface over HeroUI Pro's `Command`. It carries three adjustments and nothing
+ * else — every part still renders Pro's element with Pro's `data-slot`, so
+ * `command.css` keeps applying.
  *
  * **1. Filtering is off by default.** `Command.Dialog` wraps its children in a
- * React Aria `Autocomplete` and defaults to a case-insensitive `contains`
- * filter over each item's `textValue`
- * (`@heroui-pro/react/dist/components/command/command.js`, `filter ?? d`). That
- * is right for a static command list and wrong for this app, whose results come
- * back already filtered by the relay's Postgres FTS. Left on, it would re-filter
- * server hits against the raw query string and silently drop anything matched by
- * stemming, by a description, or by an author name that is not in the visible
- * label. `filter={() => true}` is the documented escape hatch and this surface
- * makes it the default; pass `filter` explicitly to opt back in for a genuinely
- * client-side list.
+ * React Aria `Autocomplete` and defaults to a case-insensitive `contains` filter
+ * over each item's `textValue` (`dist/components/command/command.js`,
+ * `filter ?? d`). Right for a static command list, wrong for this app: results
+ * come back already filtered by the relay's Postgres FTS, so a second client
+ * pass would silently drop hits matched by stemming, by a description, or by an
+ * author name absent from the visible label. Pass `filter` explicitly to opt
+ * back in for a genuinely client-side list.
  *
- * **2. `--muted` is re-pointed, and the surface value is kept reachable.**
- * `command.css` reads `var(--muted)` eight times — placeholder, input prefix and
- * suffix, item `svg` and `kbd`, group heading, footer, empty state. All eight are
- * text or icon colours, so [`HERO_MUTED_SCOPE`](./heroMutedScope.ts) is correct
- * for every one of them, and it goes on the dialog rather than on a caller's
- * wrapper as that file requires.
+ * **2. `--muted` is re-pointed per reading node, never on the dialog.**
+ * Verified against the *compiled* `dist/css/components/command.css` rather than
+ * the `@apply` source the MCP returns: `var(--muted)` is read exactly 8 times,
+ * none of them behind an already-mapped token, and **all 8 are `color:`** —
+ * placeholder, input prefix, input suffix, item `svg`, item `kbd`, group
+ * heading, footer, empty state. So [`HERO_MUTED_SCOPE`](./heroMutedScope.ts) is
+ * the right value for every one of them.
  *
- * But a palette is a container: app markup renders *inside* `Command.Item` and
- * `Command.Footer`, and this app spends `--muted` on a **surface**. A nested
- * `bg-muted` would therefore paint a background with a text grey — the same
- * inversion one level down. This is not hypothetical: the search result rows use
- * `bg-muted/45` and `hover:bg-muted/35` (`SearchResultRow.tsx`).
+ * Placement is the part that bites. Scoping the whole dialog is what broke
+ * `EmptyState` in the widgets lot — nested controls inherited the re-point and
+ * their hover backgrounds resolved to a text grey. So the scope goes on the node
+ * that owns each read (or the nearest reachable ancestor, for the heading and
+ * empty state, which Pro renders internally): `InputGroup`, `Group`, `List`,
+ * `Item`, `Footer`. `Dialog` stays clean.
  *
- * So `Container` captures the surface value into `--buzz-muted-surface` before
- * `Dialog` re-points `--muted`. Custom properties resolve per element, so the
- * capture has to happen on an ancestor — doing both on one element would make
- * the capture read the value being replaced. App content that needs the surface
- * back wraps itself in {@link COMMAND_APP_CONTENT_SCOPE}.
+ * Four of those five still contain app markup, and this app spends `--muted` on
+ * a **surface** (`bg-muted`, 226 files). That is not hypothetical here: the
+ * search result rows use `bg-muted/45` and `hover:bg-muted/35`
+ * (`SearchResultRow.tsx`). App content that needs the surface back wraps itself
+ * in {@link COMMAND_APP_CONTENT_SCOPE}. `Container` captures the value first,
+ * because custom properties resolve per element — capturing and re-pointing on
+ * one element would make the capture read the value being replaced.
  *
  * **3. `Command.List` is a React Aria `Menu`, not a listbox.** Items come out as
  * `role="menuitem"` inside `role="menu"`. Anything migrating off a
- * `role="listbox"` / `role="option"` list changes its accessibility tree and any
- * spec asserting those roles. `command.test.mjs` pins the emitted roles so the
- * change is a decision, not a surprise.
+ * `role="listbox"` / `role="option"` list changes its accessibility tree.
+ * `command.test.mjs` pins the emitted roles so that is a decision, not a
+ * surprise.
  */
 
 /**
  * Restores `--muted` to its app meaning (a surface) for app markup nested inside
- * the palette. Only needed by subtrees that use `bg-muted`; text that reads
+ * the palette. Needed only by subtrees that use `bg-muted`; text reading
  * `text-muted-foreground` is unaffected either way.
  */
 export const COMMAND_APP_CONTENT_SCOPE = "[--muted:var(--buzz-muted-surface)]";
@@ -58,40 +78,100 @@ export const COMMAND_APP_CONTENT_SCOPE = "[--muted:var(--buzz-muted-surface)]";
 /** Captures the app's surface `--muted` so nested content can reclaim it. */
 const COMMAND_MUTED_CAPTURE = "[--buzz-muted-surface:var(--muted)]";
 
-type CommandContainerProps = React.ComponentProps<typeof HeroCommand.Container>;
-type CommandDialogProps = React.ComponentProps<typeof HeroCommand.Dialog>;
-
 const KEEP_SERVER_ORDER = () => true;
 
-function CommandContainer({ className, ...props }: CommandContainerProps) {
+function ScopedContainer({
+  className,
+  ...props
+}: React.ComponentProps<typeof CommandContainer>) {
   return (
-    <HeroCommand.Container
+    <CommandContainer
       className={cn(COMMAND_MUTED_CAPTURE, className)}
       {...props}
     />
   );
 }
 
-function CommandDialog({ className, filter, ...props }: CommandDialogProps) {
+function UnfilteredDialog({
+  className,
+  filter,
+  ...props
+}: React.ComponentProps<typeof CommandDialog>) {
   return (
-    <HeroCommand.Dialog
-      className={cn(HERO_MUTED_SCOPE, className)}
+    <CommandDialog
+      className={className}
       filter={filter ?? KEEP_SERVER_ORDER}
       {...props}
     />
   );
 }
 
-function CommandRoot(props: React.ComponentProps<typeof HeroCommand>) {
-  return <HeroCommand {...props} />;
+function ScopedInputGroup({
+  className,
+  ...props
+}: React.ComponentProps<typeof CommandInputGroup>) {
+  return (
+    <CommandInputGroup className={cn(HERO_MUTED_SCOPE, className)} {...props} />
+  );
 }
 
-// Assign onto a local root, never onto `HeroCommand` itself: mutating the
-// imported module object would hand this app's overrides to every other
-// consumer of `@heroui-pro/react`. The root must stay a function — `Command` is
-// callable *and* carries its parts, so spreading it into an object literal
-// would drop the component and leave React with a plain object.
-export const Command = Object.assign(CommandRoot, HeroCommand, {
-  Container: CommandContainer,
-  Dialog: CommandDialog,
+function ScopedList<T extends object>({
+  className,
+  ...props
+}: React.ComponentProps<typeof CommandList<T>>) {
+  return <CommandList className={cn(HERO_MUTED_SCOPE, className)} {...props} />;
+}
+
+function ScopedItem<T extends object>({
+  className,
+  ...props
+}: React.ComponentProps<typeof CommandItem<T>>) {
+  return <CommandItem className={cn(HERO_MUTED_SCOPE, className)} {...props} />;
+}
+
+function ScopedGroup<T extends object>({
+  className,
+  ...props
+}: React.ComponentProps<typeof CommandGroup<T>>) {
+  return (
+    <CommandGroup className={cn(HERO_MUTED_SCOPE, className)} {...props} />
+  );
+}
+
+function ScopedFooter({
+  className,
+  ...props
+}: React.ComponentProps<typeof CommandFooter>) {
+  return (
+    <CommandFooter className={cn(HERO_MUTED_SCOPE, className)} {...props} />
+  );
+}
+
+const InputGroup = Object.assign(ScopedInputGroup, {
+  ClearButton: CommandInputGroupClearButton,
+  Input: CommandInputGroupInput,
+  Prefix: CommandInputGroupPrefix,
+  Suffix: CommandInputGroupSuffix,
+});
+
+function CommandRootWrapper(props: React.ComponentProps<typeof CommandRoot>) {
+  return <CommandRoot {...props} />;
+}
+
+// The parts hang off a local wrapper, never off Pro's own `CommandRoot`:
+// `Object.assign` mutates its target, so assigning onto the imported binding
+// would hand this app's overrides to every other consumer of the package. The
+// root has to stay a function — it is callable *and* carries its parts, so
+// spreading it into an object literal would drop the component itself.
+export const Command = Object.assign(CommandRootWrapper, {
+  Backdrop: CommandBackdrop,
+  Container: ScopedContainer,
+  Dialog: UnfilteredDialog,
+  Footer: ScopedFooter,
+  Group: ScopedGroup,
+  Header: CommandHeader,
+  InputGroup,
+  Item: ScopedItem,
+  List: ScopedList,
+  Separator: CommandSeparator,
 });

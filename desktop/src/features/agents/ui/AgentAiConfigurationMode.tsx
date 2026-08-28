@@ -1,5 +1,5 @@
 import type * as React from "react";
-import { Tabs, TabsList, TabsTrigger } from "@/shared/ui/tabs";
+import { SegmentedControl } from "@/shared/ui/segmented-control";
 import type { AgentAiConfigurationMode } from "./agentAiConfigurationPolicy";
 import { AgentAiDefaultsNotice } from "./AgentAiDefaults";
 import type { InheritedDefault } from "./bakedEnvHelpers";
@@ -77,37 +77,26 @@ export function AgentAiConfigurationModeField({
   return (
     <div className="space-y-1.5">
       <p className="text-sm font-medium text-foreground">AI configuration</p>
-      <Tabs
-        onValueChange={(value) =>
-          onModeChange(value as AgentAiConfigurationMode)
-        }
-        value={mode}
-      >
-        <TabsList className="relative isolate grid h-9 w-full grid-cols-2 overflow-hidden rounded-lg bg-muted p-0.5">
-          <div
-            aria-hidden="true"
-            className="absolute bottom-0.5 left-0.5 top-0.5 z-0 rounded-md bg-background shadow-sm transition-transform duration-[250ms] ease-out"
-            style={{
-              transform: `translateX(${mode === "custom" ? 100 : 0}%)`,
-              width: "calc((100% - 4px) / 2)",
-            }}
-          />
-          <TabsTrigger
-            className="relative z-10 h-full rounded-md bg-transparent text-xs font-medium shadow-none transition-colors data-[state=active]:bg-transparent data-[state=active]:shadow-none"
-            value="defaults"
-          >
-            {needsProviderSelection
+      {/* `h-9 w-full` overrides the shared control's `h-8` and its fixed
+          `SIZE_CLASSES` width: this is a full-width form field, not a settings
+          row. `className` is merged last, so both win. */}
+      <SegmentedControl<AgentAiConfigurationMode>
+        className="h-9 w-full"
+        legend="AI configuration"
+        onValueChange={onModeChange}
+        optionTestIdPrefix="agent-ai-configuration-mode"
+        options={[
+          {
+            value: "defaults",
+            label: needsProviderSelection
               ? "Use agent defaults"
-              : "Use harness defaults"}
-          </TabsTrigger>
-          <TabsTrigger
-            className="relative z-10 h-full rounded-md bg-transparent text-xs font-medium shadow-none transition-colors data-[state=active]:bg-transparent data-[state=active]:shadow-none"
-            value="custom"
-          >
-            Customize for this agent
-          </TabsTrigger>
-        </TabsList>
-      </Tabs>
+              : "Use harness defaults",
+          },
+          { value: "custom", label: "Customize for this agent" },
+        ]}
+        testId="agent-ai-configuration-mode"
+        value={mode}
+      />
     </div>
   );
 }
