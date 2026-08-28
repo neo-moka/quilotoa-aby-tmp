@@ -8,6 +8,16 @@ import {
   parseDurationSeconds,
 } from "./workflowDuration";
 
+/**
+ * **Not migrated to `@heroui-pro/react`'s `NumberStepper`.** That control is a
+ * value with a minus and a plus button, stepping by a fixed `step`. This field
+ * is a slider over `DURATION_SLIDER_STOPS` — a hand-picked, *non-linear* ramp —
+ * where the input's value is the stop's index, not the duration. A fixed step
+ * cannot express that ramp, and a two-button stepper would replace a drag with
+ * one click per stop. The same holds for the passphrase word-count slider that
+ * the onboarding and settings `EncryptedBackupCreator` both carry: every
+ * numeric control in these surfaces is a range, not a stepper.
+ */
 export function WorkflowDurationField({
   disabled,
   fallbackSeconds = DEFAULT_DURATION_SECONDS,
