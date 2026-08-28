@@ -399,223 +399,236 @@ export function WorkspaceTabs({
       />
     ) : null;
 
+  // The dialogs below sit outside <Tabs> on purpose. React Aria wraps the
+  // *root's* children — not just the tab list — in a CollectionBuilder
+  // (`react-aria-components/private/Tabs.mjs:62`), and its hidden pass renders
+  // them inside a real `<template>` element (`react-aria/private/collections/
+  // Hidden.mjs:61`). The components genuinely execute there, and `createPortal`
+  // escapes the template into document.body — so any portalling child of <Tabs>
+  // mounts twice. Both dialogs portal, both read the same open state, and both
+  // opened: `getByTestId('create-issue-dialog')` resolved to two elements.
   return (
-    <Tabs
-      className="flex min-w-0 flex-1 flex-col space-y-3"
-      onValueChange={handleTabChange}
-      value={selectedTab}
-    >
-      {!isDetailSelected ? (
-        <div
-          className={`sticky top-0 z-30 -mx-4 flex h-13 min-w-0 items-center gap-1 px-4 ${
-            sharedHeaderBackdrop ? "" : PROJECT_COLUMN_HEADER_BACKDROP_CLASS
-          }`}
-          data-testid="project-workspace-tab-menu"
-        >
-          <ProjectTabsList prsActive={isPullRequestSelected} />
-          <div className="ml-auto flex shrink-0 items-center gap-1">
-            {updatePullRequestAction ? (
-              <Button
-                className="h-8 shrink-0 gap-1.5"
-                disabled={updatePullRequestAction.pending}
-                onClick={updatePullRequestAction.onUpdate}
-                size="sm"
-                title="Publish the pushed commit to this review"
-                variant="outline"
-              >
-                <RefreshCw className="h-4 w-4" />
-                {updatePullRequestAction.pending
-                  ? "Updating…"
-                  : "Update review"}
-              </Button>
-            ) : null}
-          </div>
-        </div>
-      ) : null}
-      {/* Project content follows the same borderless flow as work-item details.
-          Inner panels retain standalone chrome, neutralized here. */}
-      <div
-        className="-mx-4 flex flex-1 flex-col [&_[data-project-detail-panel]]:rounded-none [&_[data-project-detail-panel]]:border-0"
-        data-testid="project-workspace-panel"
+    <>
+      <Tabs
+        className="flex min-w-0 flex-1 flex-col space-y-3"
+        onValueChange={handleTabChange}
+        value={selectedTab}
       >
-        {sectionHeader}
-
-        <TabsContent className="m-0" value="overview">
-          <ProjectOverviewPanel
-            accessChannelId={project.channelId}
-            externalHost={externalHost}
-            externalUrl={externalHost ? sourceControls?.externalUrl : null}
-            fileContentSource={fileContentSource}
-            gitDataState={gitDataState}
-            hideReadmeHeader
-            ownerAvatarUrl={ownerProfile?.avatarUrl}
-            ownerIsAgent={ownerProfile?.isAgent}
-            ownerName={ownerName}
-            readmeFile={readmeFile}
-            sourceControls={sourceControls}
-            unavailableReason={unavailableReason}
-          />
-        </TabsContent>
-
-        <TabsContent
-          className="m-0 min-h-0 flex-1 flex-col data-[state=active]:flex"
-          value="activity"
+        {!isDetailSelected ? (
+          <div
+            className={`sticky top-0 z-30 -mx-4 flex h-13 min-w-0 items-center gap-1 px-4 ${
+              sharedHeaderBackdrop ? "" : PROJECT_COLUMN_HEADER_BACKDROP_CLASS
+            }`}
+            data-testid="project-workspace-tab-menu"
+          >
+            <ProjectTabsList prsActive={isPullRequestSelected} />
+            <div className="ml-auto flex shrink-0 items-center gap-1">
+              {updatePullRequestAction ? (
+                <Button
+                  className="h-8 shrink-0 gap-1.5"
+                  disabled={updatePullRequestAction.pending}
+                  onClick={updatePullRequestAction.onUpdate}
+                  size="sm"
+                  title="Publish the pushed commit to this review"
+                  variant="outline"
+                >
+                  <RefreshCw className="h-4 w-4" />
+                  {updatePullRequestAction.pending
+                    ? "Updating…"
+                    : "Update review"}
+                </Button>
+              ) : null}
+            </div>
+          </div>
+        ) : null}
+        {/* Project content follows the same borderless flow as work-item details.
+          Inner panels retain standalone chrome, neutralized here. */}
+        <div
+          className="-mx-4 flex flex-1 flex-col [&_[data-project-detail-panel]]:rounded-none [&_[data-project-detail-panel]]:border-0"
+          data-testid="project-workspace-panel"
         >
-          {repositoryUnavailableState ??
-            (selectedCommitHash ? (
-              <ProjectCommitDetailPanel
-                commit={
-                  displayedSnapshot?.commits.find(
-                    (commit) => commit.hash === selectedCommitHash,
-                  ) ?? null
-                }
-                commitHash={selectedCommitHash}
-                diff={commitDiff}
-                diffError={commitDiffError}
-                diffLoading={commitDiffLoading}
-                originAgentName={selectedCommitPullRequest?.originAgentName}
-                originChannelId={selectedCommitPullRequest?.channelId}
-                project={project}
-              />
-            ) : (
-              <ActivityPanel
-                branch={sourceControls?.branch}
-                error={displayedSnapshotError}
-                isLoading={displayedSnapshotLoading}
-                onSelectCommit={(commit) =>
-                  onSelectedCommitHashChange(commit.hash)
-                }
-                profiles={profiles}
-                project={project}
-                projectId={projectId}
-                pullRequests={pullRequests}
-                repoContributors={displayedContributors}
-                snapshot={displayedSnapshot}
-                viewerGitIdentity={viewerGitIdentity}
-              />
-            ))}
-        </TabsContent>
+          {sectionHeader}
 
-        <TabsContent
-          className={`m-0 ${
-            selectedPullRequestId ? "" : PROJECT_DETAIL_PANEL_CLASS
-          }`}
-          data-project-detail-panel
-          value="prs"
-        >
-          <PullRequestsPanel
-            diffStats={
-              repoDiff
-                ? {
-                    additions: repoDiff.additions,
-                    deletions: repoDiff.deletions,
+          <TabsContent className="m-0" value="overview">
+            <ProjectOverviewPanel
+              accessChannelId={project.channelId}
+              externalHost={externalHost}
+              externalUrl={externalHost ? sourceControls?.externalUrl : null}
+              fileContentSource={fileContentSource}
+              gitDataState={gitDataState}
+              hideReadmeHeader
+              ownerAvatarUrl={ownerProfile?.avatarUrl}
+              ownerIsAgent={ownerProfile?.isAgent}
+              ownerName={ownerName}
+              readmeFile={readmeFile}
+              sourceControls={sourceControls}
+              unavailableReason={unavailableReason}
+            />
+          </TabsContent>
+
+          <TabsContent
+            className="m-0 min-h-0 flex-1 flex-col data-[state=active]:flex"
+            value="activity"
+          >
+            {repositoryUnavailableState ??
+              (selectedCommitHash ? (
+                <ProjectCommitDetailPanel
+                  commit={
+                    displayedSnapshot?.commits.find(
+                      (commit) => commit.hash === selectedCommitHash,
+                    ) ?? null
                   }
-                : null
-            }
-            error={pullRequestsError}
-            filesChanged={
-              filesChangedBody === "files" && selectedPullRequest ? (
-                <ProjectPullRequestFilesChangedPanel
-                  diff={repoDiff}
-                  error={repoDiffError}
-                  focusedAnchor={
-                    pullRequestCommentTarget?.pullRequestId ===
-                    selectedPullRequestId
-                      ? pullRequestCommentTarget.anchor
-                      : null
+                  commitHash={selectedCommitHash}
+                  diff={commitDiff}
+                  diffError={commitDiffError}
+                  diffLoading={commitDiffLoading}
+                  originAgentName={selectedCommitPullRequest?.originAgentName}
+                  originChannelId={selectedCommitPullRequest?.channelId}
+                  project={project}
+                />
+              ) : (
+                <ActivityPanel
+                  branch={sourceControls?.branch}
+                  error={displayedSnapshotError}
+                  isLoading={displayedSnapshotLoading}
+                  onSelectCommit={(commit) =>
+                    onSelectedCommitHashChange(commit.hash)
                   }
-                  isLoading={repoDiffLoading}
                   profiles={profiles}
                   project={project}
-                  pullRequest={selectedPullRequest}
+                  projectId={projectId}
+                  pullRequests={pullRequests}
+                  repoContributors={displayedContributors}
+                  snapshot={displayedSnapshot}
+                  viewerGitIdentity={viewerGitIdentity}
                 />
-              ) : filesChangedBody === "unavailable" ? (
-                repositoryUnavailableState
-              ) : undefined
-            }
-            filesCount={repoDiff?.files.length}
-            forceOpenFiles={
-              pullRequestCommentTarget?.pullRequestId === selectedPullRequestId
-            }
-            isLoading={pullRequestsLoading}
-            onOpenCommit={onSelectedCommitHashChange}
-            onOpenInlineComment={handleOpenPullRequestComment}
-            onOpenTerminal={onOpenMergeRecoveryTerminal}
-            onSelectedPullRequestIdChange={onSelectedPullRequestIdChange}
-            profiles={profiles}
-            project={project}
-            pullRequests={pullRequests}
-            selectedPullRequest={selectedPullRequest}
-          />
-        </TabsContent>
+              ))}
+          </TabsContent>
 
-        <TabsContent
-          className={`m-0 ${selectedIssueId ? "" : PROJECT_DETAIL_PANEL_CLASS}`}
-          data-project-detail-panel
-          value="issues"
-        >
-          <ProjectIssuesPanel
-            onSelectedIssueIdChange={onSelectedIssueIdChange}
-            profiles={profiles}
-            project={project}
-            selectedIssueId={selectedIssueId}
-          />
-        </TabsContent>
-
-        <TabsContent className="m-0" value="files">
-          {repositoryUnavailableState ??
-            (repoSource === "local" &&
-            !localSnapshot &&
-            !localSnapshotLoading ? (
-              <div className="mb-3">
-                <div
-                  className={PROJECT_DETAIL_PANEL_MESSAGE_CLASS}
-                  data-project-detail-panel
-                >
-                  No local checkout found.
-                </div>
-              </div>
-            ) : (
-              <RepositoryFilesPanel
-                error={displayedSnapshotError}
-                fallbackAuthorPubkey={project.owner}
-                fileContentSource={fileContentSource}
-                files={files}
-                isLoading={displayedSnapshotLoading}
-                onContextChange={onFilesContextChange}
-                onOpenCommit={onSelectedCommitHashChange}
-                profiles={profiles}
-                snapshot={displayedSnapshot}
-                unavailableMessage={
-                  externalHost
-                    ? `Not mirrored on Buzz. Repository files are hosted on ${externalHost}.`
-                    : undefined
-                }
-              />
-            ))}
-        </TabsContent>
-
-        <TabsContent className="m-0" value="channels">
-          <DiscussionChannelsPanel
-            query={repositoryDiscussionQuery(project)}
-            repositoryName={project.name}
-          />
-        </TabsContent>
-
-        <TabsContent className="m-0" value="contributors">
-          {displayedSnapshotLoading ? (
-            <BuzzLoadingState label="Loading contributors" />
-          ) : (
-            <ContributorsPanel
-              activityCounts={contributorActivityCounts}
-              contributorPubkeys={contributorPubkeys}
-              contributorPubkeysByGitIdentity={contributorPubkeysByGitIdentity}
+          <TabsContent
+            className={`m-0 ${
+              selectedPullRequestId ? "" : PROJECT_DETAIL_PANEL_CLASS
+            }`}
+            data-project-detail-panel
+            value="prs"
+          >
+            <PullRequestsPanel
+              diffStats={
+                repoDiff
+                  ? {
+                      additions: repoDiff.additions,
+                      deletions: repoDiff.deletions,
+                    }
+                  : null
+              }
+              error={pullRequestsError}
+              filesChanged={
+                filesChangedBody === "files" && selectedPullRequest ? (
+                  <ProjectPullRequestFilesChangedPanel
+                    diff={repoDiff}
+                    error={repoDiffError}
+                    focusedAnchor={
+                      pullRequestCommentTarget?.pullRequestId ===
+                      selectedPullRequestId
+                        ? pullRequestCommentTarget.anchor
+                        : null
+                    }
+                    isLoading={repoDiffLoading}
+                    profiles={profiles}
+                    project={project}
+                    pullRequest={selectedPullRequest}
+                  />
+                ) : filesChangedBody === "unavailable" ? (
+                  repositoryUnavailableState
+                ) : undefined
+              }
+              filesCount={repoDiff?.files.length}
+              forceOpenFiles={
+                pullRequestCommentTarget?.pullRequestId ===
+                selectedPullRequestId
+              }
+              isLoading={pullRequestsLoading}
+              onOpenCommit={onSelectedCommitHashChange}
+              onOpenInlineComment={handleOpenPullRequestComment}
+              onOpenTerminal={onOpenMergeRecoveryTerminal}
+              onSelectedPullRequestIdChange={onSelectedPullRequestIdChange}
               profiles={profiles}
-              repoContributors={displayedContributors}
+              project={project}
+              pullRequests={pullRequests}
+              selectedPullRequest={selectedPullRequest}
             />
-          )}
-        </TabsContent>
-      </div>
+          </TabsContent>
+
+          <TabsContent
+            className={`m-0 ${selectedIssueId ? "" : PROJECT_DETAIL_PANEL_CLASS}`}
+            data-project-detail-panel
+            value="issues"
+          >
+            <ProjectIssuesPanel
+              onSelectedIssueIdChange={onSelectedIssueIdChange}
+              profiles={profiles}
+              project={project}
+              selectedIssueId={selectedIssueId}
+            />
+          </TabsContent>
+
+          <TabsContent className="m-0" value="files">
+            {repositoryUnavailableState ??
+              (repoSource === "local" &&
+              !localSnapshot &&
+              !localSnapshotLoading ? (
+                <div className="mb-3">
+                  <div
+                    className={PROJECT_DETAIL_PANEL_MESSAGE_CLASS}
+                    data-project-detail-panel
+                  >
+                    No local checkout found.
+                  </div>
+                </div>
+              ) : (
+                <RepositoryFilesPanel
+                  error={displayedSnapshotError}
+                  fallbackAuthorPubkey={project.owner}
+                  fileContentSource={fileContentSource}
+                  files={files}
+                  isLoading={displayedSnapshotLoading}
+                  onContextChange={onFilesContextChange}
+                  onOpenCommit={onSelectedCommitHashChange}
+                  profiles={profiles}
+                  snapshot={displayedSnapshot}
+                  unavailableMessage={
+                    externalHost
+                      ? `Not mirrored on Buzz. Repository files are hosted on ${externalHost}.`
+                      : undefined
+                  }
+                />
+              ))}
+          </TabsContent>
+
+          <TabsContent className="m-0" value="channels">
+            <DiscussionChannelsPanel
+              query={repositoryDiscussionQuery(project)}
+              repositoryName={project.name}
+            />
+          </TabsContent>
+
+          <TabsContent className="m-0" value="contributors">
+            {displayedSnapshotLoading ? (
+              <BuzzLoadingState label="Loading contributors" />
+            ) : (
+              <ContributorsPanel
+                activityCounts={contributorActivityCounts}
+                contributorPubkeys={contributorPubkeys}
+                contributorPubkeysByGitIdentity={
+                  contributorPubkeysByGitIdentity
+                }
+                profiles={profiles}
+                repoContributors={displayedContributors}
+              />
+            )}
+          </TabsContent>
+        </div>
+      </Tabs>
       {createPullRequestAction && createPullRequestOpen ? (
         <CreatePullRequestDialog
           initialProjectId={projectId}
@@ -633,6 +646,6 @@ export function WorkspaceTabs({
         open={createIssueOpen}
         projectName={project.name}
       />
-    </Tabs>
+    </>
   );
 }
