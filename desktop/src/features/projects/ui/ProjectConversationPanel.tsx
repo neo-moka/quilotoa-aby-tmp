@@ -25,7 +25,12 @@ import { getEventById } from "@/shared/api/tauri";
 import type { RelayEvent, RespondToMode } from "@/shared/api/types";
 import { useIsThreadPanelOverlay } from "@/shared/hooks/use-mobile";
 import { Button } from "@/shared/ui/button";
-import { ProjectEmptyState } from "./ProjectEmptyState";
+import {
+  EmptyState,
+  EmptyStateContent,
+  EmptyStateDescription,
+  EmptyStateHeader,
+} from "@/shared/ui/empty-state";
 
 const EMPTY_PERSONA_LOOKUP = new Map<string, string>();
 const EMPTY_RESPOND_TO_LOOKUP = new Map<string, RespondToMode>();
@@ -316,15 +321,19 @@ export function ProjectConversationPanel({
   }
 
   return wrapProjectConversationPane(
-    <ProjectEmptyState
-      actions={
+    // Description only — see `PullRequestsPanelSurface` for why no title.
+    <EmptyState className="h-full justify-center bg-background">
+      <EmptyStateHeader>
+        <EmptyStateDescription>
+          This conversation could not be loaded.
+        </EmptyStateDescription>
+      </EmptyStateHeader>
+      <EmptyStateContent>
         <Button onClick={onClose} size="sm" variant="outline">
           Close
         </Button>
-      }
-      className="h-full justify-center bg-background"
-      description="This conversation could not be loaded."
-    />,
+      </EmptyStateContent>
+    </EmptyState>,
     {
       canResetWidth,
       isOverlay,

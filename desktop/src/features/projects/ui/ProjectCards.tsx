@@ -49,7 +49,6 @@ import { DropdownMenuItem } from "@/shared/ui/dropdown-menu";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/shared/ui/tooltip";
 import { UserAvatar } from "@/shared/ui/UserAvatar";
 import { CopyShareLinkMenuItem } from "./CopyShareLinkMenuItem";
-import { ProjectEmptyState } from "./ProjectEmptyState";
 import { ProjectEntityListRow } from "./ProjectEntityListRow";
 import { PROJECT_GRID_CARD_BODY_CLASS } from "./projectGridCardStyles";
 import { ProjectListRowMenu } from "./ProjectListRowMenu";
@@ -307,24 +306,31 @@ function RepositoryUnavailableIndicator({
 
 export function EmptyState() {
   return (
-    <ProjectEmptyState
-      className="flex-1 justify-center"
-      description="Projects published to this relay will appear here."
-      icon={Folders}
-      title="No projects yet"
-    />
+    <div className="flex flex-1 flex-col items-center justify-center gap-3 px-4 py-16 text-center">
+      <Folders className="h-10 w-10 text-muted-foreground/40" />
+      <div className="space-y-1">
+        <p className="text-sm font-medium text-foreground">No projects yet</p>
+        <p className="text-sm text-muted-foreground">
+          Projects published to this relay will appear here.
+        </p>
+      </div>
+    </div>
   );
 }
 
 export function EmptyFilteredState() {
   return (
-    <ProjectEmptyState
-      className="flex-1 justify-center"
-      description="Try another owner filter or sort mode."
-      icon={Folders}
-      outline
-      title="No matching projects"
-    />
+    <div className="flex flex-1 flex-col items-center justify-center gap-3 border border-dashed border-border/60 px-4 py-12 text-center">
+      <Folders className="h-9 w-9 text-muted-foreground/40" />
+      <div className="space-y-1">
+        <p className="text-sm font-medium text-foreground">
+          No matching projects
+        </p>
+        <p className="text-sm text-muted-foreground">
+          Try another owner filter or sort mode.
+        </p>
+      </div>
+    </div>
   );
 }
 
