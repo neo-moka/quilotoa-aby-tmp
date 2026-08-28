@@ -65,10 +65,10 @@ export function ProminentActiveTabSetting() {
         </p>
       </div>
       <Switch
-        checked={prominentActiveTab}
+        isSelected={prominentActiveTab}
         data-testid="prominent-active-tab-toggle"
         id="prominent-active-tab-switch"
-        onCheckedChange={setProminentActiveTab}
+        onChange={setProminentActiveTab}
       />
     </SettingsOptionRow>
   );
@@ -459,11 +459,11 @@ export function GlassBackgroundSetting() {
           </p>
         </div>
         <Switch
-          checked={glassBackgroundSupported && glassBackground}
+          isSelected={glassBackgroundSupported && glassBackground}
           data-testid="glass-background-toggle"
-          disabled={!glassBackgroundSupported}
+          isDisabled={!glassBackgroundSupported}
           id="glass-background-switch"
-          onCheckedChange={setGlassBackground}
+          onChange={setGlassBackground}
         />
       </SettingsOptionRow>
       {shouldReduceMotion ? (

@@ -1,19 +1,28 @@
-import * as React from "react";
-import * as TogglePrimitive from "@radix-ui/react-toggle";
+import type * as React from "react";
+import { ToggleButton } from "@heroui/react";
 import { cva, type VariantProps } from "class-variance-authority";
 
 import { cn } from "@/shared/lib/cn";
 
+/**
+ * Buzz's own size and variant ramp, kept on top of HeroUI's `toggle-button`
+ * base: HeroUI stops at `sm` (36px) while the transcript and mention rows need
+ * the 20px `xs` step, and it has no `outline`. These utilities sit in Tailwind's
+ * `utilities` layer, so they win over the BEM base without `!important`.
+ *
+ * `[&_svg]:m-0` neutralises the icon margins HeroUI's base applies; the state
+ * selector is `data-[selected=true]`, not Radix's `data-[state=on]`.
+ */
 const toggleVariants = cva(
-  "inline-flex items-center justify-center gap-2 rounded-lg text-sm font-medium text-muted-foreground transition-colors hover:bg-muted hover:text-foreground focus-visible:outline-hidden focus-visible:ring-1 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 data-[state=on]:bg-primary data-[state=on]:text-primary-foreground [&_svg]:pointer-events-none [&_svg]:size-4 [&_svg]:shrink-0",
+  "inline-flex items-center justify-center gap-2 rounded-lg text-sm font-medium text-muted-foreground transition-colors hover:bg-muted hover:text-foreground focus-visible:outline-hidden focus-visible:ring-1 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 data-[selected=true]:bg-primary data-[selected=true]:text-primary-foreground [&_svg]:pointer-events-none [&_svg]:m-0 [&_svg]:size-4 [&_svg]:shrink-0",
   {
     variants: {
       variant: {
         default: "bg-transparent",
         ghost:
-          "bg-transparent hover:bg-muted/70 hover:text-foreground data-[state=on]:bg-muted data-[state=on]:text-foreground",
+          "bg-transparent hover:bg-muted/70 hover:text-foreground data-[selected=true]:bg-muted data-[selected=true]:text-foreground",
         outline:
-          "border border-input/40 bg-background hover:bg-muted/70 data-[state=on]:bg-muted data-[state=on]:text-foreground",
+          "border border-input/40 bg-background hover:bg-muted/70 data-[selected=true]:bg-muted data-[selected=true]:text-foreground",
       },
       size: {
         default: "h-9 px-3 min-w-9",
@@ -29,18 +38,34 @@ const toggleVariants = cva(
   },
 );
 
-const Toggle = React.forwardRef<
-  React.ComponentRef<typeof TogglePrimitive.Root>,
-  React.ComponentPropsWithoutRef<typeof TogglePrimitive.Root> &
-    VariantProps<typeof toggleVariants>
->(({ className, variant, size, ...props }, ref) => (
-  <TogglePrimitive.Root
-    ref={ref}
-    className={cn(toggleVariants({ variant, size, className }))}
-    {...props}
-  />
-));
+type ToggleProps = Omit<
+  React.ComponentProps<typeof ToggleButton.Root>,
+  "size" | "variant"
+> &
+  VariantProps<typeof toggleVariants> & {
+    /**
+     * Native tooltip text. React Aria filters `title` off the button it
+     * renders, so it is carried by a wrapper — one that only exists when a
+     * title is actually given.
+     */
+    title?: string;
+  };
 
-Toggle.displayName = TogglePrimitive.Root.displayName;
+function Toggle({ className, size, title, variant, ...props }: ToggleProps) {
+  const button = (
+    <ToggleButton
+      {...props}
+      className={cn(toggleVariants({ variant, size, className }))}
+    />
+  );
+
+  return title ? (
+    <span className="inline-flex" title={title}>
+      {button}
+    </span>
+  ) : (
+    button
+  );
+}
 
 export { Toggle, toggleVariants };

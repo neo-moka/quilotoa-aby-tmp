@@ -102,11 +102,11 @@ export function NotificationSettingsCard({
               </p>
             </div>
             <Switch
-              checked={notificationSettings.desktopEnabled}
+              isSelected={notificationSettings.desktopEnabled}
               data-testid="notifications-desktop-toggle"
-              disabled={isUpdatingDesktopNotifications}
+              isDisabled={isUpdatingDesktopNotifications}
               id="desktop-alerts-switch"
-              onCheckedChange={(checked) => {
+              onChange={(checked) => {
                 void onSetDesktopNotificationsEnabled(checked);
               }}
             />
@@ -129,14 +129,14 @@ export function NotificationSettingsCard({
               </p>
             </div>
             <Switch
-              checked={
+              isSelected={
                 notificationSettings.desktopEnabled &&
                 notificationSettings.notifyWhileViewing
               }
               data-testid="notifications-notify-while-viewing-toggle"
-              disabled={!notificationSettings.desktopEnabled}
+              isDisabled={!notificationSettings.desktopEnabled}
               id="notify-while-viewing-switch"
-              onCheckedChange={(checked) => {
+              onChange={(checked) => {
                 onSetNotifyWhileViewing(checked);
               }}
             />
@@ -162,10 +162,10 @@ export function NotificationSettingsCard({
                   </p>
                 </div>
                 <Switch
-                  checked={anyAlertsOn}
+                  isSelected={anyAlertsOn}
                   data-testid="notifications-sound-toggle"
                   id="notification-sound-switch"
-                  onCheckedChange={(checked) => {
+                  onChange={(checked) => {
                     onSetAllSlotAlertsEnabled(checked);
                   }}
                 />
@@ -218,11 +218,11 @@ export function NotificationSettingsCard({
                             />
                           </span>
                           <Switch
-                            checked={alertsOn && !comingSoon}
+                            isSelected={alertsOn && !comingSoon}
                             data-testid={`notifications-alerts-enabled-${slot}`}
-                            disabled={comingSoon}
+                            isDisabled={comingSoon}
                             id={`alerts-enabled-${slot}-switch`}
-                            onCheckedChange={(checked) => {
+                            onChange={(checked) => {
                               onSetSlotAlertsEnabled(slot, checked);
                             }}
                           />
@@ -276,10 +276,10 @@ export function NotificationSettingsCard({
               </p>
             </div>
             <Switch
-              checked={notificationSettings.homeBadgeEnabled}
+              isSelected={notificationSettings.homeBadgeEnabled}
               data-testid="notifications-home-badge-toggle"
               id="home-badge-switch"
-              onCheckedChange={(checked) => {
+              onChange={(checked) => {
                 onSetHomeBadgeEnabled(checked);
               }}
             />

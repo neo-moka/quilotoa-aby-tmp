@@ -264,9 +264,9 @@ export function MeshComputeSettingsCard() {
               ) : null}
             </div>
             <Switch
-              checked={isSharing}
+              isSelected={isSharing}
               data-testid="mesh-share-compute-toggle"
-              disabled={
+              isDisabled={
                 // A serve node can always be stopped. An off node or consuming
                 // client can start sharing once a valid local model is selected.
                 // Unknown occupants remain protected from replacement.
@@ -278,7 +278,7 @@ export function MeshComputeSettingsCard() {
                     : !canStart)
               }
               id="mesh-share-compute-toggle"
-              onCheckedChange={handleToggle}
+              onChange={handleToggle}
             />
           </div>
 

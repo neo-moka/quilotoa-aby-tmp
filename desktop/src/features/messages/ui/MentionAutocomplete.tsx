@@ -191,12 +191,13 @@ export const MentionAutocomplete = React.memo(function MentionAutocomplete({
                     </label>
                     <Switch
                       aria-label="Automatically mention agents"
-                      checked={keepMentionedAgentsPinned}
-                      className="shadow-none [&>span]:shadow-none"
+                      className="shadow-none"
                       data-testid="mention-keep-agents-pinned-toggle"
                       id={keepPinnedSwitchId}
-                      onCheckedChange={onKeepMentionedAgentsPinnedChange}
+                      isSelected={keepMentionedAgentsPinned}
+                      onChange={onKeepMentionedAgentsPinnedChange}
                       onMouseDown={(event) => event.preventDefault()}
+                      thumbClassName="shadow-none"
                     />
                   </div>
                   <div className="mx-3 border-t border-border/50" />
@@ -391,10 +392,11 @@ export const MentionAutocomplete = React.memo(function MentionAutocomplete({
                       <span className="absolute right-3 top-1/2 inline-flex -translate-y-1/2">
                         <Toggle
                           aria-label={`${isAlwaysAddressed ? "Stop automatically mentioning" : "Automatically mention"} ${suggestion.displayName}`}
-                          className="h-6 w-6 p-0 data-[state=on]:bg-primary/15 data-[state=on]:text-primary"
+                          className="h-6 w-6 p-0 data-[selected=true]:bg-primary/15 data-[selected=true]:text-primary"
                           data-always-address-pubkey={suggestion.pubkey?.toLowerCase()}
                           data-testid={`mention-always-address-${suggestion.pubkey}`}
-                          onPressedChange={() =>
+                          isSelected={isAlwaysAddressed}
+                          onChange={() =>
                             onToggleAlwaysAddressAgent?.(suggestion)
                           }
                           onClick={(event) => event.stopPropagation()}
@@ -402,9 +404,7 @@ export const MentionAutocomplete = React.memo(function MentionAutocomplete({
                             event.preventDefault();
                             event.stopPropagation();
                           }}
-                          pressed={isAlwaysAddressed}
                           size="xs"
-                          type="button"
                         >
                           <AtSign aria-hidden="true" className="h-3.5 w-3.5" />
                         </Toggle>

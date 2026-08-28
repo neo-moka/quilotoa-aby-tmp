@@ -1983,13 +1983,11 @@ function VideoReviewDialog({
                         htmlFor="video-review-frame-toggle"
                       >
                         <Checkbox
-                          checked={postAtCurrentFrame}
-                          className="h-3.5 w-3.5"
+                          controlClassName="size-3.5"
                           data-testid="video-review-frame-toggle"
                           id="video-review-frame-toggle"
-                          onCheckedChange={(checked) =>
-                            setPostAtCurrentFrame(checked === true)
-                          }
+                          isSelected={postAtCurrentFrame}
+                          onChange={setPostAtCurrentFrame}
                         />
                         Comment at current frame
                       </label>

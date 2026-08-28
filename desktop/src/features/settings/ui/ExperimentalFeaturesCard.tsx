@@ -21,9 +21,9 @@ function FeatureRow({ feature }: { feature: FeatureDefinition }) {
       </div>
       <Switch
         aria-labelledby={`${switchId}-label`}
-        checked={enabled}
+        isSelected={enabled}
         data-testid={switchId}
-        onCheckedChange={(value) => {
+        onChange={(value) => {
           toggle(value);
           if (feature.id === "agentManagedProfiles") {
             void setAgentManagedProfiles(value).catch((error) => {

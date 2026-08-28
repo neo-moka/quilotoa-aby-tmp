@@ -474,10 +474,8 @@ const MediaAttachmentItem = React.forwardRef<
                               "rounded-lg bg-white/25 text-white ring-2 ring-white",
                           )}
                           data-testid="composer-attachment-spoiler"
-                          onPressedChange={() =>
-                            onToggleSpoiler(attachment.url)
-                          }
-                          pressed={isSpoilered}
+                          onChange={() => onToggleSpoiler(attachment.url)}
+                          isSelected={isSpoilered}
                         >
                           <HatGlasses className="h-4 w-4" />
                         </Toggle>

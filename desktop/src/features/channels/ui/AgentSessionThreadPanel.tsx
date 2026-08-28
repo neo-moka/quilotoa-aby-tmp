@@ -314,9 +314,9 @@ export function AgentSessionThreadPanel({
               </span>
               <Switch
                 aria-hidden="true"
-                checked={showRawFeed}
+                isSelected={showRawFeed}
                 className="pointer-events-none mt-0.5"
-                tabIndex={-1}
+                excludeFromTabOrder
               />
             </DropdownMenuItem>
             <DropdownMenuItem
@@ -343,9 +343,9 @@ export function AgentSessionThreadPanel({
               </span>
               <Switch
                 aria-hidden="true"
-                checked={animateActivity && !showRawFeed}
+                isSelected={animateActivity && !showRawFeed}
                 className="pointer-events-none mt-0.5"
-                tabIndex={-1}
+                excludeFromTabOrder
               />
             </DropdownMenuItem>
             <DropdownMenuItem
@@ -369,9 +369,9 @@ export function AgentSessionThreadPanel({
               </span>
               <Switch
                 aria-hidden="true"
-                checked={showTimestamps}
+                isSelected={showTimestamps}
                 className="pointer-events-none mt-0.5"
-                tabIndex={-1}
+                excludeFromTabOrder
               />
             </DropdownMenuItem>
             <DropdownMenuSeparator />

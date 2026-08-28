@@ -1,27 +1,55 @@
-import * as React from "react";
-import * as SwitchPrimitives from "@radix-ui/react-switch";
+import type * as React from "react";
+import { Switch as HeroSwitch } from "@heroui/react";
 
 import { cn } from "@/shared/lib/cn";
+import { HERO_ACCENT_SCOPE } from "./heroAccentScope";
 
-const Switch = React.forwardRef<
-  React.ComponentRef<typeof SwitchPrimitives.Root>,
-  React.ComponentPropsWithoutRef<typeof SwitchPrimitives.Root>
->(({ className, ...props }, ref) => (
-  <SwitchPrimitives.Root
-    className={cn(
-      "peer inline-flex h-5 w-9 shrink-0 cursor-pointer items-center rounded-full border-2 border-transparent shadow-none transition-colors focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background disabled:cursor-not-allowed disabled:opacity-50 data-[state=checked]:bg-primary data-[state=unchecked]:bg-input",
-      className,
-    )}
-    {...props}
-    ref={ref}
-  >
-    <SwitchPrimitives.Thumb
-      className={cn(
-        "pointer-events-none block h-4 w-4 rounded-full bg-background shadow-none ring-0 transition-transform data-[state=checked]:translate-x-4 data-[state=unchecked]:translate-x-0",
-      )}
-    />
-  </SwitchPrimitives.Root>
-));
-Switch.displayName = SwitchPrimitives.Root.displayName;
+/**
+ * HeroUI's switch is a `SwitchField` (a `div`) wrapping a `SwitchButton`
+ * (a `label`) that holds the visually hidden `input[role=switch]`. That is a
+ * different shape from the Radix `button[role=switch]` it replaces: `className`
+ * and `data-*` land on the outer field, the state lives on `data-selected`
+ * rather than `data-state`, and `id` is forwarded to the hidden input so
+ * `<label htmlFor>` keeps working.
+ *
+ * `w-fit` matters more than it looks. HeroUI's field is `display: flex`, so in a
+ * block context it would stretch to the full row while the clickable label
+ * stays shrink-to-fit at its left edge — the old Radix root was a fixed-size
+ * inline box. That both shifts layout and leaves the middle of the element
+ * inert, which is exactly where a click lands.
+ */
+type SwitchProps = Omit<
+  React.ComponentProps<typeof HeroSwitch.Root>,
+  "children"
+> & {
+  /** Label content, rendered beside the track inside the clickable area. */
+  children?: React.ReactNode;
+  /** Classes for the track. The root `className` styles the field around it. */
+  controlClassName?: string;
+  /** Classes for the knob. */
+  thumbClassName?: string;
+};
+
+function Switch({
+  children,
+  className,
+  controlClassName,
+  thumbClassName,
+  ...props
+}: SwitchProps) {
+  return (
+    <HeroSwitch.Root
+      {...props}
+      className={cn(HERO_ACCENT_SCOPE, "w-fit", className)}
+    >
+      <HeroSwitch.Content>
+        <HeroSwitch.Control className={controlClassName}>
+          <HeroSwitch.Thumb className={thumbClassName} />
+        </HeroSwitch.Control>
+        {children}
+      </HeroSwitch.Content>
+    </HeroSwitch.Root>
+  );
+}
 
 export { Switch };

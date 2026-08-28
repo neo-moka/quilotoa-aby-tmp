@@ -209,11 +209,11 @@ export function VoiceSettingsCard() {
               </p>
             </div>
             <Switch
-              checked={enabled}
+              isSelected={enabled}
               data-testid="agent-text-to-speech-toggle"
-              disabled={!settings || busy}
+              isDisabled={!settings || busy}
               id="agent-text-to-speech-switch"
-              onCheckedChange={(checked) => {
+              onChange={(checked) => {
                 if (settings) void saveEnabled(checked);
               }}
             />

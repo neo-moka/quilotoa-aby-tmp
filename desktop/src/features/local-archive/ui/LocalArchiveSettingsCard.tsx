@@ -95,11 +95,11 @@ function ObserverArchiveSection({
             </p>
           </div>
           <Switch
-            checked={enabled}
+            isSelected={enabled}
             data-testid="local-archive-observer-toggle"
-            disabled={toggleDisabled}
+            isDisabled={toggleDisabled}
             id="local-archive-observer-toggle"
-            onCheckedChange={onToggle}
+            onChange={onToggle}
           />
         </SettingsOptionRow>
       </SettingsOptionGroup>
@@ -141,11 +141,11 @@ function AgentMetricArchiveSection({
             </p>
           </div>
           <Switch
-            checked={enabled}
+            isSelected={enabled}
             data-testid="local-archive-agent-metric-toggle"
-            disabled={toggling}
+            isDisabled={toggling}
             id="local-archive-agent-metric-toggle"
-            onCheckedChange={onToggle}
+            onChange={onToggle}
           />
         </SettingsOptionRow>
       </SettingsOptionGroup>
@@ -171,12 +171,11 @@ function KindChecklist({ checkedKinds, onChange }: KindChecklistProps) {
             {/* Group header */}
             <div className="mb-1.5 flex items-center gap-2">
               <Checkbox
-                checked={indeterminate ? "indeterminate" : fullyChecked}
                 data-testid={`local-archive-group-${group.label}`}
                 id={`local-archive-group-${group.label}`}
-                onCheckedChange={() =>
-                  onChange(toggleGroup(group, checkedKinds))
-                }
+                isIndeterminate={indeterminate}
+                isSelected={fullyChecked}
+                onChange={() => onChange(toggleGroup(group, checkedKinds))}
               />
               <label
                 className="cursor-pointer text-sm font-medium"
@@ -190,12 +189,10 @@ function KindChecklist({ checkedKinds, onChange }: KindChecklistProps) {
               {group.items.map(({ kind, label }) => (
                 <div key={kind} className="flex items-center gap-2">
                   <Checkbox
-                    checked={checkedKinds.has(kind)}
+                    isSelected={checkedKinds.has(kind)}
                     data-testid={`local-archive-kind-${kind}`}
                     id={`local-archive-kind-${kind}`}
-                    onCheckedChange={() =>
-                      onChange(toggleKind(kind, checkedKinds))
-                    }
+                    onChange={() => onChange(toggleKind(kind, checkedKinds))}
                   />
                   <label
                     className="cursor-pointer text-sm text-muted-foreground"

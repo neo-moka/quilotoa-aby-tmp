@@ -96,11 +96,11 @@ export function UserProfileAgentSettingsMenu({
               </span>
               <Switch
                 aria-label="Auto-start"
-                checked={managedAgent.startOnAppLaunch}
+                isSelected={managedAgent.startOnAppLaunch}
                 data-testid={autoStartSwitchId}
-                disabled={isPending}
+                isDisabled={isPending}
                 id={autoStartSwitchId}
-                onCheckedChange={onToggleAutoStart}
+                onChange={onToggleAutoStart}
                 onClick={(event) => event.stopPropagation()}
               />
             </DropdownMenuItem>
