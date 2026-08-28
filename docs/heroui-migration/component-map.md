@@ -355,9 +355,35 @@ funcionalidad de usuario, no un test:
   base. Fuera de ella, espaciado, pesos, sombras y radios pueden cambiar en
   toda la app sin fallar nada.
 - **153 `toHaveClass` sobre clases Tailwind literales** (`h-11`, `rounded-xl`,
-  `-ml-5`, `bg-emerald-500`, `grid-flow-col`, `line-clamp-3`) y **98
-  `.locator(".clase")`**, incluidos `.font-semibold`, `.truncate`, `.sr-only` y
-  `.lucide-plus`. Caen aunque la funcionalidad se preserve.
+  `-ml-5`, `bg-emerald-500`, `grid-flow-col`, `line-clamp-3`) y **142
+  `.locator(".clase")`** (no 98), incluidos `.font-semibold`, `.truncate`,
+  `.sr-only` y `.lucide-plus`. Caen aunque la funcionalidad se preserve —
+  **pero no ante cualquier cambio, y la diferencia decide el riesgo de varios
+  lotes.** Las **153 `toHaveClass` son regex; `toHaveClass` con string exacto
+  aparece 0 veces.** Playwright trata esas dos formas distinto: con string
+  compara el atributo `class` **completo** y falla al agregar una clase; con
+  regex hace **match parcial**. Y un selector `.locator(".clase")` solo puede
+  pasar a matchear *más* nodos cuando se agregan clases, nunca menos.
+
+  **Consecuencia: agregar clases es seguro en toda la suite.** Un wrapper
+  puede adoptar la base BEM de HeroUI —`skeleton`, `chip`, `avatar`— sin tocar
+  ninguna de las 295 aserciones, siempre que conserve las clases que ya emite.
+  Lo que rompe es **quitar o renombrar**, que es justo lo que hace adoptar la
+  *apariencia* de HeroUI en vez de su base. Es otro argumento para el patrón
+  "base de HeroUI, piel propia": además de preservar el diseño, no toca la red
+  de tests.
+
+  Una excepción acotada: **tres regex nombran dos clases en orden** separadas
+  por `.*` — `tooltip-semantics.spec.ts:101`, `agents.spec.ts:1016` y
+  `agents.spec.ts:2037`. Insertar clases entre medio las deja pasar (`.*`
+  absorbe cualquier cosa); lo que las rompe es **reordenar** los tokens del
+  `class`. Es un modo de falla real cuando un wrapper pasa a componer su
+  `className` en otro orden.
+
+  Verificado con `rg` sobre `desktop/tests/e2e/`: `toHaveClass\(` → 153,
+  `toHaveClass\("` → 0, `\.locator\("\.[^"]+"\)` → 142, `toHaveClass\(\[` → 0
+  (no hay forma array) y `toContainClass` → 0. Los conteos previos de este
+  párrafo venían de una estimación, no del barrido.
 - **236 aserciones sobre `menuitem`/`menuitemradio`/`menu`**: si un menú pasa a
   `Select`/`ListBox`, el rol cambia a `option` y rompen todas.
 - **48 sobre `alertdialog`**: rol distinto de `dialog`; HeroUI puede unificarlos.
