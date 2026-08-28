@@ -3,7 +3,10 @@ packages:
   - "web"
   - "admin-web"
 allowBuilds:
+  '@heroui-pro/react': true
   esbuild: true
+  heroui-native-pro: true
+  heroui-pro: true
 overrides:
   # Force a single copy of the dismissable-layer. Radix packages otherwise
   # resolve different versions (react-menu pulled 1.1.11, react-dialog 1.1.15),
