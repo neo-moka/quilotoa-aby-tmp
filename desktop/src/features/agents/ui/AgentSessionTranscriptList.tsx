@@ -811,10 +811,10 @@ function TurnSetupFooter({
       {showContext ? (
         <Toggle
           aria-label={`${contextOpen ? "Hide" : "Show"} prompt context`}
-          className="data-[state=on]:bg-primary/10 data-[state=on]:text-primary dark:data-[state=on]:bg-primary/15"
+          className="data-[selected=true]:bg-primary/10 data-[selected=true]:text-primary dark:data-[selected=true]:bg-primary/15"
           data-testid="transcript-prompt-context-toggle"
-          onPressedChange={onContextOpenChange}
-          pressed={contextOpen}
+          isSelected={contextOpen}
+          onChange={onContextOpenChange}
           size="xs"
           title={tooltipText || "Show prompt context"}
           variant="ghost"

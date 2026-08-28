@@ -191,11 +191,11 @@ function StepConfigFields({
           {isThreadReplyEligibleTrigger(triggerType) ? (
             <div className="flex items-center gap-2">
               <Checkbox
-                checked={step.replyInThread === true}
-                disabled={disabled}
                 id={`${prefix}-reply-in-thread`}
-                onCheckedChange={(checked) =>
-                  onUpdate({ ...step, replyInThread: checked === true })
+                isDisabled={disabled}
+                isSelected={step.replyInThread === true}
+                onChange={(replyInThread) =>
+                  onUpdate({ ...step, replyInThread })
                 }
               />
               <label className="text-xs" htmlFor={`${prefix}-reply-in-thread`}>

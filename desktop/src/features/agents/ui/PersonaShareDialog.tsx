@@ -724,10 +724,10 @@ export function PersonaShareDialog({
             </div>
             <Switch
               aria-label="Share to catalog"
-              checked={catalogShareLevel !== "not-shared"}
+              isSelected={catalogShareLevel !== "not-shared"}
               data-testid="persona-share-catalog-access"
-              disabled={isPending}
-              onCheckedChange={(checked) =>
+              isDisabled={isPending}
+              onChange={(checked) =>
                 onCatalogShareLevelChange(checked ? "none" : "not-shared")
               }
               style={{ cursor: "default" }}

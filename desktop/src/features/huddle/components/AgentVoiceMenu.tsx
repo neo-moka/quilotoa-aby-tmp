@@ -113,11 +113,11 @@ export function AgentVoiceMenu({
             Agent text-to-speech
           </label>
           <Switch
-            checked={settings?.enabled ?? true}
+            isSelected={settings?.enabled ?? true}
             data-testid="huddle-agent-tts-toggle"
-            disabled={!settings || busy}
+            isDisabled={!settings || busy}
             id={`agent-tts-${agentPubkey}`}
-            onCheckedChange={(enabled) => {
+            onChange={(enabled) => {
               void update("set_huddle_agent_tts_enabled", { enabled });
             }}
           />

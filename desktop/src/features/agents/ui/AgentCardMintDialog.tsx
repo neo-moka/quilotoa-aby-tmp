@@ -373,10 +373,10 @@ export function AgentCardMintDialog({
                 </span>
               </div>
               <Switch
-                checked={canLock && lockCard}
+                isSelected={canLock && lockCard}
                 data-testid="agent-card-lock-toggle"
-                disabled={!canLock}
-                onCheckedChange={setLockCard}
+                isDisabled={!canLock}
+                onChange={setLockCard}
               />
             </div>
             {showKeyStatusRow(keyLayer, editingKey) ? (

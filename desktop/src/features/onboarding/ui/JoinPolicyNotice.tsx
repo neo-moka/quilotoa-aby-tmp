@@ -41,12 +41,10 @@ export function JoinPolicyNotice({
       {policy.ageAttestationRequired ? (
         <div className="flex items-start gap-3">
           <Checkbox
-            checked={ageConfirmed}
+            isSelected={ageConfirmed}
             className="mt-0.5"
             id={ageConfirmationId}
-            onCheckedChange={(checked) =>
-              onAgeConfirmedChange(checked === true)
-            }
+            onChange={(checked) => onAgeConfirmedChange(checked === true)}
           />
           <label
             className="cursor-pointer text-xs leading-5 text-muted-foreground"
@@ -60,12 +58,10 @@ export function JoinPolicyNotice({
       {policy.termsMarkdown || policy.privacyMarkdown ? (
         <div className="flex items-start gap-3">
           <Checkbox
-            checked={agreementConfirmed}
+            isSelected={agreementConfirmed}
             className="mt-0.5"
             id={agreementConfirmationId}
-            onCheckedChange={(checked) =>
-              onAgreementConfirmedChange(checked === true)
-            }
+            onChange={(checked) => onAgreementConfirmedChange(checked === true)}
           />
           <label
             className="cursor-pointer text-xs leading-5 text-muted-foreground"

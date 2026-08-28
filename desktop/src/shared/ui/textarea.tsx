@@ -1,13 +1,19 @@
 import * as React from "react";
+import { TextArea } from "@heroui/react";
 
 import { cn } from "@/shared/lib/cn";
 
+/**
+ * React Aria's `TextArea` under HeroUI's wrapper. As with `input.tsx` the props
+ * surface stays the DOM one and the Buzz skin is kept — see the note there for
+ * why HeroUI's field appearance is deferred rather than adopted here.
+ */
 const Textarea = React.forwardRef<
   HTMLTextAreaElement,
   React.ComponentProps<"textarea">
 >(({ className, ...props }, ref) => {
   return (
-    <textarea
+    <TextArea
       autoCapitalize="none"
       autoCorrect="off"
       spellCheck={false}

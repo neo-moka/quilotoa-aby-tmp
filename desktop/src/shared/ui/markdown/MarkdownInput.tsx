@@ -18,13 +18,13 @@ export function MarkdownInput({
     return (
       <Checkbox
         aria-label={checked ? "Completed task" : "Incomplete task"}
-        checked={Boolean(checked)}
         className={cn(
-          "pointer-events-none mr-1.5 inline-flex align-[-0.125rem] disabled:opacity-45",
+          "pointer-events-none mr-1.5 inline-flex align-[-0.125rem] data-[disabled=true]:opacity-45",
           className,
         )}
-        disabled
-        tabIndex={-1}
+        excludeFromTabOrder
+        isDisabled
+        isSelected={Boolean(checked)}
       />
     );
   }

@@ -571,12 +571,13 @@ export function InboxListPane({
                       Show unread only
                     </label>
                     <Switch
-                      checked={unreadOnly}
-                      className="shadow-none [&>span]:shadow-none"
+                      className="shadow-none"
                       data-testid="inbox-unread-only-toggle"
-                      disabled={isReminders || isDrafts}
                       id="inbox-unread-only-switch"
-                      onCheckedChange={onUnreadOnlyChange}
+                      isDisabled={isReminders || isDrafts}
+                      isSelected={unreadOnly}
+                      onChange={onUnreadOnlyChange}
+                      thumbClassName="shadow-none"
                     />
                   </div>
                   <Separator className="my-1 bg-muted" />
