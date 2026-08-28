@@ -393,9 +393,14 @@ export function normalizeHue(hue: number) {
 }
 
 function hslToRgbString(hslValue: string) {
+  // Theme tokens are complete colour values (`hsl(H S% L%)`), so the wrapper
+  // has to come off before the channels can be read. Left unstripped this
+  // yields NaN and paints the canvas wrong without throwing.
   const [hue, saturation, lightness] = hslValue
     .trim()
-    .split(/\s+/)
+    .replace(/^hsla?\(/i, "")
+    .replace(/\)$/, "")
+    .split(/[\s,]+/)
     .map((part) => Number.parseFloat(part.replace("%", "")));
 
   if (

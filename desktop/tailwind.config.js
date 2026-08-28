@@ -46,7 +46,8 @@ export default {
         "message-author": "var(--conversation-author-line-height)",
       },
       boxShadow: {
-        "content-edge": "-1px -1px 0 0 hsl(var(--sidebar-border) / 0.45)",
+        "content-edge":
+          "-1px -1px 0 0 hsl(from var(--sidebar-border) h s l / 0.45)",
         // Edge + elevation for a surface anchored to the right of the content
         // area, whose only exposed edge faces left. Tailwind's stock shadows are
         // all y-offset, so they cast almost nothing sideways — `shadow-xl` on a
@@ -56,7 +57,7 @@ export default {
         // soft layer carries the lift. A left-only `border` can't do this job —
         // it tapers out at each corner instead of turning it.
         "panel-left":
-          "-1px 0 0 0 hsl(var(--border) / 0.8), -16px 0 32px -12px rgb(0 0 0 / 0.18)",
+          "-1px 0 0 0 hsl(from var(--border) h s l / 0.8), -16px 0 32px -12px rgb(0 0 0 / 0.18)",
       },
       borderRadius: {
         lg: "var(--radius)",
@@ -80,54 +81,54 @@ export default {
         ],
       },
       colors: {
-        background: "hsl(var(--background))",
-        foreground: "hsl(var(--foreground))",
+        background: "var(--background)",
+        foreground: "var(--foreground)",
         card: {
-          DEFAULT: "hsl(var(--card))",
-          foreground: "hsl(var(--card-foreground))",
+          DEFAULT: "var(--card)",
+          foreground: "var(--card-foreground)",
         },
         popover: {
-          DEFAULT: "hsl(var(--popover))",
-          foreground: "hsl(var(--popover-foreground))",
+          DEFAULT: "var(--popover)",
+          foreground: "var(--popover-foreground)",
         },
         primary: {
-          DEFAULT: "hsl(var(--primary))",
-          foreground: "hsl(var(--primary-foreground))",
+          DEFAULT: "var(--primary)",
+          foreground: "var(--primary-foreground)",
         },
         secondary: {
-          DEFAULT: "hsl(var(--secondary))",
-          foreground: "hsl(var(--secondary-foreground))",
+          DEFAULT: "var(--secondary)",
+          foreground: "var(--secondary-foreground)",
         },
         muted: {
-          DEFAULT: "hsl(var(--muted))",
-          foreground: "hsl(var(--muted-foreground))",
+          DEFAULT: "var(--muted)",
+          foreground: "var(--muted-foreground)",
         },
         accent: {
-          DEFAULT: "hsl(var(--accent))",
-          foreground: "hsl(var(--accent-foreground))",
+          DEFAULT: "var(--accent)",
+          foreground: "var(--accent-foreground)",
         },
         destructive: {
-          DEFAULT: "hsl(var(--destructive))",
-          foreground: "hsl(var(--destructive-foreground))",
+          DEFAULT: "var(--destructive)",
+          foreground: "var(--destructive-foreground)",
         },
         notification: {
-          DEFAULT: "hsl(var(--notification))",
-          foreground: "hsl(var(--notification-foreground))",
+          DEFAULT: "var(--notification)",
+          foreground: "var(--notification-foreground)",
         },
-        border: "hsl(var(--border))",
-        input: "hsl(var(--input))",
-        ring: "hsl(var(--ring))",
+        border: "var(--border)",
+        input: "var(--input)",
+        ring: "var(--ring)",
         sidebar: {
-          DEFAULT: "hsl(var(--sidebar-background))",
-          foreground: "hsl(var(--sidebar-foreground))",
-          primary: "hsl(var(--sidebar-primary))",
-          "primary-foreground": "hsl(var(--sidebar-primary-foreground))",
-          active: "hsl(var(--sidebar-active))",
-          "active-foreground": "hsl(var(--sidebar-active-foreground))",
-          accent: "hsl(var(--sidebar-accent))",
-          "accent-foreground": "hsl(var(--sidebar-accent-foreground))",
-          border: "hsl(var(--sidebar-border))",
-          ring: "hsl(var(--sidebar-ring))",
+          DEFAULT: "var(--sidebar-background)",
+          foreground: "var(--sidebar-foreground)",
+          primary: "var(--sidebar-primary)",
+          "primary-foreground": "var(--sidebar-primary-foreground)",
+          active: "var(--sidebar-active)",
+          "active-foreground": "var(--sidebar-active-foreground)",
+          accent: "var(--sidebar-accent)",
+          "accent-foreground": "var(--sidebar-accent-foreground)",
+          border: "var(--sidebar-border)",
+          ring: "var(--sidebar-ring)",
         },
         status: {
           added: "var(--status-added)",

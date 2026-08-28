@@ -23,33 +23,37 @@ export const BUZZ_GRADIENT_STOPS: Record<
 };
 
 export const LIGHT_PREVIEW_VARS: ThemePreviewVars = {
-  "--background": "0 0% 100%",
-  "--border": "0 0% 89.8%",
-  "--foreground": "0 0% 9%",
-  "--muted": "0 0% 96.1%",
-  "--muted-foreground": "0 0% 45.1%",
-  "--primary": "0 0% 9%",
-  "--sidebar-background": "0 0% 98%",
-  "--sidebar-foreground": "0 0% 9%",
+  "--background": "hsl(0 0% 100%)",
+  "--border": "hsl(0 0% 89.8%)",
+  "--foreground": "hsl(0 0% 9%)",
+  "--muted": "hsl(0 0% 96.1%)",
+  "--muted-foreground": "hsl(0 0% 45.1%)",
+  "--primary": "hsl(0 0% 9%)",
+  "--sidebar-background": "hsl(0 0% 98%)",
+  "--sidebar-foreground": "hsl(0 0% 9%)",
 };
 
 export const DARK_PREVIEW_VARS: ThemePreviewVars = {
-  "--background": "0 0% 3.9%",
-  "--border": "0 0% 14.9%",
-  "--foreground": "0 0% 98%",
-  "--muted": "0 0% 14.9%",
-  "--muted-foreground": "0 0% 63.9%",
-  "--primary": "0 0% 98%",
-  "--sidebar-background": "0 0% 0%",
-  "--sidebar-foreground": "0 0% 98%",
+  "--background": "hsl(0 0% 3.9%)",
+  "--border": "hsl(0 0% 14.9%)",
+  "--foreground": "hsl(0 0% 98%)",
+  "--muted": "hsl(0 0% 14.9%)",
+  "--muted-foreground": "hsl(0 0% 63.9%)",
+  "--primary": "hsl(0 0% 98%)",
+  "--sidebar-background": "hsl(0 0% 0%)",
+  "--sidebar-foreground": "hsl(0 0% 98%)",
 };
 
+// Theme vars now hold complete colour values, so a token is usable as-is.
 function hsl(vars: ThemePreviewVars | null, key: string) {
-  return `hsl(${vars?.[key] ?? LIGHT_PREVIEW_VARS[key]})`;
+  return vars?.[key] ?? LIGHT_PREVIEW_VARS[key];
 }
 
+// `color-mix` rather than relative-colour syntax: these strings land in SVG
+// presentation attributes, where `hsl(from …)` is not reliably honoured.
 function hslAlpha(vars: ThemePreviewVars | null, key: string, alpha: number) {
-  return `hsl(${vars?.[key] ?? LIGHT_PREVIEW_VARS[key]} / ${alpha})`;
+  const color = vars?.[key] ?? LIGHT_PREVIEW_VARS[key];
+  return `color-mix(in srgb, ${color} ${alpha * 100}%, transparent)`;
 }
 
 function ThemePreviewSvg({
@@ -617,7 +621,7 @@ export function SystemPreferencePreviewFrame({
         className,
       )}
       style={{
-        backgroundColor: "hsl(var(--muted))",
+        backgroundColor: "var(--muted)",
       }}
     >
       <div className="absolute -bottom-1 -right-1 h-[90%] w-[90%]">

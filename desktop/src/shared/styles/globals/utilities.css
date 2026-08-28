@@ -69,7 +69,7 @@
 
   .buzz-huddle-drawer .buzz-huddle-control-button,
   .buzz-huddle-drawer .buzz-huddle-split-main {
-    background: hsl(var(--huddle-control-surface, var(--secondary)));
+    background: var(--huddle-control-surface, var(--secondary));
   }
 
   .buzz-huddle-drawer .buzz-huddle-control-button:hover,
@@ -83,16 +83,16 @@
   }
 
   .buzz-huddle-drawer .buzz-huddle-control-button[aria-pressed="true"] {
-    background: hsl(var(--primary));
-    color: hsl(var(--primary-foreground));
+    background: var(--primary);
+    color: var(--primary-foreground);
   }
 
   .buzz-huddle-drawer .buzz-huddle-control-button[aria-pressed="true"]:hover {
-    background: hsl(var(--primary) / 90%);
+    background: hsl(from var(--primary) h s l / 90%);
   }
 
   .buzz-huddle-drawer .buzz-huddle-split-chevron {
-    background: hsl(var(--huddle-control-chevron-surface, var(--secondary)));
+    background: var(--huddle-control-chevron-surface, var(--secondary));
   }
 
   .buzz-huddle-drawer .buzz-huddle-split-chevron:hover {
