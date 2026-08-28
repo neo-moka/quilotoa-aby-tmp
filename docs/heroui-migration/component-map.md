@@ -656,7 +656,7 @@ Dos cosas, y las dos ya estaban dichas en otras partes de este documento:
 | `chat-attachment` | **Descartado** | Miniatura de 64px + tarjeta de archivo + quitar. `ComposerAttachments` (831 líneas) tiene anotación de imágenes, spoilers, revert, spoilers de video, progreso de subida y tarjetas de snapshot. |
 | `chat-loader` | **Descartado** | `ChatLoader.Dots` dice *que* algo carga; `TypingIndicatorRow` dice **quién** (avatares apilados + nombres). Y `ChatLoader.Skeleton` es un bloque fijo, mientras `TimelineSkeleton` cachea la forma de las filas en `localStorage` (`buzz-timeline-skeleton-shape.v1`) para imitar la conversación real. |
 | `chat-source` | **Descartado** | Trae favicons desde `google.com/s2/favicons`: **pedido externo bajo el CSP de Tauri, y le filtra a un tercero qué links ve el usuario.** Eso solo ya lo saca, sin evaluar el resto. |
-| `emoji-reaction-button` | **Descartado** | Era el mejor calce y se falsificó empíricamente. `filterDOMProps` **descarta `title`** (el nombre del emoji) y el componente no tiene prop `render` como escotilla. Su CSS trae `[data-readonly=true]{pointer-events:none}`, o sea que `isReadOnly` **recrea** el hack del `<span>` que se quería eliminar. Su estado seleccionado resuelve de `--accent` (necesita `HERO_ACCENT_SCOPE`) y su geometría `--md` hay que pisarla. Ganancia neta después de todo eso: una animación de press. |
+| `emoji-reaction-button` | **Descartado**, y por un motivo distinto del que parecía | Era el mejor calce: es el único de la evaluación que Pro **no** clasifica bajo "AI". `filterDOMProps` descarta `title` (el nombre del emoji), pero **eso no es lo que lo bloquea**: `render` lo recupera, la misma escotilla que usa `button.tsx` — aunque la doc de Pro no liste esa prop para este componente, el root reenvía sus rest props al `ToggleButton` de React Aria, que sí la honra. Lo que lo bloquea es `isReadOnly`, que era **la única razón para adoptarlo** (eliminar el `<span>` que delega hover/focus alrededor de un botón `disabled` en `MessageReactions`): su CSS trae `[data-readonly=true]{pointer-events:none}` y el root fuerza `excludeFromTabOrder`, o sea ni hovereable ni tabulable. El span se queda, y con él se cae el motivo. Encima el estado seleccionado resuelve de `--accent` (necesita `HERO_ACCENT_SCOPE`) y su geometría `--md` hay que pisarla. Ganancia neta: una animación de press. Los cinco hechos están fijados en `shared/ui/emojiReactionButtonHeroUiGap.test.mjs`. |
 | `hover-card` | **Descartado**, y es el que más dolía | Hay **seis** implementaciones a mano del mismo patrón (`DEFAULT_POPOVER_HOVER_OPEN_DELAY_MS` + timer de cierre): `MessageReactions`, `ChannelActivityPopover`, `UserProfilePopover`, `BotActivityBar`, `PubKey`, `InlineEmojiPopover`. Pro lo trae con `openDelay`/`closeDelay` y hasta resuelve el Escape de §6ter con un listener a nivel `document`. Pero pasa `isNonModal: true` a `Popover` de RAC, y con eso `usePopover` le da `onClose: state.close` a `useOverlayPosition`, que **sí** importa `useCloseOnScroll`. O sea: el hover card se cierra cuando scrollea cualquier ancestro del trigger — y casi todos estos sitios viven dentro del timeline, que auto-scrollea al llegar un mensaje. |
 | `emoji-picker` | **Descartado** | Es un `Select` + `ListBox` + `Popover` de RAC: **es dueño del foco y del teclado**, contra el contrato del composer (`ComposerEmojiPicker` hace `onOpenAutoFocus={e => e.preventDefault()}` y un `MutationObserver` que le da el foco al input de búsqueda en shadow DOM). Además habría que reconstruir la capa de datos de emoji-mart: `buildCustomEmojiCategory(useCustomEmoji())` mete los **emoji custom del relay**, y la selección se normaliza para que resuelvan a `emojiUrl`. |
 | `drop-zone` | **Descartado** | `DropZone` de RAC está construido sobre el sistema de drag-and-drop de React Aria; el composer necesita `File` crudos de un drag del sistema operativo y usa un contador de profundidad (`dragDepthRef` en `useMediaUpload`) para el problema clásico de `dragenter`/`dragleave` anidados. Es reescribir algo que funciona por equivalente. |
@@ -670,8 +670,21 @@ Dos cosas, y las dos ya estaban dichas en otras partes de este documento:
   `onClose: isNonModal && !isSubmenu ? state.close : null` a
   `useOverlayPosition`, y es **ese** el que importa `useCloseOnScroll`. La otra
   mitad (`isDismissable: !isNonModal || isSubmenu`) está donde decía.
-- **Todos estos componentes se exportan desde la raíz del paquete.** Se verificó
-  con resolución real y con `tsc --noEmit`, no por `grep` de nombres:
+- **La tabla de props de la doc de Pro no es la API real.** El "API Reference"
+  de `emoji-reaction-button` no lista `render`, y el componente **sí la honra**
+  (el root hace `...rest` sobre el `ToggleButton` de React Aria). Esta
+  evaluación llegó a afirmar lo contrario por leer la tabla en vez del `dist`,
+  que es exactamente el error contra el que advierte el punto siguiente. Para
+  cualquier componente de Pro: la lista de props documentada es un piso, no un
+  techo — todo lo que el root reenvíe al primitivo de RAC está disponible
+  aunque no figure.
+- **Todos estos componentes se exportan desde la raíz del paquete** — para el
+  bundler y para `tsc`. En un test de Node con jsdom conviene igual el subpath:
+  el barrel de la raíz arrastra `sheet`, cuyo `use-scale-background` llama a
+  `window.matchMedia` **en el scope del módulo**, y jsdom no lo implementa, así
+  que un import desde la raíz revienta al importar y no en una aserción.
+  La exportación se verificó con resolución real y con `tsc --noEmit`, no por
+  `grep` de nombres:
   `dist/index.d.ts` es un barrel de tres líneas (`export * from "./components"`),
   así que buscar el nombre ahí da cero y **es un falso negativo**. Aplica a
   `ChatListView`, `DropZone`, `EmojiPicker`, `EmojiReactionButton`, `EmptyState`,
