@@ -893,6 +893,89 @@ const KIND_LABEL = {
   runtime: "querySelector",
 };
 
+/* ------------------------------------------------------------------ *
+ * Anchors
+ * ------------------------------------------------------------------ */
+
+/**
+ * Tag name owning the JSX attribute at `index`: the nearest element opened
+ * before it. Attributes always precede children, so scanning backwards for the
+ * last `<Tag` is sound for well-formed JSX.
+ */
+function owningTag(content, index) {
+  let tag = null;
+  for (const match of content.slice(0, index).matchAll(/<([A-Za-z][\w.]*)/g)) {
+    tag = match[1];
+  }
+  return tag;
+}
+
+/**
+ * Coverage answers "does *something* still emit this testid", which is one
+ * question short of the contract. Two components can emit the same shape —
+ * `channel-${channel.name}` in `SidebarSection` and `channel-${…}` in
+ * `SearchResultItem` both compile to `/^channel-.+$/` — so deleting either one
+ * leaves every `channel-general` consumer covered by the other and the check
+ * stays green. Coverage also says nothing about the *kind* of node: `theme.css`
+ * needs the testid on the element carrying the surface class, and
+ * `projectsSectionMeta.openAppSearch` does
+ * `querySelector<HTMLButtonElement>('[data-testid="open-search"]')?.click()`,
+ * which resolves to `null` on a `div[role=button]` and silently stops working.
+ *
+ * An anchor pins both: this exact emitter, in this file, and optionally on this
+ * element. Anchor only the testids whose consumers fail silently — the ones
+ * `theme.css` styles and the ones runtime code queries. Spec-only testids
+ * already fail loudly in CI and do not need one.
+ *
+ * @param {Array<{testId: string, file: string, tag?: string, why: string}>} anchors
+ * @param {Array<{raw: string, relativePath: string, lineNumber: number}>} emitters
+ * @param {Array<{relativePath: string, content: string}>} sourceFiles
+ */
+export function checkAnchors(anchors, emitters, sourceFiles) {
+  const contents = new Map(
+    sourceFiles.map((file) => [file.relativePath, file.content]),
+  );
+  const failures = [];
+
+  for (const anchor of anchors) {
+    const matches = emitters.filter(
+      (emitter) =>
+        emitter.raw === anchor.testId &&
+        emitter.relativePath === anchor.file,
+    );
+
+    if (matches.length === 0) {
+      const elsewhere = emitters
+        .filter((emitter) => emitter.raw === anchor.testId)
+        .map((emitter) => `${emitter.relativePath}:${emitter.lineNumber}`);
+      failures.push({
+        anchor,
+        detail:
+          elsewhere.length > 0
+            ? `no longer emitted there; found at ${elsewhere.join(", ")}`
+            : "no longer emitted anywhere",
+      });
+      continue;
+    }
+
+    if (!anchor.tag) continue;
+    const content = contents.get(anchor.file) ?? "";
+    const tags = matches.map((match) => {
+      const lineStart = indexOfLine(content, match.lineNumber);
+      const attribute = content.indexOf("data-testid", lineStart);
+      return owningTag(content, attribute < 0 ? lineStart : attribute);
+    });
+    if (!tags.includes(anchor.tag)) {
+      failures.push({
+        anchor,
+        detail: `emitted on <${tags.filter(Boolean).join(">, <") || "?"}>, not <${anchor.tag}>`,
+      });
+    }
+  }
+
+  return failures;
+}
+
 /**
  * @param {object} options
  * @param {string} options.projectRoot Absolute path the roots resolve against.
@@ -904,6 +987,7 @@ const KIND_LABEL = {
  * @param {Set<string>} options.styleExtensions
  * @param {RegExp[]} [options.ignore] Relative paths to skip everywhere.
  * @param {Set<string>} [options.overrides] Deliberately retired testids.
+ * @param {Array<object>} [options.anchors] Emitters pinned to a file and element.
  * @param {string} options.label Human label for the failure header.
  * @param {string} options.scriptPath Path mentioned in the failure hint.
  * @param {string} [options.gitPathspec] Pathspec used to locate prior emitters.
@@ -918,6 +1002,7 @@ export async function runTestIdCheck({
   styleExtensions,
   ignore = [],
   overrides = new Set(),
+  anchors = [],
   label,
   scriptPath,
   gitPathspec,
@@ -944,13 +1029,37 @@ export async function runTestIdCheck({
     downgradedFiles: specEmitters.dynamicInjectionFiles,
   });
   const allUnresolved = [...spec.unresolved, ...unresolved];
+  const anchorFailures = checkAnchors(anchors, appEmitters, sourceFiles);
+
+  if (anchorFailures.length > 0) {
+    console.error(
+      `${label} data-testid contract check failed: ${anchorFailures.length} ` +
+        `anchored testid(s) moved off the node their silent consumers need.\n`,
+    );
+    for (const { anchor, detail } of anchorFailures) {
+      console.error(`  "${anchor.testId}" — ${detail}`);
+      console.error(
+        `      expected in ${anchor.file}${anchor.tag ? ` on <${anchor.tag}>` : ""}`,
+      );
+      console.error(`      why: ${anchor.why}`);
+    }
+    console.error(
+      `\nAn anchor exists because this testid's consumers fail silently — the ` +
+        `theme stylesheet paints through it, or runtime code queries it. ` +
+        `Coverage elsewhere does not substitute: re-emit it on the node that ` +
+        `replaced the old one, or update the anchor in \`${scriptPath}\` in the ` +
+        `same change that moves it deliberately.`,
+    );
+    process.exit(1);
+  }
 
   if (missing.length === 0) {
     console.log(
       `${label} data-testid contract: ${index.literals.size} literal + ` +
         `${index.patterns.length} dynamic emitters cover ${consumers.length} ` +
         `consumer references (${allUnresolved.length} unresolved, ` +
-        `${index.untrustedPatterns.length} patterns too generic to trust).`,
+        `${index.untrustedPatterns.length} patterns too generic to trust), ` +
+        `${anchors.length} anchored to a node.`,
     );
     return;
   }
