@@ -10,6 +10,7 @@ import {
 import { selectProjectRepository } from "@/features/projects/projectModels";
 import { useCreateProjectPullRequestMutation } from "@/features/projects/pullRequestMutations";
 import { useProjectRepoSyncStatusQuery } from "@/features/projects/repoSyncHooks";
+import { Select } from "@/shared/ui/select";
 
 import {
   CreateProjectWorkItemDialog,
@@ -177,11 +178,15 @@ export function CreatePullRequestDialog({
       titlePlaceholder="Describe the change"
     >
       <div className="grid gap-3 rounded-xl border border-border/60 bg-muted/25 p-3 sm:grid-cols-2">
-        <label className="space-y-1.5 text-sm font-medium sm:col-span-2">
+        <label
+          className="space-y-1.5 text-sm font-medium sm:col-span-2"
+          htmlFor="create-pull-request-repository"
+        >
           <span>Repository</span>
-          <select
-            className="h-10 w-full rounded-lg border border-input bg-background px-3 text-sm font-normal outline-hidden focus:ring-1 focus:ring-ring"
+          <Select
+            className="h-10 text-sm font-normal"
             data-testid="create-pull-request-repository"
+            id="create-pull-request-repository"
             disabled={createMutation.isPending}
             onChange={(event) => setRepositoryId(event.target.value)}
             value={repository?.id ?? ""}
@@ -196,13 +201,17 @@ export function CreatePullRequestDialog({
                   : candidate.project.name}
               </option>
             ))}
-          </select>
+          </Select>
         </label>
-        <label className="space-y-1.5 text-sm font-medium">
+        <label
+          className="space-y-1.5 text-sm font-medium"
+          htmlFor="create-pull-request-base-branch"
+        >
           <span>Base</span>
-          <select
-            className="h-10 w-full rounded-lg border border-input bg-background px-3 text-sm font-normal outline-hidden focus:ring-1 focus:ring-ring"
+          <Select
+            className="h-10 text-sm font-normal"
             data-testid="create-pull-request-base-branch"
+            id="create-pull-request-base-branch"
             disabled={createMutation.isPending}
             onChange={(event) => setTargetBranch(event.target.value)}
             value={targetBranch}
@@ -212,13 +221,17 @@ export function CreatePullRequestDialog({
                 {branch}
               </option>
             ))}
-          </select>
+          </Select>
         </label>
-        <label className="space-y-1.5 text-sm font-medium">
+        <label
+          className="space-y-1.5 text-sm font-medium"
+          htmlFor="create-pull-request-compare-branch"
+        >
           <span>Compare</span>
-          <select
-            className="h-10 w-full rounded-lg border border-input bg-background px-3 text-sm font-normal outline-hidden focus:ring-1 focus:ring-ring"
+          <Select
+            className="h-10 text-sm font-normal"
             data-testid="create-pull-request-compare-branch"
+            id="create-pull-request-compare-branch"
             disabled={createMutation.isPending}
             onChange={(event) => setSourceBranch(event.target.value)}
             value={sourceBranch}
@@ -231,7 +244,7 @@ export function CreatePullRequestDialog({
                 {branch}
               </option>
             ))}
-          </select>
+          </Select>
         </label>
         {selectionError ? (
           <p className="text-xs text-muted-foreground sm:col-span-2">

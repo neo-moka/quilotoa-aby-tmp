@@ -13,6 +13,7 @@ import {
 } from "@/shared/ui/dialog";
 import { Input } from "@/shared/ui/input";
 import { Popover, PopoverAnchor, PopoverContent } from "@/shared/ui/popover";
+import { Select } from "@/shared/ui/select";
 import { downloadDisabled, MIN_PASSPHRASE_LEN } from "../lib/encryptedBackup";
 
 /** Word-count bounds mirroring `key_backup.rs` (Rust clamps regardless). */
@@ -210,8 +211,8 @@ function PassphraseGeneratorPopover({
           >
             Separator
           </label>
-          <select
-            className="h-8 rounded-lg border border-border bg-background px-2 text-sm text-foreground outline-hidden focus-visible:ring-1 focus-visible:ring-ring"
+          <Select
+            className="h-8 w-auto px-2 text-sm"
             id="backup-passphrase-separator"
             data-testid="backup-passphrase-separator"
             onChange={(event) => setSeparator(event.target.value)}
@@ -222,7 +223,7 @@ function PassphraseGeneratorPopover({
                 {option.label}
               </option>
             ))}
-          </select>
+          </Select>
         </div>
 
         {error ? (

@@ -36,7 +36,7 @@ async function openCreateDialog(page: import("@playwright/test").Page) {
 }
 
 async function customizeAgentAi(page: import("@playwright/test").Page) {
-  await page.getByRole("tab", { name: "Customize for this agent" }).click();
+  await page.getByTestId("agent-ai-configuration-mode-custom").click();
 }
 
 /**
@@ -780,7 +780,7 @@ test.describe("global agent config screenshots", () => {
       page.locator("#persona-runtime"),
       "Claude Code",
     );
-    await page.getByRole("tab", { name: "Use harness defaults" }).click();
+    await page.getByTestId("agent-ai-configuration-mode-defaults").click();
 
     // Provider picker hidden — the runtime drives its own provider.
     await expect(page.locator("#persona-llm-provider")).not.toBeVisible();

@@ -39,7 +39,7 @@ async function openNewPersonaDialog(page: import("@playwright/test").Page) {
 
   const dialog = page.getByTestId("persona-dialog");
   await expect(dialog).toBeVisible({ timeout: 8_000 });
-  await dialog.getByRole("tab", { name: "Customize for this agent" }).click();
+  await dialog.getByTestId("agent-ai-configuration-mode-custom").click();
   return dialog;
 }
 
@@ -91,14 +91,13 @@ test.describe("persona model combobox screenshots", () => {
 
     await trigger.click();
 
-    // Wait for the search input to appear (popover is open).
-    await expect(page.getByPlaceholder("Search models…")).toBeVisible({
-      timeout: 5_000,
-    });
+    // Wait for the listbox to appear (popover is open). The combobox input is
+    // itself the filter, so there is no separate search field to wait on.
+    await expect(page.getByRole("listbox")).toBeVisible({ timeout: 5_000 });
 
     // Wait for model discovery to populate at least one non-loading row.
     await expect(
-      page.getByRole("button", { name: /claude|gpt|default/i }).first(),
+      page.getByRole("option", { name: /claude|gpt|default/i }).first(),
     ).toBeVisible({ timeout: 8_000 });
 
     await waitForAnimations(page);
@@ -111,17 +110,17 @@ test.describe("persona model combobox screenshots", () => {
 
     await trigger.click();
 
-    const searchInput = page.getByPlaceholder("Search models…");
-    await expect(searchInput).toBeVisible({ timeout: 5_000 });
+    await expect(page.getByRole("listbox")).toBeVisible({ timeout: 5_000 });
     await expect(
-      page.getByRole("button", { name: /claude|gpt|default/i }).first(),
+      page.getByRole("option", { name: /claude|gpt|default/i }).first(),
     ).toBeVisible({ timeout: 8_000 });
 
-    await searchInput.fill("gpt");
+    // The combobox input is the filter — type into the trigger itself.
+    await trigger.fill("gpt");
 
     // At least one GPT option should be visible; Claude options gone.
     await expect(
-      page.getByRole("button", { name: /gpt/i }).first(),
+      page.getByRole("option", { name: /gpt/i }).first(),
     ).toBeVisible({ timeout: 3_000 });
 
     await waitForAnimations(page);
@@ -134,13 +133,13 @@ test.describe("persona model combobox screenshots", () => {
 
     await trigger.click();
 
-    const searchInput = page.getByPlaceholder("Search models…");
-    await expect(searchInput).toBeVisible({ timeout: 5_000 });
+    await expect(page.getByRole("listbox")).toBeVisible({ timeout: 5_000 });
     await expect(
-      page.getByRole("button", { name: /claude|gpt|default/i }).first(),
+      page.getByRole("option", { name: /claude|gpt|default/i }).first(),
     ).toBeVisible({ timeout: 8_000 });
 
-    await searchInput.fill("zzznomatch");
+    // The combobox input is the filter — type into the trigger itself.
+    await trigger.fill("zzznomatch");
 
     await expect(page.getByText("No models match")).toBeVisible({
       timeout: 3_000,

@@ -52,7 +52,7 @@ async function openCreateDialog(page: Page) {
   await page.getByTestId("new-agent-card").click();
   const dialog = page.getByTestId("persona-dialog");
   await expect(dialog).toBeVisible({ timeout: 10_000 });
-  await dialog.getByRole("tab", { name: "Customize for this agent" }).click();
+  await dialog.getByTestId("agent-ai-configuration-mode-custom").click();
   return dialog;
 }
 
@@ -67,7 +67,7 @@ async function openDefinitionEditDialog(page: Page, name: string) {
   await page.getByRole("menuitem", { name: "Edit" }).click();
   const dialog = page.getByTestId("persona-dialog");
   await expect(dialog).toBeVisible({ timeout: 10_000 });
-  await dialog.getByRole("tab", { name: "Customize for this agent" }).click();
+  await dialog.getByTestId("agent-ai-configuration-mode-custom").click();
   return dialog;
 }
 
