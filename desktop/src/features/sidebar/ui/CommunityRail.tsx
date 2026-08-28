@@ -15,7 +15,14 @@ import {
   useSortable,
 } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
-import { CheckCheck, Link2, Plus, Settings2, Ticket } from "lucide-react";
+import {
+  CheckCheck,
+  Link2,
+  Plus,
+  Settings2,
+  Ticket,
+  Users,
+} from "lucide-react";
 import * as React from "react";
 
 import type { Community } from "@/features/communities/types";
@@ -155,7 +162,7 @@ function CommunityButton({
                     src={iconUrl}
                   />
                 ) : (
-                  getInitials(community.name) || "🐝"
+                  getInitials(community.name) || <Users className="h-4 w-4" />
                 )}
               </span>
               {showBadge ? (
@@ -207,7 +214,7 @@ function CommunityDragOverlay({
           src={iconUrl}
         />
       ) : (
-        getInitials(community.name) || "🐝"
+        getInitials(community.name) || <Users className="h-4 w-4" />
       )}
     </div>
   );

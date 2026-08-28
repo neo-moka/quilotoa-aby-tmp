@@ -13,6 +13,19 @@ type ProfileAvatarProps = {
   avatarUrl: string | null;
   avatarDataUrl?: string | null;
   label: string;
+  /**
+   * Text the initials derive from. Defaults to `label`, which is also the
+   * image's alt text — pass `""` to suppress initials while keeping a real alt.
+   *
+   * The two are separate because `label` is not always a name. An account with
+   * no profile falls back to a truncated npub, and `getInitials` strips the
+   * ellipsis and reads the halves as words, so `npub1y4r2q…hl9e` yields "NH" —
+   * a monogram belonging to nobody. Callers that render their own figure for
+   * that case (`SidebarProfileCard`, `ProfilePopover` use an identicon) still
+   * reach this component when a picture exists, and would show the invented
+   * initials the moment that picture failed to load.
+   */
+  initialsLabel?: string;
   className?: string;
   iconClassName?: string;
   imageClassName?: string;
@@ -24,13 +37,14 @@ export function ProfileAvatar({
   avatarUrl,
   avatarDataUrl,
   label,
+  initialsLabel,
   className,
   iconClassName,
   imageClassName,
   plain = false,
   testId,
 }: ProfileAvatarProps) {
-  const initials = getInitials(label);
+  const initials = getInitials(initialsLabel ?? label);
   const presentation = useAvatarPresentation(avatarUrl);
   const presentedAvatarUrl = presentation?.displayUrl ?? avatarUrl;
 

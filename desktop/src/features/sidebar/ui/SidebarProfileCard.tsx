@@ -187,15 +187,17 @@ export function SidebarProfileCard({
               value={identiconSeed}
             />
           ) : (
-            // `label` stays the resolved name so the image keeps a real `alt`.
-            // Without a profile name this branch is only reached when a picture
-            // exists, so `ProfileAvatar`'s initials are unreachable except in
-            // the narrow case of that picture failing to load.
+            // `label` stays the resolved name so the image keeps a real `alt`;
+            // `initialsLabel=""` suppresses the initials it would otherwise be
+            // used for. Without a profile name this branch is only reached when
+            // a picture exists, and that picture failing to load is the one
+            // path back to invented initials.
             <ProfileAvatar
               avatarDataUrl={avatarDataUrl}
               avatarUrl={avatarUrl}
               className="h-full w-full text-xs"
               iconClassName="h-4 w-4"
+              initialsLabel={hasProfileName ? undefined : ""}
               label={resolvedDisplayName}
               testId="sidebar-profile-avatar"
             />

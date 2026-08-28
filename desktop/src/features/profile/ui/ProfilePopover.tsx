@@ -160,6 +160,7 @@ export function ProfilePopover({
                     avatarUrl={avatarUrl}
                     className="h-full w-full text-xs"
                     iconClassName="h-4 w-4"
+                    initialsLabel={hasProfileName ? undefined : ""}
                     label={displayName}
                   />
                 )}
@@ -173,7 +174,23 @@ export function ProfilePopover({
                 >
                   {displayName}
                 </p>
-                {/* ── Presence chip (opens status chooser) ─────────── */}
+                {/*
+                 * ── Presence chip (opens status chooser) ───────────
+                 *
+                 * Open proposal, deliberately not applied: this is the only
+                 * layer in the menu that opens *downwards*, while the menu
+                 * itself is anchored upwards from the sidebar card
+                 * (`sideOffset={-32}`). The community row next to it uses a
+                 * lateral submenu, so the two sibling disclosures behave
+                 * differently. Moving this one to a lateral submenu would make
+                 * them consistent.
+                 *
+                 * It stays as written because it changes how the menu is
+                 * navigated, not how it looks, and nobody on this branch can
+                 * run Playwright or see the result. Flattening a fill or moving
+                 * a separator shows itself instantly; this does not. Whoever
+                 * can watch it should take it.
+                 */}
                 <Popover
                   onOpenChange={setPresenceMenuOpen}
                   open={presenceMenuOpen}
@@ -229,8 +246,16 @@ export function ProfilePopover({
 
             {/* ── Status input (Slack-style) ──────────────────────── */}
             <div className="pt-0 pb-1">
+              {/*
+               * Flat like every other row. It used to carry `bg-muted/30`,
+               * which made the only row with a fill read as promoted when it is
+               * one action among several. The fill was also a *surface* use of
+               * `--muted`, the token this app spends on a panel colour and
+               * HeroUI reads as text — so it would have inverted the day this
+               * subtree landed inside a Pro component's scope.
+               */}
               <button
-                className={cn(MENU_ITEM_CLASS, "bg-muted/30")}
+                className={MENU_ITEM_CLASS}
                 data-testid="profile-popover-set-status"
                 onClick={() => {
                   closePopover();
