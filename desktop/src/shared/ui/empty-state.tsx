@@ -33,6 +33,19 @@ import { HERO_MUTED_SCOPE } from "@/shared/ui/heroMutedScope";
  *
  * `Content` is re-stacked to a row: Pro columns its action area, and every
  * caller here lays buttons out side by side.
+ *
+ * **One name, two stylesheets.** `@heroui/styles` — the OSS package, imported
+ * by `heroui.css` for every HeroUI component the app uses — ships its own
+ * `.empty-state` rule (`@apply p-2 text-sm text-muted`) for the OSS component
+ * of the same name. Pro's per-component CSS is imported after it and into the
+ * same `layer(components)`, so Pro wins every property the two declare and
+ * `.empty-state--*` overrides the OSS padding; this component is unaffected.
+ *
+ * What it means is for the *other* one: adopting OSS's `EmptyState` anywhere in
+ * the app would silently dress its one-line "No results found" in Pro's full
+ * centred-column layout, because the class name is shared and Pro's rules are
+ * already loaded. Nothing imports it today. If you need an empty state, use
+ * this component — do not reach for `EmptyState` from `@heroui/react`.
  */
 
 type EmptyStateProps = React.ComponentProps<typeof HeroEmptyState>;

@@ -1,15 +1,20 @@
 import { Search } from "lucide-react";
 import * as React from "react";
 
-import { resolveUserLabel } from "@/features/profile/lib/identity";
 import { getMinimumSearchQueryLength } from "@/features/search/hooks";
 import { useSearchResults } from "@/features/search/useSearchResults";
 import {
-  resultIcon,
   resultKey,
-  resultTestId,
   type SearchResult,
 } from "@/features/search/ui/SearchResultItem";
+import { SearchResultRow } from "@/features/search/ui/SearchResultRow";
+import {
+  getSuggestedSearchResults,
+  groupSearchResults,
+  SEARCH_SECTION_TITLE_CLASS,
+  type SearchResultSection,
+} from "@/features/search/ui/searchResultFormatting";
+import { SearchResultsSkeleton } from "@/features/search/ui/SearchResultsSkeleton";
 import {
   CurrentChannelSearchAction,
   getChannelScopeLabel,
@@ -18,15 +23,11 @@ import {
 import { useSearchMenuKeyboardNavigation } from "@/features/search/ui/useSearchMenuKeyboardNavigation";
 import type { Channel, SearchHit, UserSearchResult } from "@/shared/api/types";
 import { cn } from "@/shared/lib/cn";
-import { normalizePubkey, truncatePubkey } from "@/shared/lib/pubkey";
+import { normalizePubkey } from "@/shared/lib/pubkey";
 import { Dialog, DialogContent, DialogTitle } from "@/shared/ui/dialog";
 import { useDeferredModalOpen } from "@/shared/ui/deferredModalOpen";
-import {
-  MENTION_CHIP_BASE_CLASSES,
-  MESSAGE_MARKDOWN_CLASS,
-} from "@/shared/ui/mentionChip";
-import { Skeleton } from "@/shared/ui/skeleton";
-import { UserAvatar } from "@/shared/ui/UserAvatar";
+
+const SEARCH_RESULT_LIMIT = 40;
 
 type TopbarSearchProps = {
   channelLabels?: Record<string, string>;
@@ -45,351 +46,6 @@ type TopbarSearchProps = {
   scopeFocusRequest?: number;
   variant?: "bar" | "icon";
 };
-
-const MAX_SEARCH_SUGGESTIONS = 4;
-const SEARCH_RESULT_LIMIT = 40;
-const SEARCH_SECTION_TITLE_CLASS =
-  "px-2.5 pb-1.5 pt-2 text-xs font-medium text-muted-foreground/70";
-const SEARCH_RESULT_SECTION_ORDER = [
-  "channels",
-  "direct-messages",
-  "people",
-  "agents",
-  "messages",
-  "actions",
-] as const;
-
-type SearchResultSectionKey = (typeof SEARCH_RESULT_SECTION_ORDER)[number];
-
-type SearchResultSection = {
-  key: SearchResultSectionKey;
-  results: SearchResult[];
-  title: string;
-};
-
-type SearchHitContextLabel = {
-  channelLabel: string | null;
-  text: string;
-};
-
-function truncateResultText(content: string, maxLength = 96) {
-  const trimmed = content.trim();
-  if (trimmed.length === 0) {
-    return "No message body.";
-  }
-
-  if (trimmed.length <= maxLength) {
-    return trimmed;
-  }
-
-  return `${trimmed.slice(0, maxLength - 3).trimEnd()}...`;
-}
-
-function formatRelativeTime(unixSeconds: number) {
-  const diff = Math.floor(Date.now() / 1_000) - unixSeconds;
-
-  if (diff < 60) {
-    return "just now";
-  }
-
-  if (diff < 60 * 60) {
-    return `${Math.floor(diff / 60)}m ago`;
-  }
-
-  if (diff < 60 * 60 * 24) {
-    return `${Math.floor(diff / (60 * 60))}h ago`;
-  }
-
-  if (diff < 60 * 60 * 24 * 7) {
-    return `${Math.floor(diff / (60 * 60 * 24))}d ago`;
-  }
-
-  return new Intl.DateTimeFormat("en-US", {
-    month: "short",
-    day: "numeric",
-  }).format(new Date(unixSeconds * 1_000));
-}
-
-function getChannelActivityTime(channel: Channel) {
-  if (!channel.lastMessageAt) {
-    return 0;
-  }
-
-  const timestamp = Date.parse(channel.lastMessageAt);
-  return Number.isFinite(timestamp) ? timestamp : 0;
-}
-
-function getChannelSuggestionMeta(channel: Channel) {
-  const activityTime = getChannelActivityTime(channel);
-
-  if (activityTime > 0) {
-    return formatRelativeTime(Math.floor(activityTime / 1_000));
-  }
-
-  return null;
-}
-
-function getChannelDisplayName(
-  channel: Channel,
-  channelLabels?: Record<string, string>,
-) {
-  return channelLabels?.[channel.id]?.trim() || channel.name;
-}
-
-function getChannelPreview(channel: Channel) {
-  if (channel.channelType === "dm") {
-    return "";
-  }
-
-  if (channel.description.trim()) {
-    return channel.description;
-  }
-
-  return "";
-}
-
-function getUserDisplayName(user: UserSearchResult) {
-  return (
-    user.displayName?.trim() ||
-    user.nip05Handle?.trim() ||
-    truncatePubkey(user.pubkey)
-  );
-}
-
-function getUserSecondaryLabel(user: UserSearchResult) {
-  const displayName = user.displayName?.trim();
-  const nip05Handle = user.nip05Handle?.trim();
-
-  if (nip05Handle && nip05Handle !== displayName) {
-    return nip05Handle;
-  }
-
-  return null;
-}
-
-function getSearchHitChannelName(
-  hit: SearchHit,
-  channelLookup: ReadonlyMap<string, Channel>,
-  channelLabels?: Record<string, string>,
-) {
-  const channel = hit.channelId ? channelLookup.get(hit.channelId) : null;
-  const channelName =
-    (hit.channelId ? channelLabels?.[hit.channelId]?.trim() : null) ||
-    hit.channelName?.trim() ||
-    channel?.name.trim() ||
-    null;
-
-  if (!channelName) {
-    return null;
-  }
-
-  return channelName;
-}
-
-function getSearchHitContextLabel(
-  hit: SearchHit,
-  channelLookup: ReadonlyMap<string, Channel>,
-  channelLabels?: Record<string, string>,
-): SearchHitContextLabel {
-  const channel = hit.channelId ? channelLookup.get(hit.channelId) : null;
-  const channelName = getSearchHitChannelName(
-    hit,
-    channelLookup,
-    channelLabels,
-  );
-
-  if (channel?.channelType === "dm") {
-    return {
-      channelLabel: null,
-      text: "Direct message",
-    };
-  }
-
-  const isThread = hit.kind === 45003 || Boolean(hit.threadRootId);
-
-  return {
-    channelLabel: channelName,
-    text: channelName
-      ? `${isThread ? "Thread" : "Message"} in`
-      : isThread
-        ? "Thread"
-        : "Message",
-  };
-}
-
-function getResultSectionKey(result: SearchResult): SearchResultSectionKey {
-  if (result.kind === "channel") {
-    return result.channel.channelType === "dm" ? "direct-messages" : "channels";
-  }
-
-  if (result.kind === "user") {
-    return result.user.isAgent ? "agents" : "people";
-  }
-
-  if (result.kind === "action") {
-    return "actions";
-  }
-
-  return "messages";
-}
-
-function getSectionTitle(sectionKey: SearchResultSectionKey) {
-  switch (sectionKey) {
-    case "channels":
-      return "Channels";
-    case "direct-messages":
-      return "Direct messages";
-    case "people":
-      return "People";
-    case "agents":
-      return "Agents";
-    case "messages":
-      return "Most relevant";
-    case "actions":
-      return "Actions";
-  }
-}
-
-function SearchHitContextLine({ label }: { label: SearchHitContextLabel }) {
-  return (
-    <span
-      className={cn(
-        MESSAGE_MARKDOWN_CLASS,
-        "mt-0 flex min-w-0 items-center gap-1.5 text-2xs font-medium leading-3 text-muted-foreground/80",
-      )}
-    >
-      <span className="shrink-0">{label.text}</span>
-      {label.channelLabel ? (
-        <span
-          className={cn(
-            MENTION_CHIP_BASE_CLASSES,
-            "search-channel-chip min-w-0 max-w-full overflow-hidden",
-          )}
-          data-channel-link=""
-        >
-          <span className="truncate">#{label.channelLabel}</span>
-        </span>
-      ) : null}
-    </span>
-  );
-}
-
-function groupSearchResults(results: SearchResult[]): SearchResultSection[] {
-  const resultsBySection = new Map<SearchResultSectionKey, SearchResult[]>();
-
-  for (const result of results) {
-    const sectionKey = getResultSectionKey(result);
-    const sectionResults = resultsBySection.get(sectionKey) ?? [];
-    sectionResults.push(result);
-    resultsBySection.set(sectionKey, sectionResults);
-  }
-
-  return SEARCH_RESULT_SECTION_ORDER.flatMap((sectionKey) => {
-    const sectionResults = resultsBySection.get(sectionKey);
-
-    if (!sectionResults || sectionResults.length === 0) {
-      return [];
-    }
-
-    return [
-      {
-        key: sectionKey,
-        results: sectionResults,
-        title: getSectionTitle(sectionKey),
-      },
-    ];
-  });
-}
-
-function getSuggestedSearchResults(channels: Channel[]) {
-  return channels
-    .filter(
-      (channel) =>
-        !channel.archivedAt &&
-        (channel.isMember || channel.channelType === "dm"),
-    )
-    .sort((a, b) => {
-      const activityDiff =
-        getChannelActivityTime(b) - getChannelActivityTime(a);
-      if (activityDiff !== 0) {
-        return activityDiff;
-      }
-
-      const typeRank = (channel: Channel) =>
-        channel.channelType === "dm"
-          ? 0
-          : channel.channelType === "stream"
-            ? 1
-            : 2;
-      const rankDiff = typeRank(a) - typeRank(b);
-      if (rankDiff !== 0) {
-        return rankDiff;
-      }
-
-      return a.name.localeCompare(b.name);
-    })
-    .slice(0, MAX_SEARCH_SUGGESTIONS)
-    .map((channel) => ({
-      kind: "channel" as const,
-      channel,
-    }));
-}
-
-const searchSkeletonRows = [
-  {
-    iconShape: "rounded-md",
-    key: "channel",
-    metaWidth: "w-16",
-    previewWidth: "w-48",
-    titleWidth: "w-28",
-    trailingWidth: "w-14",
-  },
-  {
-    iconShape: "rounded-full",
-    key: "message",
-    metaWidth: "w-24",
-    previewWidth: "w-72",
-    titleWidth: "w-24",
-    trailingWidth: "w-20",
-  },
-  {
-    iconShape: "rounded-full",
-    key: "note",
-    metaWidth: "w-20",
-    previewWidth: "w-60",
-    titleWidth: "w-32",
-    trailingWidth: "w-16",
-  },
-] as const;
-
-function SearchResultsSkeleton() {
-  return (
-    <div
-      aria-hidden="true"
-      className="p-1"
-      data-testid="search-results-loading"
-    >
-      {searchSkeletonRows.map((row) => (
-        <div
-          className="flex w-full items-center gap-3 rounded-lg px-3 py-2"
-          key={row.key}
-        >
-          <Skeleton className={cn("h-7 w-7 shrink-0", row.iconShape)} />
-          <div className="min-w-0 flex-1">
-            <div className="flex min-w-0 items-center gap-1.5">
-              <Skeleton className={cn("h-4", row.titleWidth)} />
-              <Skeleton className={cn("h-3", row.metaWidth)} />
-            </div>
-            <Skeleton
-              className={cn("mt-1.5 h-3 max-w-full", row.previewWidth)}
-            />
-          </div>
-          <Skeleton className={cn("h-3 shrink-0", row.trailingWidth)} />
-        </div>
-      ))}
-    </div>
-  );
-}
 
 export function TopbarSearch({
   channelLabels,
@@ -663,137 +319,20 @@ export function TopbarSearch({
 
   const renderSearchResultRow = (result: SearchResult, index: number) => {
     const menuIndex = index + (hasScopeAction ? 1 : 0);
-    const channelDisplayName =
-      result.kind === "channel"
-        ? getChannelDisplayName(result.channel, channelLabels)
-        : null;
-    const userDisplayName =
-      result.kind === "user" ? getUserDisplayName(result.user) : null;
-    const messageAuthorLabel =
-      result.kind === "message"
-        ? resolveUserLabel({
-            currentPubkey,
-            profiles: resultProfiles,
-            pubkey: result.hit.pubkey,
-            preferResolvedSelfLabel: true,
-          })
-        : null;
-    const messageContextLabel =
-      result.kind === "message"
-        ? getSearchHitContextLabel(result.hit, channelLookup, channelLabels)
-        : null;
-    const title =
-      result.kind === "channel"
-        ? channelDisplayName
-        : result.kind === "action"
-          ? result.action.title
-          : result.kind === "user"
-            ? userDisplayName
-            : messageAuthorLabel;
-    const preview =
-      result.kind === "channel"
-        ? getChannelPreview(result.channel)
-        : result.kind === "action"
-          ? result.action.description
-          : result.kind === "user"
-            ? getUserSecondaryLabel(result.user)
-            : truncateResultText(result.hit.content);
-    const trailingLabel =
-      result.kind === "channel"
-        ? getChannelSuggestionMeta(result.channel)
-        : result.kind === "message"
-          ? formatRelativeTime(result.hit.createdAt)
-          : null;
 
     return (
-      <button
-        aria-selected={menuIndex === selectedMenuIndex}
-        className={cn(
-          "search-result-row flex w-full gap-3 rounded-lg px-2.5 text-left transition-colors",
-          result.kind === "message" ? "items-start" : "items-center",
-          result.kind === "message" ? "py-3.5" : "py-2.5",
-          menuIndex === selectedMenuIndex
-            ? "bg-muted/45 text-foreground"
-            : "hover:bg-muted/35",
-        )}
+      <SearchResultRow
+        channelLabels={channelLabels}
+        channelLookup={channelLookup}
+        currentPubkey={currentPubkey}
+        isSelected={menuIndex === selectedMenuIndex}
         key={resultKey(result)}
-        onClick={() => openResult(result)}
+        menuIndex={menuIndex}
         onMouseEnter={() => setSelectedMenuIndex(menuIndex)}
-        role="option"
-        type="button"
-        data-testid={resultTestId(result)}
-        data-search-result-index={menuIndex}
-      >
-        {result.kind === "message" ? (
-          <UserAvatar
-            avatarUrl={
-              resultProfiles?.[result.hit.pubkey.toLowerCase()]?.avatarUrl ??
-              null
-            }
-            className="h-8 w-8"
-            displayName={resolveUserLabel({
-              currentPubkey,
-              profiles: resultProfiles,
-              pubkey: result.hit.pubkey,
-              preferResolvedSelfLabel: true,
-            })}
-            size="md"
-          />
-        ) : result.kind === "user" ? (
-          <UserAvatar
-            avatarUrl={result.user.avatarUrl}
-            className="h-7 w-7"
-            displayName={userDisplayName ?? result.user.pubkey}
-            size="sm"
-          />
-        ) : (
-          <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-md bg-background/70 text-muted-foreground">
-            {React.createElement(resultIcon(result, channelLookup), {
-              className: "h-4 w-4",
-            })}
-          </span>
-        )}
-        <span className="min-w-0 flex-1">
-          {result.kind === "message" ? (
-            <span className="grid w-full min-w-0 grid-cols-[minmax(0,1fr)_auto] gap-x-3">
-              <span className="col-start-1 row-start-1 min-w-0 truncate text-sm font-semibold leading-4 text-foreground">
-                {title}
-              </span>
-              {trailingLabel ? (
-                <span className="col-start-2 row-start-1 flex shrink-0 items-center justify-self-end text-xs font-medium leading-4 text-muted-foreground/70">
-                  {trailingLabel}
-                </span>
-              ) : null}
-              {messageContextLabel ? (
-                <span className="col-start-1 min-w-0">
-                  <SearchHitContextLine label={messageContextLabel} />
-                </span>
-              ) : null}
-              {preview ? (
-                <span className="col-start-1 mt-1.5 block min-w-0 truncate text-sm leading-5 text-muted-foreground">
-                  {preview}
-                </span>
-              ) : null}
-            </span>
-          ) : (
-            <span className="block space-y-0.5">
-              <span className="block truncate text-sm font-semibold">
-                {title}
-              </span>
-              {preview ? (
-                <span className="block truncate text-xs text-muted-foreground">
-                  {preview}
-                </span>
-              ) : null}
-            </span>
-          )}
-        </span>
-        {result.kind !== "message" && trailingLabel ? (
-          <span className="shrink-0 text-2xs text-muted-foreground/75">
-            {trailingLabel}
-          </span>
-        ) : null}
-      </button>
+        onSelect={() => openResult(result)}
+        result={result}
+        resultProfiles={resultProfiles}
+      />
     );
   };
 

@@ -34,14 +34,9 @@
    these files ship unlayered, and unlayered rules outrank every Tailwind
    utility, so `.context-menu__popover`'s padding would beat the app's classes
    on the very elements those classes exist to restyle. */
+/* Alphabetical, so several branches can append here without colliding. */
+@import "@heroui-pro/react/css/components/command.css" layer(components);
 @import "@heroui-pro/react/css/components/context-menu.css" layer(components);
-/* Name collision, currently inert: `@heroui/styles` imported above ships its
-   own `.empty-state` (`@apply p-2 text-sm text-muted`) for the OSS component of
-   the same name. Both land in `layer(components)`, so Pro's rules — imported
-   second — win the properties they share and OSS's padding is overridden by
-   `.empty-state--*`. Nothing in the app renders the OSS `EmptyState` today, so
-   this costs nothing; but adopting it would give a one-line "No results found"
-   Pro's full centred-column layout. Reach for `shared/ui/empty-state` instead. */
 @import "@heroui-pro/react/css/components/empty-state.css" layer(components);
 
 /* The app's radius scale wins.
@@ -153,13 +148,24 @@
  * 286 times across its components, of which `context-menu`, the only Pro
  * component imported so far, happens to read it zero times. Counts for the
  * components most likely to arrive next: command 8, rich-text-editor 7,
- * prompt-input 6, file-tree 5, sidebar 5, markdown 3.
+ * prompt-input 6, file-tree 5, sidebar 5, markdown 3 — all of them bare.
  *
- * Any Pro component added to the import list above should be checked with
- * `grep -c 'var(--muted)'` against its file in
- * `@heroui-pro/react/dist/css/components/`. A non-zero count means that
- * component needs `HERO_MUTED_SCOPE` on its root, or its muted text renders
- * near-invisible in both themes.
+ * Any Pro component added to the import list above should be checked against
+ * its file in `@heroui-pro/react/dist/css/components/`. Audit the **dist**:
+ * the MCP's `get_css` returns the source, with `@apply` unexpanded, and it is
+ * the compiled file that ships.
+ *
+ * Count only *bare* `var(--muted)`. A usage written `var(--<token>,
+ * var(--muted))` falls through only when `<token>` is unmapped, so it is not a
+ * bug when the mapping above covers it. 282 of the 286 are bare; the other 4
+ * sit behind `var(--field-placeholder, …)`, mapped above — which is why
+ * `native-select` needs no scope even though a plain
+ * `grep -c 'var(--muted)'` reports two hits for it.
+ *
+ * A non-zero *bare* count means that component needs `HERO_MUTED_SCOPE`, or
+ * its muted text renders near-invisible in both themes. Apply it to the
+ * elements that read the token — not the component root, which also catches
+ * app markup composed into the component; see `shared/ui/heroMutedScope.ts`.
  * ─────────────────────────────────────────────────────────────────────── */
 
 /* ── Known gap ────────────────────────────────────────────────────────────

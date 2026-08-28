@@ -30,12 +30,24 @@
  * which had to be re-pointed by hand in the accent scope — same inheritance
  * rule, opposite thing wanted from it.
  *
- * **Scope it to the narrowest node Pro owns.** Every consumer inside the
- * subtree follows the re-point, including app markup slotted into a Pro
- * component — so a nested `bg-muted` would paint a surface with the text grey,
- * reintroducing the inversion one level down. Leaf controls are safe;
- * containers (`sidebar`, `file-tree`, `command`) need the scope on the Pro
- * element itself rather than on a wrapper that also holds app children.
+ * **Put it on the leaves that read the token, not on the component root.**
+ * This is the trap, and a component root is usually already too broad: every
+ * consumer in the subtree follows the re-point, including *app* markup composed
+ * into a Pro component. Scoping `EmptyState`'s root, for instance, is enough to
+ * catch an app outline button rendered as its action — its `hover:bg-muted/70`
+ * then hovers to the text grey, reintroducing the inversion one level down.
+ * That is a real failure this codebase already hit, not a hypothetical. Slot
+ * the class onto the Pro elements that actually resolve `--muted` and no
+ * higher; a component whose children are all Pro's own is the only case where
+ * the root is the right node.
+ *
+ * **Count only bare `var(--muted)` when deciding whether a component needs
+ * this.** A usage written as `var(--<token>, var(--muted))` falls through only
+ * when `<token>` is unmapped, so a component reading it exclusively that way
+ * needs no scope. That is not academic: across the Pro component CSS 282 uses
+ * are bare and 4 sit behind `var(--field-placeholder, …)`, which `heroui.css`
+ * maps — which is the whole reason `native-select` needs no scope despite a raw
+ * grep reporting two hits.
  *
  * `--muted-foreground` is the right target for all four ways Pro reads the
  * token — `color` (210), `background-color` (32), `fill` (18) and `stroke` (18)
