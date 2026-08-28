@@ -1,6 +1,6 @@
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import * as React from "react";
-import { toast } from "sonner";
+import { toast } from "@/shared/ui/toast";
 
 import { AgentCreationPreview } from "@/features/agents/ui/AgentCreationPreview";
 import { downscaleIconToDataUrl } from "@/features/communities/lib/downscaleIcon";

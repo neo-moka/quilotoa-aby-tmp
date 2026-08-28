@@ -9,7 +9,7 @@ import {
   useDismissMediaContextMenu,
 } from "@/shared/ui/markdown/MediaContextMenu";
 import { resolveVideoDownloadFilename } from "@/shared/ui/videoDownload";
-import { toast } from "sonner";
+import { toast } from "@/shared/ui/toast";
 
 type UseVideoContextMenu = {
   /** `onContextMenuCapture` handler for the inline video surface. */

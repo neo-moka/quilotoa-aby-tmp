@@ -1,4 +1,4 @@
-import { toast } from "sonner";
+import { toast } from "@/shared/ui/toast";
 
 import { truncatePubkey } from "@/shared/lib/pubkey";
 import { PubKey } from "@/shared/ui/PubKey";

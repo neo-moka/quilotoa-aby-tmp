@@ -1,6 +1,6 @@
 import { Check, Copy } from "lucide-react";
 import * as React from "react";
-import { toast } from "sonner";
+import { toast } from "@/shared/ui/toast";
 
 import { writeTextToClipboard } from "@/shared/lib/clipboard";
 import { cn } from "@/shared/lib/cn";
