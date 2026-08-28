@@ -36,6 +36,25 @@
    on the very elements those classes exist to restyle. */
 @import "@heroui-pro/react/css/components/context-menu.css" layer(components);
 
+/* The app's radius scale wins.
+ *
+ * HeroUI derives its whole scale from `--radius` with its own multipliers, so
+ * importing its theme silently repoints the `rounded-*` utilities the app
+ * already uses: `rounded-2xl` went from 16px to 20px, which is a geometry
+ * change across every surface that names it, and it fails specs that pin the
+ * radius. `tailwind.config.js` covers `sm`/`md`/`lg` through `@config`; the
+ * rest are restored here to Tailwind's stock values.
+ *
+ * The trade is deliberate: HeroUI's components inherit the app's geometry
+ * rather than the app inheriting theirs. */
+@theme {
+  --radius-xs: 0.125rem;
+  --radius-xl: 0.75rem;
+  --radius-2xl: 1rem;
+  --radius-3xl: 1.5rem;
+  --radius-4xl: 2rem;
+}
+
 /* Unlayered on purpose: beats HeroUI's `layer(theme)` defaults without
    `!important`, the same trick theme.css uses for the Buzz sidebar gradient. */
 :root {
