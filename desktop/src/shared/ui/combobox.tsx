@@ -1,5 +1,6 @@
 import { ComboBox as HeroComboBox, ListBox } from "@heroui/react";
 
+import { cn } from "@/shared/lib/cn";
 import { Input } from "@/shared/ui/input";
 
 export type ComboBoxOption = {
@@ -81,7 +82,17 @@ export function ComboBox({
         <Input className={inputClassName} id={id} placeholder={placeholder} />
         <HeroComboBox.Trigger />
       </HeroComboBox.InputGroup>
-      <HeroComboBox.Popover className={popoverClassName}>
+      {/* `pointer-events-auto` is what keeps this usable inside a modal dialog,
+          and its absence is invisible: the popover paints, the options render,
+          and the click lands on the dialog underneath. Radix's modal `Dialog`
+          blanks `pointer-events` on `<body>` and hands them back only to its
+          own content; React Aria portals to that same body and claims nothing.
+          Baked in rather than left to `popoverClassName` because every caller
+          inside a dialog needs it and forgetting it fails silently. Same fix,
+          same reason, as `MENU_POPOVER_CLASS` in `menuCollection.ts`. */}
+      <HeroComboBox.Popover
+        className={cn("pointer-events-auto", popoverClassName)}
+      >
         <ListBox
           renderEmptyState={() => (
             <p className="px-3 py-6 text-center text-sm text-muted-foreground/55">
