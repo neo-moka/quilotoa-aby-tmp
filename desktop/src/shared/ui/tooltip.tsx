@@ -4,23 +4,33 @@ import * as TooltipPrimitive from "@radix-ui/react-tooltip";
 import { cn } from "@/shared/lib/cn";
 
 /**
- * Still Radix. HeroUI's `Tooltip` was evaluated for the migration and rejected
- * on one gap that cannot be closed from the outside:
+ * Still Radix. Re-verified against the installed packages rather than the
+ * previous summary; the gap is real and narrower than it was written.
  *
- * `skipDelayDuration` has no equivalent. HeroUI exposes only `delay` and
- * `closeDelay`; the "already warmed up, show the next one instantly" grace is a
- * module-global timer inside React Aria's tooltip state with no prop to disable
- * it — HeroUI's own source acknowledges it ("React Aria sets
- * `shouldSkipAnimation` while its global warmup timer is active"). Adopting
- * HeroUI would therefore invert the deliberate anti-cascade behaviour documented
- * below, across all 56 consumers, and `shouldSkipAnimation` only suppresses the
- * animation — not the warmup that causes the cascade.
+ * `skipDelayDuration` has no HeroUI equivalent. HeroUI's `Tooltip` forwards
+ * only `delay` and `closeDelay` to React Aria's `useTooltipTriggerState`
+ * (react-stately 3.49.0), where the warmup lives in *module-level* state:
+ * `globalWarmedUp` is set on every open and cleared by a timeout of
+ * `Math.max(TOOLTIP_COOLDOWN, closeDelay)` with `TOOLTIP_COOLDOWN` a hardcoded
+ * 500. While it is set, `warmupTooltip()` takes its `showTooltip(true)` branch
+ * and the next trigger opens with no dwell at all. No prop reaches that
+ * variable, and `closeDelay` can only make the warm window *longer* — so the
+ * `delayDuration` / `skipDelayDuration={0}` pair below has no expressible
+ * counterpart, and adopting HeroUI would invert the deliberate anti-cascade
+ * behaviour across all 86 trigger sites at once. `shouldSkipAnimation` is a
+ * different thing: it only restores the fade when one tooltip replaces another.
  *
- * Two further frictions, both solvable and noted so the next attempt does not
- * re-derive them: every one of the 86 `TooltipTrigger` call sites uses Radix's
- * `asChild`, which maps to HeroUI's `render` prop rather than disappearing; and
- * HeroUI's trigger hardcodes `role="button"` on the element it renders, which a
- * `render` override would have to strip for non-interactive tooltip targets.
+ * The one remaining path is to drive `isOpen` from this wrapper and
+ * re-implement the dwell here — a second timing state machine wrapped around
+ * one built for the opposite behaviour, per trigger, also intercepting the
+ * focus-open path. Not worth it while Radix expresses the same thing in one
+ * prop.
+ *
+ * Two frictions for the next attempt, both smaller than previously recorded:
+ * every one of the 86 `TooltipTrigger` call sites uses Radix's `asChild`, which
+ * maps to HeroUI's `render` prop rather than disappearing; and HeroUI's trigger
+ * does hardcode `role="button"`, but it spreads caller props *after* it, so a
+ * caller-supplied `role` simply wins — nothing has to be stripped.
  *
  * See docs/heroui-migration/component-map.md §7.2.
  */
