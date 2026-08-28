@@ -65,20 +65,49 @@ test("the root forwards data-testid and the caller's className", async () => {
   assert.ok(node.classList.contains("justify-center"));
 });
 
-// Pro paints `.empty-state__description` and `__media` with `var(--muted)`,
+// Pro paints `.empty-state__media` and `__description` with `var(--muted)`,
 // which in this app is a *surface* token, not a foreground — secondary text
 // would land at 82.75% lightness in light and 16% in dark, i.e. invisible in
-// both. The root carries the re-pointing scope; if it ever stops doing so the
+// both. Those two are the only places this stylesheet reads the token, and the
+// scope belongs on them and nowhere higher. If it ever stops being applied the
 // regression is silent, because nothing throws and both themes fail the same
 // way. See shared/ui/heroMutedScope.ts.
-test("the root re-points HeroUI's --muted onto the app's foreground token", async () => {
+test("media and description re-point --muted onto the app's foreground token", async () => {
+  const { HERO_MUTED_SCOPE } = await import("./heroMutedScope.ts");
+  assert.equal(HERO_MUTED_SCOPE, "[--muted:var(--muted-foreground)]");
+
+  const { container } = await renderEmptyState({}, (React, parts) =>
+    React.createElement(
+      parts.EmptyStateHeader,
+      null,
+      React.createElement(parts.EmptyStateMedia, {
+        "data-testid": "media",
+      }),
+      React.createElement(parts.EmptyStateDescription, null, "Clone it."),
+    ),
+  );
+
+  for (const selector of [".empty-state__media", ".empty-state__description"]) {
+    const el = container.querySelector(selector);
+    assert.ok(el, `${selector} did not render`);
+    assert.ok(
+      el.classList.contains(HERO_MUTED_SCOPE),
+      `${selector} is missing the muted scope; classes were: ${el.className}`,
+    );
+  }
+});
+
+// The scope must NOT sit on the root. The root wraps caller markup, and the
+// app's Button uses `hover:bg-muted/70` for its outline variant — a root scope
+// would make every outline button in an empty state hover to the text grey
+// instead of the surface grey, reintroducing the inversion one level down.
+test("the root does not carry the muted scope, so caller markup is unaffected", async () => {
   const { HERO_MUTED_SCOPE } = await import("./heroMutedScope.ts");
   const { node } = await renderEmptyState();
 
-  assert.equal(HERO_MUTED_SCOPE, "[--muted:var(--muted-foreground)]");
   assert.ok(
-    node.classList.contains(HERO_MUTED_SCOPE),
-    `root is missing the muted scope; classes were: ${node.className}`,
+    !node.classList.contains(HERO_MUTED_SCOPE),
+    "the muted scope leaked onto the root, which wraps caller markup",
   );
 });
 
