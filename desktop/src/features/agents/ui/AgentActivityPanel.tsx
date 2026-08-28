@@ -183,20 +183,28 @@ export function AgentActivityPanel({
               />
             </div>
             {selectedAgent ? (
-              // Flush, not a card. `ManagedAgentSessionPanel` frames itself as
-              // a standalone card (`rounded-lg border … shadow-xs`) because its
-              // other caller is a preview inside a profile. In a sidebar that
-              // reads as a card dropped into a panel, so the frame is dissolved
-              // here — `cn` is tailwind-merge backed, so these win.
+              // Embedded, not standalone — the same treatment
+              // `AgentSessionThreadPanel` gives it, because both put it under a
+              // panel that already has a header. It defaults to a standalone
+              // card with its own header, which suits its third caller (a
+              // preview inside a profile) and produces a boxed-in look with two
+              // stacked headers anywhere else. Dissolved at the call site so
+              // that preview keeps its card.
+              //
+              // `rawLayout="exclusive"` for the same reason the channel panel
+              // uses it: the responsive default puts the raw rail beside the
+              // transcript, which a sidebar has no width for.
               <ManagedAgentSessionPanel
                 agent={selectedAgent}
                 autoTail
                 channelId={null}
-                className="min-h-0 flex-1 rounded-none border-0 bg-transparent shadow-none"
+                className="min-h-0 flex-1 rounded-none border-0 bg-transparent px-0 py-2 shadow-none"
                 emptyDescription="This agent has not started a turn yet."
                 key={selectedAgent.pubkey}
                 panelPadding={false}
                 profiles={profiles}
+                rawLayout="exclusive"
+                showHeader={false}
                 showRaw={showRaw}
               />
             ) : null}

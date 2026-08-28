@@ -841,6 +841,29 @@ export const ChannelPane = React.memo(function ChannelPane({
        * animate. It can hold the real thread through the exit rather than a
        * frozen snapshot because the panel is fully prop-driven.
        */}
+      {/* ── Right pane: one slot, and a chrome contract ──────────────────
+       *
+       * Adding a branch below means honouring two things that nothing
+       * enforces, both learned by breaking them:
+       *
+       * 1. **Forward `layout`, `transparentChrome` and `isSinglePanelView`.**
+       *    In split mode `wrapAux` puts the panel inside `RightAuxiliaryPane`,
+       *    which already draws the surface and the divider. A panel that also
+       *    draws its own paints a second surface inside the first and reads as
+       *    a box inside a panel. Every branch here does this — compare
+       *    `AgentSessionThreadPanel`, `ChannelManagementAuxiliaryPanel` and
+       *    `AgentActivityPanel` — which is what makes it look like a
+       *    convention rather than a requirement.
+       *
+       * 2. **Add the branch's condition to `hasSplitAuxiliaryPane`.** That is
+       *    what decides the pane exists at all; a branch missing from it
+       *    renders into nothing in split mode.
+       *
+       * The same shape recurs one level down: a component written to stand
+       * alone keeps framing itself when embedded. `ManagedAgentSessionPanel`
+       * needs `showHeader={false}` and its card dissolved in both panels that
+       * host it, for the same reason.
+       * ──────────────────────────────────────────────────────────────── */}
       <AnimatePresence onExitComplete={markExitComplete}>
         {/* The right pane is one slot with strict precedence, not a container,
             so an explicitly toggled panel has to outrank the rest or its button
