@@ -53,6 +53,15 @@ type NostrKeyImportFormProps = {
  * Shared between the first-run welcome flow (no community yet) and the
  * onboarding profile flow (community exists, user wants to reuse an
  * existing key). The caller owns what happens after `onImport` resolves.
+ *
+ * **Not migrated to `@heroui-pro/react`'s `DropZone`.** Pro's is a bounded
+ * dashed target you drop *onto*. This one listens for drag on `window`, so a
+ * file dropped anywhere over the card lands, and paints a full-bleed overlay
+ * only while a drag is in flight — over a `key` variant that is itself the drop
+ * target and a `backup` variant that is not. It also owns behaviour Pro has no
+ * seam for: the size guard, taking only the first non-empty line, and handing a
+ * `.ncryptsec` file off to the passphrase stage. Adopting it would be a net
+ * loss of capability, so the hand-rolled zone stays.
  */
 export function NostrKeyImportForm({
   backLabel = "Back",

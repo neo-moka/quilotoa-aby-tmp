@@ -33,6 +33,31 @@ function monthlyDayWarning(monthDay: string): string | null {
     : null;
 }
 
+/**
+ * **The frequency and weekday pickers below are not migrated to
+ * `@heroui-pro/react`'s `RadioButtonGroup` / `CheckboxButtonGroup`.** The ARIA
+ * lines up — both wrap React Aria's group primitives, so a `fieldset` +
+ * `sr-only` `legend` + native inputs announces the same as their `radiogroup` —
+ * but the geometry does not, and the check that settles it is in the installed
+ * `dist`, not the docs.
+ *
+ * `RadioButtonGroup.Item` puts the `.radio-button-group__item` skin on the
+ * inner `Radio.Content`, not on the item root. That class hardcodes a vertical
+ * card: `flex-direction: column`, `padding-inline: 1.25rem`, `padding-block:
+ * 1rem`, a border, and a `--surface` fill. These pickers are a compact centred
+ * pill (`min-h-12 px-3 py-2`, transparent, no indicator) and a round weekday
+ * toggle — so every declaration Pro contributes would have to be overridden,
+ * leaving only the state machine. Worse, the focus ring: these draw it on the
+ * visible surface via `peer-focus-visible`, while Pro's `[data-focus-visible]`
+ * lands on the item root, one level up from the styled node, so it would have
+ * to be re-plumbed through a descendant selector by hand.
+ *
+ * Same reasoning as `shared/ui/segmented-control.tsx`: adopt Pro where it
+ * supplies something absent, not where it replaces a working control with a
+ * heavier one wearing our CSS. The `FormSelect` in this file *is* on Pro — see
+ * `workflowFormPrimitives.tsx` — because the app owned no select at all.
+ */
+
 function customCronSeed(schedule: ScheduleFormState): string {
   const currentTrigger = scheduleTriggerFromForm(schedule);
   if (currentTrigger.cron) return currentTrigger.cron;

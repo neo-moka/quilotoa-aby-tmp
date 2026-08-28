@@ -57,6 +57,20 @@ export const ONBOARDING_SECURITY_ICON_CLASS =
  * static ABY mark pinned to the top-left, and a centered pagination track that
  * sits above the page title. The active page reads as a longer bar; inactive
  * pages are dots.
+ *
+ * **Not migrated to `@heroui-pro/react`'s `Stepper`.** The track is
+ * `aria-hidden` on purpose: it is ambient position feedback, and the pages it
+ * counts have no short titles to announce — each step's heading already names
+ * where you are. `Stepper` is a labelled `<ol>` of `<li>` steps with titles,
+ * descriptions and optional click-through navigation, so adopting it would
+ * publish a list navigator to screen readers with nothing to read out.
+ *
+ * This is the same conclusion `shared/ui/step-progress.tsx` reached before it
+ * was deleted as dead code (it was a single `role="progressbar"`; `Stepper` is
+ * a navigator, not a restyling of one). Worth noting for whoever revisits it:
+ * `stepper.css` also reads a bare, unguarded `var(--muted)` for inactive step
+ * titles and descriptions, and this app spends `--muted` on a *surface* — so
+ * inactive steps would render text in a background colour.
  */
 export function OnboardingChrome({
   current,

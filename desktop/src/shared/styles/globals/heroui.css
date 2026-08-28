@@ -35,6 +35,15 @@
    utility, so `.context-menu__popover`'s padding would beat the app's classes
    on the very elements those classes exist to restyle. */
 @import "@heroui-pro/react/css/components/context-menu.css" layer(components);
+/* `native-select.css` reads `--muted` twice — on the indicator and on the
+   placeholder-option colour — but both are guarded:
+   `var(--field-placeholder, var(--muted))`. `--field-placeholder` is mapped
+   below, so the fallback never fires and the inverted-`--muted` hazard (Pro
+   treats it as a text colour, this app as a surface) stays dormant here. The
+   call sites still put an explicit `text-*` utility on `NativeSelect.Indicator`,
+   because `--field-placeholder` resolves at `:root` and would carry the root
+   value into the onboarding sub-themes; a utility resolves at the element. */
+@import "@heroui-pro/react/css/components/native-select.css" layer(components);
 
 /* The app's radius scale wins.
  *

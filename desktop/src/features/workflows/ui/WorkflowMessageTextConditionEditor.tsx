@@ -31,6 +31,16 @@ const DEFAULT_CONDITION: MessageTextCondition = {
 
 type EditorMode = "basic" | "advanced";
 
+/**
+ * **The operator picker below is not migrated to `@heroui-pro/react`'s
+ * `RadioButtonGroup`**, for the reason recorded at length in
+ * `WorkflowScheduleFields.tsx`: Pro's item skin is a vertical card applied to an
+ * inner node, and its focus state sits one level above the styled element, so a
+ * compact centred pill would override every declaration Pro brings. This picker
+ * is the same pill, deliberately — the two read as one control vocabulary
+ * across the trigger form, and splitting them across two implementations would
+ * cost more than the boilerplate it saves.
+ */
 function conditionSummary(condition: MessageTextCondition): string {
   const label = MESSAGE_TEXT_CONDITION_LABELS[condition.operator].toLowerCase();
   if (!messageTextConditionNeedsValue(condition.operator)) return label;

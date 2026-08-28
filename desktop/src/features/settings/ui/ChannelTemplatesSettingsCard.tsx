@@ -1,3 +1,4 @@
+import { NativeSelect } from "@heroui-pro/react";
 import {
   Bot,
   Copy,
@@ -773,19 +774,27 @@ function RuntimeRow({
         )}
         <span className="truncate text-sm">{label}</span>
       </div>
-      <select
-        className="h-7 rounded-md border border-input bg-background px-2 text-xs shadow-xs focus-visible:outline-hidden focus-visible:ring-1 focus-visible:ring-ring"
-        disabled={disabled}
-        onChange={(e) => onChange(e.target.value)}
-        value={value}
-      >
-        <option value="">Default</option>
-        {providers.map((runtime) => (
-          <option key={runtime.id} value={runtime.id}>
-            {runtime.label}
-          </option>
-        ))}
-      </select>
+      {/* `text-foreground` is load-bearing, not decoration: Pro's field CSS
+          dims a select whose `option[value=""]` is checked, treating the empty
+          value as an unfilled placeholder. Here "Default" is a real choice, so
+          the dimming would misreport it as unset. The utility sits in
+          `layer(utilities)` and outranks the layered component rule. */}
+      <NativeSelect>
+        <NativeSelect.Trigger
+          className="h-7 rounded-md border border-input bg-background px-2 pr-6 text-xs text-foreground shadow-xs focus-visible:outline-hidden focus-visible:ring-1 focus-visible:ring-ring"
+          disabled={disabled}
+          onChange={(e) => onChange(e.target.value)}
+          value={value}
+        >
+          <option value="">Default</option>
+          {providers.map((runtime) => (
+            <option key={runtime.id} value={runtime.id}>
+              {runtime.label}
+            </option>
+          ))}
+          <NativeSelect.Indicator className="right-1 text-muted-foreground" />
+        </NativeSelect.Trigger>
+      </NativeSelect>
     </div>
   );
 }
