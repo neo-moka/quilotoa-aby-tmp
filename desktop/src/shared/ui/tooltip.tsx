@@ -26,10 +26,22 @@ import { cn } from "@/shared/lib/cn";
  * focus-open path. Not worth it while Radix expresses the same thing in one
  * prop.
  *
- * Two frictions for the next attempt, both smaller than previously recorded:
- * every one of the 86 `TooltipTrigger` call sites uses Radix's `asChild`, which
- * maps to HeroUI's `render` prop rather than disappearing; and HeroUI's trigger
- * does hardcode `role="button"`, but it spreads caller props *after* it, so a
+ * The second half of the cost is the call sites, and it is the larger half.
+ * Every trigger in the app wraps its child in Radix's `asChild`; React Aria has
+ * no `Slot`, so each one has to be re-expressed. Lote B priced this for the
+ * menus and needed *two* different translations there — `Pressable` for the
+ * dropdown trigger, the `render` prop for the context menu, because Pro's own
+ * trigger renders a positioned `<div>` — so this is not one mechanical
+ * substitution repeated N times.
+ *
+ * The N, counted on this branch and confirmed on `heroui-integration` and
+ * `heroui-lote-f-button`: **86** `TooltipTrigger asChild` across 53 modules.
+ * There is no `asChild` on `Tooltip` or on `TooltipContent` anywhere in
+ * `desktop/src`; `web/` has 2 more triggers, but that app is outside this
+ * migration and keeps its own Radix dependency.
+ *
+ * One friction is smaller than previously recorded: HeroUI's trigger does
+ * hardcode `role="button"`, but it spreads caller props *after* it, so a
  * caller-supplied `role` simply wins — nothing has to be stripped.
  *
  * See docs/heroui-migration/component-map.md §7.2.
