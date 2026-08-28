@@ -21,7 +21,6 @@
 @import "./globals/avatar-framing.css";
 @import "./globals/image-lightbox.css";
 @import "./globals/video-review.css";
-@import "./globals/progress.css";
 
 @config "../../../tailwind.config.js";
 

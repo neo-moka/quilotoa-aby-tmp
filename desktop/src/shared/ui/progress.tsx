@@ -1,45 +1,67 @@
-import * as React from "react";
+import {
+  ProgressBarFill,
+  ProgressBarRoot,
+  ProgressBarTrack,
+} from "@heroui/react/progress-bar";
+import type * as React from "react";
 
 import { cn } from "@/shared/lib/cn";
 
 /**
- * shadcn-style progress bar (no Radix dependency). `value` is 0–100; a
- * `null`/`undefined` value renders an indeterminate sweep, used for phases
- * with no byte counts (e.g. video transcoding before the upload starts).
+ * Progress bar on HeroUI (React Aria). `value` is 0–100; a `null`/`undefined`
+ * value renders an indeterminate sweep, used for phases with no byte counts
+ * (e.g. video transcoding before the upload starts).
+ *
+ * The indeterminate sweep is an infinite CSS animation, so anything that waits
+ * for animations to settle (`waitForAnimations`, screenshot helpers) will hang
+ * on a mounted indeterminate bar. That was already true of the hand-rolled
+ * version this replaces.
+ *
+ * `className` styles the bar itself, as before. The fill is no longer the
+ * root's direct child — React Aria nests it under a track — so call sites tint
+ * it through `fillClassName` rather than the old `[&>div]:` hook.
  */
-const Progress = React.forwardRef<
-  HTMLDivElement,
-  React.HTMLAttributes<HTMLDivElement> & { value?: number | null }
->(({ className, value, ...props }, ref) => {
+type ProgressProps = Omit<
+  React.ComponentPropsWithoutRef<typeof ProgressBarRoot>,
+  "children" | "isIndeterminate" | "value"
+> & {
+  fillClassName?: string;
+  value?: number | null;
+};
+
+function Progress({
+  className,
+  fillClassName,
+  value,
+  ...props
+}: ProgressProps) {
   const clamped =
     typeof value === "number" && Number.isFinite(value)
       ? Math.min(100, Math.max(0, value))
       : null;
 
   return (
-    <div
-      aria-valuemax={100}
-      aria-valuemin={0}
-      aria-valuenow={clamped ?? undefined}
+    <ProgressBarRoot
+      // `block gap-0` neutralises HeroUI's label/output grid: this bar has
+      // neither, and call sites size the root directly.
       className={cn(
-        "relative h-2 w-full overflow-hidden rounded-full bg-primary/20",
+        "block h-2 w-full gap-0 overflow-hidden rounded-full bg-primary/20",
         className,
       )}
-      ref={ref}
-      role="progressbar"
+      isIndeterminate={clamped === null}
+      value={clamped ?? undefined}
       {...props}
     >
-      {clamped === null ? (
-        <div className="h-full w-1/3 animate-[progress-indeterminate_1.2s_ease-in-out_infinite] rounded-full bg-primary" />
-      ) : (
-        <div
-          className="h-full w-full flex-1 rounded-full bg-primary transition-transform duration-200"
-          style={{ transform: `translateX(-${100 - clamped}%)` }}
+      <ProgressBarTrack className="h-full w-full rounded-full bg-transparent">
+        <ProgressBarFill
+          // HeroUI paints the fill with `--accent`, which this app uses as a
+          // hover tint rather than its brand colour — see the known gap in
+          // shared/styles/globals/heroui.css. Pin it to `--primary` instead.
+          className={cn("rounded-full bg-primary", fillClassName)}
         />
-      )}
-    </div>
+      </ProgressBarTrack>
+    </ProgressBarRoot>
   );
-});
-Progress.displayName = "Progress";
+}
 
 export { Progress };

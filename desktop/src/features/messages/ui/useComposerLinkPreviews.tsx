@@ -132,8 +132,9 @@ function ComposerLinkPreviewCard({
             <div className="absolute inset-x-0 bottom-0 px-1.5 pb-1.5">
               <Progress
                 aria-label="Loading link preview"
-                className="h-1 bg-foreground/15 [&>div]:bg-foreground/80"
+                className="h-1 bg-foreground/15"
                 data-testid="link-preview-progress"
+                fillClassName="bg-foreground/80"
                 value={null}
               />
             </div>

@@ -16,7 +16,26 @@ const SIZE_CLASSES: Record<SegmentedControlSize, string> = {
   wide: "w-72",
 };
 
-/** A mutually exclusive control with equal-width, optionally scrubbable options. */
+/**
+ * A mutually exclusive control with equal-width, optionally scrubbable options.
+ *
+ * **Not migrated to `@heroui-pro/react/segment`** — three gaps, each of which
+ * would cost behaviour or break the E2E contract:
+ *
+ * - `Segment` is a `ToggleButtonGroup` pinned to `selectionMode="single"`, and
+ *   React Aria's `useToggleButtonGroupItem` then rewrites every item to
+ *   `role="radio"` with `aria-checked` and **deletes `aria-pressed`**. The
+ *   buttons below are toggle buttons inside a `fieldset`/`legend`, and
+ *   `messaging.spec.ts` asserts `aria-pressed` on `link-preview-style-rich`.
+ * - `Segment.Item` renders its own `SelectionIndicator`, so the indicator
+ *   becomes one node per option. This control emits a single sliding indicator
+ *   under `indicatorTestId`, which `buzz-theme-screenshots.spec.ts` resolves as
+ *   one element and asserts a border radius on.
+ * - `onPreviewChange` — the pointer-capture scrub that live-previews a value
+ *   while dragging across the control, used by all four appearance settings —
+ *   has no counterpart, and `ToggleButtonGroup`'s own press handling would
+ *   fight the pointer capture.
+ */
 export function SegmentedControl<Value extends string>({
   className,
   indicatorTestId,

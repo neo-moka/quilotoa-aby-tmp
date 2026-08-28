@@ -1,5 +1,16 @@
 import { cn } from "@/shared/lib/cn";
 
+/**
+ * **Not migrated to `@heroui-pro/react/stepper`.** Two reasons:
+ *
+ * - Nothing renders it. Onboarding used it when it landed (#924) but every
+ *   call site has since been replaced; it is unreferenced across the repo and
+ *   emits no `data-testid`.
+ * - The semantics do not line up anyway. This is a single `role="progressbar"`
+ *   with `aria-valuenow`, drawn as anonymous dots. `Stepper` is an `<ol>` of
+ *   `<li>` steps with titles, descriptions, icons and optional click-through
+ *   navigation — a different control, not a restyling of this one.
+ */
 type StepProgressProps = {
   activeSegmentClassName?: string;
   className?: string;
