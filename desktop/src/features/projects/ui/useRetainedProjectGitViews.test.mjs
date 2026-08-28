@@ -172,6 +172,10 @@ Object.assign(globalThis, {
   Node: dom.window.Node,
   NodeFilter: dom.window.NodeFilter,
   ResizeObserver: NoopObserver,
+  // React Aria narrows event targets with `target instanceof SVGElement`, so
+  // the constructor has to exist even though this tree renders no SVG.
+  // `heroControls` and `MentionAutocomplete` register it for the same reason.
+  SVGElement: dom.window.SVGElement,
   document: dom.window.document,
   getComputedStyle: (...args) => dom.window.getComputedStyle(...args),
   localStorage: dom.window.localStorage,
