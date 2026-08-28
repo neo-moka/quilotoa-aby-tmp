@@ -35,6 +35,7 @@
    utility, so `.context-menu__popover`'s padding would beat the app's classes
    on the very elements those classes exist to restyle. */
 @import "@heroui-pro/react/css/components/context-menu.css" layer(components);
+@import "@heroui-pro/react/css/components/empty-state.css" layer(components);
 
 /* The app's radius scale wins.
  *
@@ -132,4 +133,23 @@
  * Until then, HeroUI components tinted with `accent` (primary buttons, focus
  * rings) render with the app's hover tint instead of its brand colour.
  * Components that avoid `accent` are unaffected.
+ * ─────────────────────────────────────────────────────────────────────── */
+
+/* ── Known gap 2 ──────────────────────────────────────────────────────────
+ * `--muted` is a second name collision, and a worse one because both sides
+ * think they own it. HeroUI reads `--muted` as secondary *text* (its theme
+ * derives `--field-placeholder` from it); this app spends it on a *surface*
+ * and keeps text on `--muted-foreground`. Since the app declares the token
+ * under the same name, the mapping block above passes over it, and
+ * `@theme inline`'s `--color-muted: var(--muted)` then sends every HeroUI
+ * `@apply text-muted` to the app's surface grey — invisible in light *and*
+ * dark, so no theme toggle reveals it.
+ *
+ * Unlike `--accent` this one is not blocked by ThemeProvider, but it still
+ * cannot be remapped here: ~470 call sites use `bg-muted` for the surface
+ * meaning and would all repaint.
+ *
+ * So it is scoped per subtree instead — see `shared/ui/heroMutedScope.ts`.
+ * 51 of the 67 Pro component stylesheets reference the token, so any newly
+ * adopted Pro component very likely needs that scope on its root.
  * ─────────────────────────────────────────────────────────────────────── */
