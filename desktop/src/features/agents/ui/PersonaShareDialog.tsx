@@ -9,7 +9,7 @@ import {
   X,
 } from "lucide-react";
 import { AnimatePresence, motion, useReducedMotion } from "motion/react";
-import { toast } from "sonner";
+import { toast } from "@/shared/ui/toast";
 
 import { useEncodeAgentSnapshotForSendMutation } from "@/features/agents/hooks";
 import type { CatalogPersonaShareLevel } from "@/features/agents/lib/personaCatalogRelay";
@@ -724,10 +724,10 @@ export function PersonaShareDialog({
             </div>
             <Switch
               aria-label="Share to catalog"
-              checked={catalogShareLevel !== "not-shared"}
+              isSelected={catalogShareLevel !== "not-shared"}
               data-testid="persona-share-catalog-access"
-              disabled={isPending}
-              onCheckedChange={(checked) =>
+              isDisabled={isPending}
+              onChange={(checked) =>
                 onCatalogShareLevelChange(checked ? "none" : "not-shared")
               }
               style={{ cursor: "default" }}

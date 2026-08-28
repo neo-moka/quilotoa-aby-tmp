@@ -1,4 +1,4 @@
-import { toast } from "sonner";
+import { toast } from "@/shared/ui/toast";
 
 import { projectCloneErrorPresentation } from "@/features/projects/lib/projectGitError";
 import type { ProjectRepoUnavailableReason } from "@/features/projects/lib/projectRepoAvailability";

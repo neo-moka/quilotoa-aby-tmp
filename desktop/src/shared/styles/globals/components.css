@@ -22,7 +22,7 @@
     --buzz-huddle-drawer-surface: var(--huddle-drawer-surface, 0 0% 0%);
     /* Keep the drawer surface behind the lifted app so the dark background
      * remains visible through its rounded lower corners. */
-    background: hsl(var(--buzz-huddle-drawer-surface));
+    background: var(--buzz-huddle-drawer-surface);
   }
 
   .buzz-huddle-app-surface {
@@ -44,7 +44,7 @@
   }
 
   .buzz-huddle-app-surface::after {
-    background: hsl(var(--buzz-huddle-drawer-surface));
+    background: var(--buzz-huddle-drawer-surface);
     bottom: -1px;
     content: "";
     height: 2px;
@@ -71,7 +71,7 @@
   }
 
   .buzz-huddle-drawer-backdrop {
-    background: hsl(var(--buzz-huddle-drawer-surface));
+    background: var(--buzz-huddle-drawer-surface);
     bottom: 0;
     height: calc(
       var(--buzz-huddle-drawer-height) +
@@ -99,28 +99,28 @@
   .buzz-huddle-drawer {
     --buzz-huddle-drawer-surface: var(--huddle-drawer-surface, 0 0% 0%);
     --background: var(--buzz-huddle-drawer-surface);
-    --foreground: 0 0% 98%;
-    --primary: 0 0% 98%;
-    --primary-foreground: 0 0% 9%;
+    --foreground: hsl(0 0% 98%);
+    --primary: hsl(0 0% 98%);
+    --primary-foreground: hsl(0 0% 9%);
     --secondary: var(--huddle-control-surface, 0 0% 14.9%);
     --secondary-foreground: var(--huddle-control-foreground, 0 0% 98%);
     --muted: var(--huddle-control-chevron-surface, 0 0% 14.9%);
-    --muted-foreground: 0 0% 63.9%;
+    --muted-foreground: hsl(0 0% 63.9%);
     --accent: var(
       --huddle-control-hover-surface,
       var(--huddle-control-surface, 0 0% 14.9%)
     );
-    --accent-foreground: 0 0% 98%;
+    --accent-foreground: hsl(0 0% 98%);
     --popover: var(--buzz-huddle-drawer-surface);
-    --popover-foreground: 0 0% 98%;
-    --destructive: 0 84.2% 60.2%;
-    --destructive-foreground: 0 0% 98%;
-    --border: 0 0% 14.9%;
-    --input: 0 0% 14.9%;
-    --ring: 0 0% 83.1%;
+    --popover-foreground: hsl(0 0% 98%);
+    --destructive: hsl(0 84.2% 60.2%);
+    --destructive-foreground: hsl(0 0% 98%);
+    --border: hsl(0 0% 14.9%);
+    --input: hsl(0 0% 14.9%);
+    --ring: hsl(0 0% 83.1%);
 
     color-scheme: dark;
-    background: hsl(var(--buzz-huddle-drawer-surface));
+    background: var(--buzz-huddle-drawer-surface);
     overflow-x: auto;
     overflow-y: hidden;
   }
@@ -143,13 +143,13 @@
       var(--huddle-control-hover-surface, 0 0% 24%)
     );
 
-    background: hsl(var(--buzz-huddle-popover-surface));
-    border-color: hsl(var(--border) / 0.6);
+    background: var(--buzz-huddle-popover-surface);
+    border-color: hsl(from var(--border) h s l / 0.6);
     box-shadow:
       0 6px 18px lch(0% 0 0 / 0.02),
       0 3px 9px lch(0% 0 0 / 0.04),
       0 1px 1px lch(0% 0 0 / 0.04);
-    color: hsl(var(--foreground));
+    color: var(--foreground);
   }
 
   .buzz-huddle-headphones-hint {
@@ -164,12 +164,12 @@
     --popover: var(--background);
     --popover-foreground: var(--foreground);
 
-    background: hsl(var(--background));
+    background: var(--background);
     box-shadow:
       0 6px 18px lch(0% 0 0 / 0.02),
       0 3px 9px lch(0% 0 0 / 0.04),
       0 1px 1px lch(0% 0 0 / 0.04);
-    color: hsl(var(--foreground));
+    color: var(--foreground);
   }
 
   .buzz-huddle-mic-meter-bar {
@@ -331,19 +331,19 @@
     /* Violet ink for the backup step's private key and its "never share" caption,
        reading against the fuzzy-white key frame. */
     --buzz-onboarding-backup-ink: #5b3a8e;
-    --background: 0 0% 100%;
-    --foreground: 0 0% 9%;
-    --primary: 0 0% 9%;
-    --primary-foreground: 0 0% 98%;
-    --secondary: 0 0% 96.1%;
-    --secondary-foreground: 0 0% 9%;
-    --muted: 0 0% 96.1%;
-    --muted-foreground: 0 0% 45.1%;
-    --accent: 0 0% 96.1%;
-    --accent-foreground: 0 0% 9%;
-    --border: 0 0% 89.8%;
-    --input: 0 0% 89.8%;
-    --ring: 0 0% 9%;
+    --background: hsl(0 0% 100%);
+    --foreground: hsl(0 0% 9%);
+    --primary: hsl(0 0% 9%);
+    --primary-foreground: hsl(0 0% 98%);
+    --secondary: hsl(0 0% 96.1%);
+    --secondary-foreground: hsl(0 0% 9%);
+    --muted: hsl(0 0% 96.1%);
+    --muted-foreground: hsl(0 0% 45.1%);
+    --accent: hsl(0 0% 96.1%);
+    --accent-foreground: hsl(0 0% 9%);
+    --border: hsl(0 0% 89.8%);
+    --input: hsl(0 0% 89.8%);
+    --ring: hsl(0 0% 9%);
     --buzz-onboarding-emoji-picker-background: 245, 245, 245;
     --buzz-onboarding-emoji-picker-color: 23, 23, 23;
     --buzz-onboarding-emoji-picker-input: 255, 255, 255;
@@ -366,25 +366,25 @@
     color-scheme: dark;
     --buzz-onboarding-shell-bottom: #082b49;
     --buzz-onboarding-cta-label: #f5f5f5;
-    --background: 222 45% 4%;
-    --foreground: 0 0% 96%;
-    --card: 220 14% 11%;
-    --card-foreground: 0 0% 96%;
-    --popover: 220 14% 9%;
-    --popover-foreground: 0 0% 96%;
-    --primary: 0 0% 16%;
-    --primary-foreground: 0 0% 96%;
-    --secondary: 0 0% 12%;
-    --secondary-foreground: 0 0% 96%;
-    --muted: 0 0% 12%;
-    --muted-foreground: 0 0% 72%;
-    --accent: 0 0% 16%;
-    --accent-foreground: 0 0% 96%;
-    --destructive: 0 84% 70%;
-    --destructive-foreground: 0 0% 4%;
-    --border: 0 0% 22%;
-    --input: 0 0% 22%;
-    --ring: 0 0% 84%;
+    --background: hsl(222 45% 4%);
+    --foreground: hsl(0 0% 96%);
+    --card: hsl(220 14% 11%);
+    --card-foreground: hsl(0 0% 96%);
+    --popover: hsl(220 14% 9%);
+    --popover-foreground: hsl(0 0% 96%);
+    --primary: hsl(0 0% 16%);
+    --primary-foreground: hsl(0 0% 96%);
+    --secondary: hsl(0 0% 12%);
+    --secondary-foreground: hsl(0 0% 96%);
+    --muted: hsl(0 0% 12%);
+    --muted-foreground: hsl(0 0% 72%);
+    --accent: hsl(0 0% 16%);
+    --accent-foreground: hsl(0 0% 96%);
+    --destructive: hsl(0 84% 70%);
+    --destructive-foreground: hsl(0 0% 4%);
+    --border: hsl(0 0% 22%);
+    --input: hsl(0 0% 22%);
+    --ring: hsl(0 0% 84%);
   }
 
   .buzz-onboarding-neutral-theme.buzz-startup-shell.buzz-onboarding-security-theme {
@@ -411,19 +411,19 @@
   }
 
   .dark .buzz-onboarding-neutral-theme:not(.buzz-startup-shell) {
-    --background: 0 0% 3.9%;
-    --foreground: 0 0% 98%;
-    --primary: 0 0% 98%;
-    --primary-foreground: 0 0% 9%;
-    --secondary: 0 0% 14.9%;
-    --secondary-foreground: 0 0% 98%;
-    --muted: 0 0% 14.9%;
-    --muted-foreground: 0 0% 63.9%;
-    --accent: 0 0% 14.9%;
-    --accent-foreground: 0 0% 98%;
-    --border: 0 0% 14.9%;
-    --input: 0 0% 14.9%;
-    --ring: 0 0% 83.1%;
+    --background: hsl(0 0% 3.9%);
+    --foreground: hsl(0 0% 98%);
+    --primary: hsl(0 0% 98%);
+    --primary-foreground: hsl(0 0% 9%);
+    --secondary: hsl(0 0% 14.9%);
+    --secondary-foreground: hsl(0 0% 98%);
+    --muted: hsl(0 0% 14.9%);
+    --muted-foreground: hsl(0 0% 63.9%);
+    --accent: hsl(0 0% 14.9%);
+    --accent-foreground: hsl(0 0% 98%);
+    --border: hsl(0 0% 14.9%);
+    --input: hsl(0 0% 14.9%);
+    --ring: hsl(0 0% 83.1%);
     --buzz-onboarding-emoji-picker-background: 38, 38, 38;
     --buzz-onboarding-emoji-picker-color: 250, 250, 250;
     --buzz-onboarding-emoji-picker-input: 10, 10, 10;
@@ -441,19 +441,19 @@
     .buzz-onboarding-neutral-theme[data-system-color-scheme="light"]:not(
       .buzz-startup-shell
     ) {
-    --background: 0 0% 100%;
-    --foreground: 0 0% 9%;
-    --primary: 0 0% 9%;
-    --primary-foreground: 0 0% 98%;
-    --secondary: 0 0% 96.1%;
-    --secondary-foreground: 0 0% 9%;
-    --muted: 0 0% 96.1%;
-    --muted-foreground: 0 0% 45.1%;
-    --accent: 0 0% 96.1%;
-    --accent-foreground: 0 0% 9%;
-    --border: 0 0% 89.8%;
-    --input: 0 0% 89.8%;
-    --ring: 0 0% 9%;
+    --background: hsl(0 0% 100%);
+    --foreground: hsl(0 0% 9%);
+    --primary: hsl(0 0% 9%);
+    --primary-foreground: hsl(0 0% 98%);
+    --secondary: hsl(0 0% 96.1%);
+    --secondary-foreground: hsl(0 0% 9%);
+    --muted: hsl(0 0% 96.1%);
+    --muted-foreground: hsl(0 0% 45.1%);
+    --accent: hsl(0 0% 96.1%);
+    --accent-foreground: hsl(0 0% 9%);
+    --border: hsl(0 0% 89.8%);
+    --input: hsl(0 0% 89.8%);
+    --ring: hsl(0 0% 9%);
     --buzz-onboarding-emoji-picker-background: 245, 245, 245;
     --buzz-onboarding-emoji-picker-color: 23, 23, 23;
     --buzz-onboarding-emoji-picker-input: 255, 255, 255;
@@ -469,19 +469,19 @@
   .buzz-onboarding-neutral-theme[data-system-color-scheme="dark"]:not(
     .buzz-startup-shell
   ) {
-    --background: 0 0% 3.9%;
-    --foreground: 0 0% 98%;
-    --primary: 0 0% 98%;
-    --primary-foreground: 0 0% 9%;
-    --secondary: 0 0% 14.9%;
-    --secondary-foreground: 0 0% 98%;
-    --muted: 0 0% 14.9%;
-    --muted-foreground: 0 0% 63.9%;
-    --accent: 0 0% 14.9%;
-    --accent-foreground: 0 0% 98%;
-    --border: 0 0% 14.9%;
-    --input: 0 0% 14.9%;
-    --ring: 0 0% 83.1%;
+    --background: hsl(0 0% 3.9%);
+    --foreground: hsl(0 0% 98%);
+    --primary: hsl(0 0% 98%);
+    --primary-foreground: hsl(0 0% 9%);
+    --secondary: hsl(0 0% 14.9%);
+    --secondary-foreground: hsl(0 0% 98%);
+    --muted: hsl(0 0% 14.9%);
+    --muted-foreground: hsl(0 0% 63.9%);
+    --accent: hsl(0 0% 14.9%);
+    --accent-foreground: hsl(0 0% 98%);
+    --border: hsl(0 0% 14.9%);
+    --input: hsl(0 0% 14.9%);
+    --ring: hsl(0 0% 83.1%);
     --buzz-onboarding-emoji-picker-background: 38, 38, 38;
     --buzz-onboarding-emoji-picker-color: 250, 250, 250;
     --buzz-onboarding-emoji-picker-input: 10, 10, 10;
@@ -527,26 +527,26 @@
        caption. Lightened from the border blue, which is too dark to read as
        text against the near-black key frame. */
     --buzz-onboarding-backup-ink: #8ab4f0;
-    --background: 0 0% 3.5%;
-    --foreground: 0 0% 95%;
-    --card: 215 47% 20%;
-    --card-foreground: 0 0% 95%;
-    --popover: 215 47% 20%;
-    --popover-foreground: 0 0% 95%;
-    --primary: 215 47% 20%;
-    --primary-foreground: 0 0% 95%;
-    --secondary: 215 47% 20%;
-    --secondary-foreground: 0 0% 95%;
-    --muted: 215 42% 15%;
-    --muted-foreground: 214 32% 70%;
-    --accent: 217 61% 36%;
-    --accent-foreground: 0 0% 98%;
-    --destructive: 0 84% 70%;
-    --destructive-foreground: 0 0% 3.5%;
-    --border: 217 61% 36%;
-    --input: 217 61% 36%;
+    --background: hsl(0 0% 3.5%);
+    --foreground: hsl(0 0% 95%);
+    --card: hsl(215 47% 20%);
+    --card-foreground: hsl(0 0% 95%);
+    --popover: hsl(215 47% 20%);
+    --popover-foreground: hsl(0 0% 95%);
+    --primary: hsl(215 47% 20%);
+    --primary-foreground: hsl(0 0% 95%);
+    --secondary: hsl(215 47% 20%);
+    --secondary-foreground: hsl(0 0% 95%);
+    --muted: hsl(215 42% 15%);
+    --muted-foreground: hsl(214 32% 70%);
+    --accent: hsl(217 61% 36%);
+    --accent-foreground: hsl(0 0% 98%);
+    --destructive: hsl(0 84% 70%);
+    --destructive-foreground: hsl(0 0% 3.5%);
+    --border: hsl(217 61% 36%);
+    --input: hsl(217 61% 36%);
     /* Focus rings brighten the border blue so they read against it. */
-    --ring: 217 66% 52%;
+    --ring: hsl(217 66% 52%);
     --buzz-onboarding-emoji-picker-background: 27, 47, 75;
     --buzz-onboarding-emoji-picker-color: 240, 240, 240;
     --buzz-onboarding-emoji-picker-input: 9, 9, 9;
@@ -578,7 +578,7 @@
     .buzz-onboarding-security-theme
   )
   .buzz-onboarding-cta {
-    border: 1px solid hsl(var(--border));
+    border: 1px solid var(--border);
   }
 
   /* The key-import card is viewport-centered on ordinary windows, independent

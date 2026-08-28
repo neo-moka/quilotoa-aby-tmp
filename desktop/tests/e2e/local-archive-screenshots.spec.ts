@@ -71,7 +71,7 @@ test.describe("local archive screenshots", () => {
     // dedicated observer section instead — toggle should be visible and checked.
     const observerToggle = card.getByTestId("local-archive-observer-toggle");
     await expect(observerToggle).toBeVisible({ timeout: 5_000 });
-    await expect(observerToggle).toBeChecked();
+    await expect(observerToggle).toHaveAttribute("data-selected", "true");
     await settleAnimations(card);
     await card.screenshot({ path: `${SHOTS}/01-subscriptions-list.png` });
   });

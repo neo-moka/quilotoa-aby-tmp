@@ -24,7 +24,10 @@ import {
 } from "./theme-loader";
 
 export const THEME_STORAGE_KEY = "buzz-theme";
-const CACHE_KEY = "buzz-theme-cache";
+// v2: theme vars switched from bare HSL triplets to complete colour values.
+// A v1 blob would resolve to `hsl(hsl(220 …))` on the pre-paint path, so the
+// key is versioned rather than migrated — a stale cache is cheap to rebuild.
+const CACHE_KEY = "buzz-theme-cache.v2";
 export const ACCENT_STORAGE_KEY = "buzz-accent-color";
 export const GLASS_BACKGROUND_STORAGE_KEY = "buzz-glass-background";
 export const GLASS_OPACITY_STORAGE_KEY = "buzz-glass-opacity";
@@ -35,7 +38,7 @@ export const DEFAULT_GLASS_OPACITY = 65;
 export const DEFAULT_PROMINENT_ACTIVE_TAB = false;
 export const NEUTRAL_ACCENT = "neutral";
 const FOLLOW_SYSTEM_KEY = "buzz-follow-system";
-const VIDEO_REVIEW_NEUTRAL_ACCENT = "0 0% 98%";
+const VIDEO_REVIEW_NEUTRAL_ACCENT = "hsl(0 0% 98%)";
 const VIDEO_REVIEW_CHIP_SURFACE = "#161616";
 const VIDEO_REVIEW_TEXT_CONTRAST = 4.5;
 const VIDEO_REVIEW_CHIP_BACKGROUND_ALPHAS = [0.15, 0.3] as const;

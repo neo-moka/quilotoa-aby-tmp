@@ -1,4 +1,4 @@
-import { toast } from "sonner";
+import { toast } from "@/shared/ui/toast";
 
 import { personaManagedAgentUpdate } from "@/features/profile/ui/UserProfilePanelUtils";
 import type {

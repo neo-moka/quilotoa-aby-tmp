@@ -1,5 +1,5 @@
 import * as React from "react";
-import { toast } from "sonner";
+import { toast } from "@/shared/ui/toast";
 
 /**
  * Show a toast when a message string becomes truthy. Uses a ref to avoid

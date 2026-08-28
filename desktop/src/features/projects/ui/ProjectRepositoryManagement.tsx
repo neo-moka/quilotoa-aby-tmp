@@ -1,6 +1,6 @@
 import * as React from "react";
 import { Check, FolderPlus, Link, Plus, ShieldCheck } from "lucide-react";
-import { toast } from "sonner";
+import { toast } from "@/shared/ui/toast";
 
 import { useIsManagedAgent } from "@/features/agent-memory/hooks";
 import { useChannelsQuery } from "@/features/channels/hooks";

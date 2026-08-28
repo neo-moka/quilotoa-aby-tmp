@@ -47,7 +47,7 @@ import { VideoReviewCommentMarkdown } from "@/shared/ui/VideoReviewCommentMarkdo
 import { MessageActionBar } from "./MessageActionBar";
 import { editMessage } from "@/shared/api/tauri";
 import { hasLinkPreviewSuppression } from "@/features/messages/lib/formatTimelineMessages";
-import { toast } from "sonner";
+import { toast } from "@/shared/ui/toast";
 import { MessageAgentOwner } from "./MessageAgentOwner";
 import {
   MessageAuthorText,

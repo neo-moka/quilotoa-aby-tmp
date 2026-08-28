@@ -474,10 +474,8 @@ const MediaAttachmentItem = React.forwardRef<
                               "rounded-lg bg-white/25 text-white ring-2 ring-white",
                           )}
                           data-testid="composer-attachment-spoiler"
-                          onPressedChange={() =>
-                            onToggleSpoiler(attachment.url)
-                          }
-                          pressed={isSpoilered}
+                          onChange={() => onToggleSpoiler(attachment.url)}
+                          isSelected={isSpoilered}
                         >
                           <HatGlasses className="h-4 w-4" />
                         </Toggle>
@@ -797,10 +795,13 @@ export const ComposerAttachments = React.memo(function ComposerAttachments({
                         className={cn(
                           "h-1",
                           preview.posterUrl
-                            ? "bg-white/30 [&>div]:bg-white"
-                            : "bg-foreground/15 [&>div]:bg-foreground/80",
+                            ? "bg-white/30"
+                            : "bg-foreground/15",
                         )}
                         data-testid="upload-progress"
+                        fillClassName={
+                          preview.posterUrl ? "bg-white" : "bg-foreground/80"
+                        }
                         value={preview.progress ?? null}
                       />
                     </div>

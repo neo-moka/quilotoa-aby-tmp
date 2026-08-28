@@ -572,7 +572,7 @@ function ThemeSettingsCard() {
           className="pointer-events-none absolute inset-x-0 top-0 z-10 h-3"
           style={{
             background:
-              "linear-gradient(to bottom, hsl(var(--background)), hsl(var(--background) / 0))",
+              "linear-gradient(to bottom, var(--background), hsl(from var(--background) h s l / 0))",
           }}
         />
         {/* Bottom fade — hidden while the accent picker is visible so its
@@ -584,7 +584,7 @@ function ThemeSettingsCard() {
             className="pointer-events-none absolute inset-x-0 bottom-0 z-10 h-3"
             style={{
               background:
-                "linear-gradient(to top, hsl(var(--background)), hsl(var(--background) / 0))",
+                "linear-gradient(to top, var(--background), hsl(from var(--background) h s l / 0))",
             }}
           />
         ) : null}

@@ -34,7 +34,7 @@ test.describe("observer archive policy — Settings toggle", () => {
     const toggle = card.getByTestId("local-archive-observer-toggle");
     await expect(toggle).toBeVisible({ timeout: 5_000 });
     await expect(toggle).toBeEnabled();
-    await expect(toggle).toBeChecked();
+    await expect(toggle).toHaveAttribute("data-selected", "true");
   });
 
   test("toggle click OFF disables, then ON re-enables", async ({ page }) => {
@@ -51,15 +51,15 @@ test.describe("observer archive policy — Settings toggle", () => {
     const card = await openLocalArchiveSettings(page);
     const toggle = card.getByTestId("local-archive-observer-toggle");
     await expect(toggle).toBeVisible({ timeout: 5_000 });
-    await expect(toggle).toBeChecked();
+    await expect(toggle).toHaveAttribute("data-selected", "true");
 
     // OFF: removes kind 24200.
     await toggle.click();
-    await expect(toggle).not.toBeChecked();
+    await expect(toggle).not.toHaveAttribute("data-selected", "true");
 
     // ON again: re-creates the row from empty.
     await toggle.click();
-    await expect(toggle).toBeChecked();
+    await expect(toggle).toHaveAttribute("data-selected", "true");
   });
 
   test("explicit opt-out persists across reload: toggle stays OFF", async ({
@@ -87,7 +87,7 @@ test.describe("observer archive policy — Settings toggle", () => {
     const toggle = card.getByTestId("local-archive-observer-toggle");
     await expect(toggle).toBeVisible({ timeout: 5_000 });
     await expect(toggle).toBeEnabled();
-    await expect(toggle).not.toBeChecked();
+    await expect(toggle).not.toHaveAttribute("data-selected", "true");
   });
 
   test("no subscriptions, no stored choice: defaults ON then OFF removes, ON re-creates", async ({
@@ -105,15 +105,15 @@ test.describe("observer archive policy — Settings toggle", () => {
     await expect(toggle).toBeVisible({ timeout: 5_000 });
 
     // Default-on: reconciliation seeds the row, toggle must be checked.
-    await expect(toggle).toBeChecked();
+    await expect(toggle).toHaveAttribute("data-selected", "true");
 
     // OFF: removes kind 24200.
     await toggle.click();
-    await expect(toggle).not.toBeChecked();
+    await expect(toggle).not.toHaveAttribute("data-selected", "true");
 
     // ON again: re-creates the row from empty.
     await toggle.click();
-    await expect(toggle).toBeChecked();
+    await expect(toggle).toHaveAttribute("data-selected", "true");
   });
 });
 

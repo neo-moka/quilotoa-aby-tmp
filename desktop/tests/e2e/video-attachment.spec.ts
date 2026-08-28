@@ -744,9 +744,9 @@ test("video upload previews use poster frames and inline videos open review mode
   // Frame-stamp toggle off → the comment posts without a timecode chip and
   // the composer chip drops to its muted state.
   const frameToggle = reviewDialog.getByTestId("video-review-frame-toggle");
-  await expect(frameToggle).toHaveAttribute("data-state", "checked");
+  await expect(frameToggle).toHaveAttribute("data-selected", "true");
   await frameToggle.click();
-  await expect(frameToggle).toHaveAttribute("data-state", "unchecked");
+  await expect(frameToggle).not.toHaveAttribute("data-selected", "true");
   await commentBox.fill("Untimed general note");
   await reviewDialog.getByTestId("send-message").click();
   const untimedCard = page
@@ -758,7 +758,7 @@ test("video upload previews use poster frames and inline videos open review mode
     untimedCard.getByTestId("video-review-comment-timecode"),
   ).toHaveCount(0);
   await frameToggle.click();
-  await expect(frameToggle).toHaveAttribute("data-state", "checked");
+  await expect(frameToggle).toHaveAttribute("data-selected", "true");
 
   // The comments panel collapses and reopens (animated width).
   const commentsPanel = page.getByTestId("video-review-comments-panel");

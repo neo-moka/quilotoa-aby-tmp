@@ -1,5 +1,5 @@
 import * as React from "react";
-import { toast } from "sonner";
+import { toast } from "@/shared/ui/toast";
 
 import { NsecMaskedDisplay } from "@/features/onboarding/ui/NsecMaskedDisplay";
 import { getNsec, signOut } from "@/shared/api/tauriIdentity";
@@ -189,14 +189,12 @@ export function SignOutSection() {
               htmlFor="signout-backup-confirm"
             >
               <Checkbox
-                checked={hasConfirmedBackup}
+                isSelected={hasConfirmedBackup}
                 className="mt-0.5"
                 data-testid="signout-backup-confirm"
-                disabled={isPending}
+                isDisabled={isPending}
                 id="signout-backup-confirm"
-                onCheckedChange={(checked) =>
-                  setHasConfirmedBackup(checked === true)
-                }
+                onChange={(checked) => setHasConfirmedBackup(checked === true)}
               />
               <span>
                 I have tested a key backup or saved this private key somewhere

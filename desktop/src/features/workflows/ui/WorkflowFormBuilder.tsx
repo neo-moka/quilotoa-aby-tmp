@@ -973,12 +973,10 @@ export const WorkflowFormBuilder = React.forwardRef<
         ? createPortal(
             <Switch
               aria-label="Enable workflow"
-              checked={formState.enabled}
-              disabled={disabled}
               id="wf-enabled"
-              onCheckedChange={(checked) =>
-                updateFormState({ ...formState, enabled: checked })
-              }
+              isDisabled={disabled}
+              isSelected={formState.enabled}
+              onChange={(enabled) => updateFormState({ ...formState, enabled })}
             />,
             nameLeadingContainer,
           )

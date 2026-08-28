@@ -1,7 +1,7 @@
 import { useQueryClient } from "@tanstack/react-query";
 import { Headphones, MessageSquareText } from "lucide-react";
 import * as React from "react";
-import { toast } from "sonner";
+import { toast } from "@/shared/ui/toast";
 
 import type { TimelineMessage } from "@/features/messages/types";
 import { relayClient } from "@/shared/api/relayClient";

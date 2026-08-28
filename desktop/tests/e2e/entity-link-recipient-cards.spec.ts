@@ -160,8 +160,8 @@ test("agent-style ABY links stay chip-only with metadata tooltips", async ({
   const tooltipSemanticColors = await prTooltip.evaluate((element) => {
     const styles = getComputedStyle(element);
     const probe = document.createElement("span");
-    probe.style.backgroundColor = "hsl(var(--secondary))";
-    probe.style.color = "hsl(var(--secondary-foreground))";
+    probe.style.backgroundColor = "var(--secondary)";
+    probe.style.color = "var(--secondary-foreground)";
     document.body.append(probe);
     const semanticStyles = getComputedStyle(probe);
     const result = {
@@ -255,8 +255,8 @@ test("agent-style ABY links stay chip-only with metadata tooltips", async ({
   const missingRepoColors = await missingRepoChip.evaluate((element) => {
     const styles = getComputedStyle(element);
     const probe = document.createElement("span");
-    probe.style.backgroundColor = "hsl(var(--primary) / 0.15)";
-    probe.style.color = "hsl(var(--primary))";
+    probe.style.backgroundColor = "hsl(from var(--primary) h s l / 0.15)";
+    probe.style.color = "var(--primary)";
     document.body.append(probe);
     const semanticStyles = getComputedStyle(probe);
     const result = {

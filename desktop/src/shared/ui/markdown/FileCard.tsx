@@ -1,6 +1,6 @@
 import * as React from "react";
 import { Download, FileText } from "lucide-react";
-import { toast } from "sonner";
+import { toast } from "@/shared/ui/toast";
 
 import { invokeTauri } from "@/shared/api/tauri";
 import { useSmoothCorners } from "@/shared/ui/smoothCorners";

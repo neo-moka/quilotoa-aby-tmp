@@ -1,6 +1,6 @@
 import * as React from "react";
 import { MoreHorizontal, Plus, Shield, ShieldCheck, User } from "lucide-react";
-import { toast } from "sonner";
+import { toast } from "@/shared/ui/toast";
 
 import { useUsersBatchQuery } from "@/features/profile/hooks";
 import { truncatePubkey } from "@/shared/lib/pubkey";

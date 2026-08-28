@@ -3,7 +3,21 @@ packages:
   - "web"
   - "admin-web"
 allowBuilds:
+  '@heroui-pro/react': true
+  # An optionalDependency native module that nothing here uses — the desktop
+  # app reaches the OS keyring through Tauri's Rust side. Declared false to
+  # keep it unbuilt, which is what already happened implicitly; optional deps
+  # tolerate a failed build by design.
+  #
+  # It needs an answer rather than silence: pnpm 11 verifies deps before every
+  # script, and an undeclared build script aborts that check with
+  # ERR_PNPM_IGNORED_BUILDS — which takes down typecheck, build, test and the
+  # lint tasks alike, and looks like broken code rather than a missing
+  # decision.
+  '@zowe/secrets-for-zowe-sdk': false
   esbuild: true
+  heroui-native-pro: true
+  heroui-pro: true
 overrides:
   # Force a single copy of the dismissable-layer. Radix packages otherwise
   # resolve different versions (react-menu pulled 1.1.11, react-dialog 1.1.15),

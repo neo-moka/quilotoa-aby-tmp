@@ -68,7 +68,7 @@ export function ChannelTypePicker({
         align={align}
         onCloseAutoFocus={(event) => event.preventDefault()}
         style={{
-          minWidth: "var(--radix-dropdown-menu-trigger-width)",
+          minWidth: "var(--trigger-width)",
         }}
       >
         <DropdownMenuRadioGroup

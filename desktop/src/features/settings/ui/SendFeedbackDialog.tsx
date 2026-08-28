@@ -298,11 +298,11 @@ export function SendFeedbackDialog({
               htmlFor="feedback-include-logs"
             >
               <Checkbox
-                checked={includeLogs}
+                isSelected={includeLogs}
                 data-testid="feedback-include-logs"
-                disabled={isPending}
+                isDisabled={isPending}
                 id="feedback-include-logs"
-                onCheckedChange={(checked) => setIncludeLogs(checked === true)}
+                onChange={(checked) => setIncludeLogs(checked === true)}
               />
               Attach diagnostics
             </label>

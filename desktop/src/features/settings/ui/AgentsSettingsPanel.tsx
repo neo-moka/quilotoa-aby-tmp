@@ -42,9 +42,9 @@ export function AgentsSettingsPanel() {
             </div>
             <Switch
               aria-label="Automatically mention agents"
-              checked={automaticallyMentionAgents}
+              isSelected={automaticallyMentionAgents}
               id="settings-automatic-agent-mentions-switch"
-              onCheckedChange={setKeepMentionedAgentsPinned}
+              onChange={setKeepMentionedAgentsPinned}
             />
           </SettingsOptionRow>
         </SettingsOptionGroup>

@@ -1,6 +1,6 @@
 import * as React from "react";
 import { Copy } from "lucide-react";
-import { toast } from "sonner";
+import { toast } from "@/shared/ui/toast";
 import {
   getSingletonHighlighter,
   type HighlighterGeneric,

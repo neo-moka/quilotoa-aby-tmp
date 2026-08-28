@@ -30,10 +30,10 @@ export function PreventSleepSettingsCard() {
             </p>
           </div>
           <Switch
-            checked={enabled}
+            isSelected={enabled}
             data-testid="prevent-sleep-toggle"
             id="prevent-sleep-switch"
-            onCheckedChange={(checked) => {
+            onChange={(checked) => {
               if (expired) {
                 clearExpired();
               }

@@ -1,6 +1,10 @@
 @import "tailwindcss";
 @import "tw-animate-css";
 
+/* Before theme.css on purpose: HeroUI's defaults land first, the app's tokens
+   overwrite them. See globals/heroui.css. */
+@import "./globals/heroui.css";
+
 @import "./globals/scrollbars.css";
 @import "./globals/motion.css";
 @import "./globals/animations.css";
@@ -17,7 +21,6 @@
 @import "./globals/avatar-framing.css";
 @import "./globals/image-lightbox.css";
 @import "./globals/video-review.css";
-@import "./globals/progress.css";
 
 @config "../../../tailwind.config.js";
 

@@ -10,7 +10,7 @@ import {
 } from "lucide-react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { openUrl } from "@tauri-apps/plugin-opener";
-import { toast } from "sonner";
+import { toast } from "@/shared/ui/toast";
 
 import {
   setCardGalleryOpen,
@@ -373,10 +373,10 @@ export function AgentCardMintDialog({
                 </span>
               </div>
               <Switch
-                checked={canLock && lockCard}
+                isSelected={canLock && lockCard}
                 data-testid="agent-card-lock-toggle"
-                disabled={!canLock}
-                onCheckedChange={setLockCard}
+                isDisabled={!canLock}
+                onChange={setLockCard}
               />
             </div>
             {showKeyStatusRow(keyLayer, editingKey) ? (

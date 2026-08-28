@@ -1,6 +1,6 @@
 import { listen } from "@tauri-apps/api/event";
 import { useEffect } from "react";
-import { toast } from "sonner";
+import { toast } from "@/shared/ui/toast";
 
 const MIGRATION_TOAST_KEY = "buzz-legacy-nest-migrated-notified";
 

@@ -2,10 +2,13 @@ import type * as React from "react";
 
 import { cn } from "@/shared/lib/cn";
 
+// Tokens hold complete colour values, so they are used directly; the alpha
+// tints go through relative-colour syntax rather than the old `/ .15` slot,
+// which only worked while these were bare HSL triplets.
 const TIMECODE_ACCENT_CLASS =
-  "bg-[hsl(var(--buzz-video-review-accent,var(--primary))/0.15)] text-[hsl(var(--buzz-video-review-accent-foreground,var(--buzz-video-review-accent,var(--primary))))]";
+  "bg-[hsl(from_var(--buzz-video-review-accent,var(--primary))_h_s_l/0.15)] text-[var(--buzz-video-review-accent-foreground,var(--buzz-video-review-accent,var(--primary)))]";
 const TIMECODE_ACCENT_HOVER_CLASS =
-  "hover:bg-[hsl(var(--buzz-video-review-accent,var(--primary))/0.3)]";
+  "hover:bg-[hsl(from_var(--buzz-video-review-accent,var(--primary))_h_s_l/0.3)]";
 const MESSAGE_TIMECODE_ACCENT_CLASS =
   "bg-primary/15 text-primary hover:bg-primary/30";
 

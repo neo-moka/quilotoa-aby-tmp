@@ -11,7 +11,7 @@ import {
   WifiOff,
 } from "lucide-react";
 import * as React from "react";
-import { toast } from "sonner";
+import { toast } from "@/shared/ui/toast";
 
 import type { LeaveCommunityResult } from "@/features/communities/leaveCommunity";
 import type { Community } from "@/features/communities/types";
@@ -402,7 +402,7 @@ export function CommunitySwitcher({
       </DropdownMenuTrigger>
       <DropdownMenuContent
         align="start"
-        className="w-(--radix-dropdown-menu-trigger-width) min-w-[220px]"
+        className="w-(--trigger-width) min-w-[220px]"
         onCloseAutoFocus={(e) => e.preventDefault()}
         side={variant === "profile" ? "top" : "bottom"}
         sideOffset={4}

@@ -845,10 +845,10 @@ export function ProfileRuntimeTabContent({
               </span>
               <Switch
                 aria-hidden="true"
-                checked={resolvedStartOnLaunchEnabled}
+                isSelected={resolvedStartOnLaunchEnabled}
                 data-testid={`${startOnLaunchField.testId}-toggle`}
-                disabled={!canToggleStartOnLaunch || startOnLaunchPending}
-                tabIndex={-1}
+                excludeFromTabOrder
+                isDisabled={!canToggleStartOnLaunch || startOnLaunchPending}
               />
             </div>
           ) : null}

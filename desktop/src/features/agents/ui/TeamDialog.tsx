@@ -286,10 +286,10 @@ export function TeamDialog({
                           tabIndex={0}
                         >
                           <Checkbox
-                            checked={isSelected}
                             className="pointer-events-none"
-                            disabled={isPending}
-                            tabIndex={-1}
+                            excludeFromTabOrder
+                            isDisabled={isPending}
+                            isSelected={isSelected}
                           />
                           <ProfileAvatar
                             avatarUrl={persona.avatarUrl}

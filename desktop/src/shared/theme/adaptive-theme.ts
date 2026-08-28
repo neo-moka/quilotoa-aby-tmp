@@ -135,7 +135,13 @@ function calculateChromeColors(syntaxBg: string): {
 }
 
 // =============================================================================
-// Hex → HSL component format ("H S% L%") for Tailwind's hexToHsl() wrappers
+// Hex → a complete CSS colour value ("hsl(H S% L%)").
+//
+// This is the single point where the token format is produced: every var in
+// createThemeVars and applyAccentColor flows through here. It emits a complete
+// colour, not a bare triplet, so tokens are usable directly — `var(--accent)`
+// rather than `hsl(var(--accent))` — which is what HeroUI's component CSS
+// requires, since it consumes the raw token names.
 // =============================================================================
 
 export function hexToHsl(hex: string): string {
@@ -149,7 +155,7 @@ export function hexToHsl(hex: string): string {
   const l = (max + min) / 2;
 
   if (max === min) {
-    return `0 0% ${(l * 100).toFixed(1)}%`;
+    return `hsl(0 0% ${(l * 100).toFixed(1)}%)`;
   }
 
   const d = max - min;
@@ -164,7 +170,7 @@ export function hexToHsl(hex: string): string {
     h = ((rn - gn) / d + 4) / 6;
   }
 
-  return `${(h * 360).toFixed(1)} ${(s * 100).toFixed(2)}% ${(l * 100).toFixed(1)}%`;
+  return `hsl(${(h * 360).toFixed(1)} ${(s * 100).toFixed(2)}% ${(l * 100).toFixed(1)}%)`;
 }
 
 // =============================================================================
@@ -229,7 +235,7 @@ export function createThemeVars(
   const huddleTooltipBg = huddleControlBg;
   const primaryFg = hexToHsl(primaryBg);
   const textFg = hexToHsl(syntaxFg);
-  const huddleControlFg = isDark ? textFg : "0 0% 98%";
+  const huddleControlFg = isDark ? textFg : "hsl(0 0% 98%)";
 
   return {
     isDark,
@@ -241,7 +247,7 @@ export function createThemeVars(
       "--muted": hexToHsl(hoverBg),
       "--accent": hexToHsl(hoverBg),
       "--secondary": hexToHsl(hoverBg),
-      "--huddle-drawer-surface": isDark ? hexToHsl(hoverBg) : "0 0% 0%",
+      "--huddle-drawer-surface": isDark ? hexToHsl(hoverBg) : "hsl(0 0% 0%)",
       "--huddle-control-surface": hexToHsl(huddleControlBg),
       "--huddle-control-hover-surface": hexToHsl(huddleControlHoverBg),
       "--huddle-control-chevron-surface": hexToHsl(huddleChevronBg),

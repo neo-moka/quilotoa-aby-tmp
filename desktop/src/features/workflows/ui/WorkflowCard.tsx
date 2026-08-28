@@ -94,9 +94,9 @@ function StatusToggle({
   return (
     <Switch
       aria-label={enabled ? "Disable workflow" : "Enable workflow"}
-      checked={enabled}
-      disabled={disabled}
-      onCheckedChange={(checked) => {
+      isSelected={enabled}
+      isDisabled={disabled}
+      onChange={(checked) => {
         if (checked !== enabled) onToggle();
       }}
     />

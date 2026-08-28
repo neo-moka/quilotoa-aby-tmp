@@ -91,7 +91,10 @@ test("cancel resets the gates for the next open", async ({ page }) => {
   // Reopen — everything must be reset again.
   await page.getByTestId("signout-open-dialog").click();
   await expect(page.getByRole("alertdialog")).toBeVisible();
-  await expect(page.getByTestId("signout-backup-confirm")).not.toBeChecked();
+  await expect(page.getByTestId("signout-backup-confirm")).not.toHaveAttribute(
+    "data-selected",
+    "true",
+  );
   await expect(page.getByTestId("signout-confirm-phrase")).toHaveValue("");
   await expect(page.getByTestId("signout-confirm")).toBeDisabled();
 });

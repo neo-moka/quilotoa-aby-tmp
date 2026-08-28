@@ -3421,7 +3421,10 @@ test("Inbox All never lists drafts and unread-only hides reminders", async ({
   await expect(draftRow).toHaveCount(0);
 
   await page.getByTestId("inbox-options-trigger").click();
-  await page.getByRole("switch", { name: "Show unread only" }).click();
+  // The node with `role="switch"` is the visually hidden input, which the
+  // `clip-path` on React Aria's `VisuallyHidden` removes from hit-testing.
+  // Click the field wrapper the test id already points at instead.
+  await page.getByTestId("inbox-unread-only-toggle").click();
 
   await expect(messageRow).toBeVisible();
   await expect(reminderRow).toHaveCount(0);

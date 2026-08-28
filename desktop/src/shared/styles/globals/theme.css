@@ -2,59 +2,59 @@
   :root {
     /* Catppuccin Latte (mauve accent) */
     --radius: 0.625rem;
-    --background: 220 23.08% 94.9%;
-    --foreground: 234 16.02% 35.49%;
-    --card: 220 23.08% 94.9%;
-    --card-foreground: 234 16.02% 35.49%;
-    --popover: 220 23.08% 94.9%;
-    --popover-foreground: 234 16.02% 35.49%;
-    --primary: 217 61% 36%;
-    --primary-foreground: 220 23.08% 94.9%;
-    --secondary: 223 15.91% 82.75%;
-    --secondary-foreground: 234 16.02% 35.49%;
-    --muted: 223 15.91% 82.75%;
-    --muted-foreground: 233 12.8% 41.37%;
-    --huddle-drawer-surface: 0 0% 0%;
-    --huddle-control-surface: 0 0% 20%;
-    --huddle-control-hover-surface: 0 0% 24%;
-    --huddle-control-chevron-surface: 0 0% 16%;
-    --huddle-control-chevron-hover-surface: 0 0% 22%;
-    --huddle-control-foreground: 0 0% 98%;
-    --huddle-popover-surface: 0 0% 16%;
-    --huddle-popover-border: 0 0% 24%;
-    --huddle-tooltip-surface: 0 0% 20%;
-    --huddle-tooltip-foreground: 0 0% 98%;
-    --accent: 223 15.91% 82.75%;
-    --accent-foreground: 234 16.02% 35.49%;
-    --destructive: 347 86.67% 44.12%;
-    --destructive-foreground: 220 23.08% 94.9%;
+    --background: hsl(220 23.08% 94.9%);
+    --foreground: hsl(234 16.02% 35.49%);
+    --card: hsl(220 23.08% 94.9%);
+    --card-foreground: hsl(234 16.02% 35.49%);
+    --popover: hsl(220 23.08% 94.9%);
+    --popover-foreground: hsl(234 16.02% 35.49%);
+    --primary: hsl(217 61% 36%);
+    --primary-foreground: hsl(220 23.08% 94.9%);
+    --secondary: hsl(223 15.91% 82.75%);
+    --secondary-foreground: hsl(234 16.02% 35.49%);
+    --muted: hsl(223 15.91% 82.75%);
+    --muted-foreground: hsl(233 12.8% 41.37%);
+    --huddle-drawer-surface: hsl(0 0% 0%);
+    --huddle-control-surface: hsl(0 0% 20%);
+    --huddle-control-hover-surface: hsl(0 0% 24%);
+    --huddle-control-chevron-surface: hsl(0 0% 16%);
+    --huddle-control-chevron-hover-surface: hsl(0 0% 22%);
+    --huddle-control-foreground: hsl(0 0% 98%);
+    --huddle-popover-surface: hsl(0 0% 16%);
+    --huddle-popover-border: hsl(0 0% 24%);
+    --huddle-tooltip-surface: hsl(0 0% 20%);
+    --huddle-tooltip-foreground: hsl(0 0% 98%);
+    --accent: hsl(223 15.91% 82.75%);
+    --accent-foreground: hsl(234 16.02% 35.49%);
+    --destructive: hsl(347 86.67% 44.12%);
+    --destructive-foreground: hsl(220 23.08% 94.9%);
     /* Notification attention colors are fixed across syntax themes. Unlike
        destructive, these must stay recognizably red with AA label contrast. */
-    --notification: 348 65% 48%;
-    --notification-foreground: 350 100% 98%;
+    --notification: hsl(348 65% 48%);
+    --notification-foreground: hsl(350 100% 98%);
     /* Opaque highlighter colors keep near-black mention text readable on every
        message surface instead of depending on the active theme underneath. */
-    --mention-highlight: 48 96% 70%;
-    --mention-highlight-hover: 48 96% 62%;
-    --border: 225 13.56% 76.86%;
-    --input: 225 13.56% 76.86%;
-    --ring: 234 16.02% 35.49%;
-    --chart-1: 345 57.65% 74.12%;
-    --chart-2: 185 37.25% 70.59%;
-    --chart-3: 219 81.96% 78.43%;
-    --chart-4: 35 61.18% 76.86%;
-    --chart-5: 113 32.94% 73.33%;
-    --sidebar: 218 25.1% 93.73%;
-    --sidebar-background: 218 25.1% 93.73%;
-    --sidebar-foreground: 234 16.02% 35.49%;
-    --sidebar-primary: 217 61% 36%;
-    --sidebar-primary-foreground: 220 23.08% 94.9%;
+    --mention-highlight: hsl(48 96% 70%);
+    --mention-highlight-hover: hsl(48 96% 62%);
+    --border: hsl(225 13.56% 76.86%);
+    --input: hsl(225 13.56% 76.86%);
+    --ring: hsl(234 16.02% 35.49%);
+    --chart-1: hsl(345 57.65% 74.12%);
+    --chart-2: hsl(185 37.25% 70.59%);
+    --chart-3: hsl(219 81.96% 78.43%);
+    --chart-4: hsl(35 61.18% 76.86%);
+    --chart-5: hsl(113 32.94% 73.33%);
+    --sidebar: hsl(218 25.1% 93.73%);
+    --sidebar-background: hsl(218 25.1% 93.73%);
+    --sidebar-foreground: hsl(234 16.02% 35.49%);
+    --sidebar-primary: hsl(217 61% 36%);
+    --sidebar-primary-foreground: hsl(220 23.08% 94.9%);
     --sidebar-active: var(--sidebar-primary);
     --sidebar-active-foreground: var(--sidebar-primary-foreground);
-    --sidebar-accent: 220 23.08% 94.9%;
-    --sidebar-accent-foreground: 234 16.02% 35.49%;
-    --sidebar-border: 225 13.56% 76.86%;
-    --sidebar-ring: 225 13.56% 76.86%;
+    --sidebar-accent: hsl(220 23.08% 94.9%);
+    --sidebar-accent-foreground: hsl(234 16.02% 35.49%);
+    --sidebar-border: hsl(225 13.56% 76.86%);
+    --sidebar-ring: hsl(225 13.56% 76.86%);
     /* Exact Buzz palette tokens; components consume these semantically. */
     /*
      * Chrome surface. These read as a "gradient" for historical reasons, but
@@ -70,7 +70,7 @@
     /* Inset content canvas — the chat surface, rgb(24 25 27). One step *up*
        from the chrome so the reading surface is the lighter of the two, as in
        the reference IDE. */
-    --buzz-content-dark: 220 6% 10%;
+    --buzz-content-dark: hsl(220 6% 10%);
     /* Hosted-community onboarding intentionally keeps this light palette in
        both app themes; semantic tokens keep component code color-agnostic. */
     --buzz-hosted-community-surface-fg: 23 23 23;
@@ -92,51 +92,51 @@
      * low-saturation ramp at hue 220, and color appears only as accent.
      */
     --radius: 0.625rem;
-    --background: 220 6% 10%;
-    --foreground: 220 8% 93%;
-    --card: 220 6% 10%;
-    --card-foreground: 220 8% 93%;
-    --popover: 220 6% 13%;
-    --popover-foreground: 220 8% 93%;
-    --primary: 217 66% 62%;
-    --primary-foreground: 220 6% 10%;
-    --secondary: 220 6% 16%;
-    --secondary-foreground: 220 8% 93%;
-    --muted: 220 6% 16%;
-    --muted-foreground: 220 7% 64%;
-    --huddle-drawer-surface: 220 6% 13%;
-    --huddle-control-surface: 220 6% 20%;
-    --huddle-control-hover-surface: 220 6% 24%;
-    --huddle-control-chevron-surface: 220 6% 17%;
-    --huddle-control-chevron-hover-surface: 220 6% 20%;
-    --huddle-control-foreground: 220 8% 93%;
-    --huddle-popover-surface: 220 6% 17%;
-    --huddle-popover-border: 220 6% 24%;
-    --huddle-tooltip-surface: 220 6% 20%;
-    --huddle-tooltip-foreground: 220 8% 93%;
-    --accent: 220 6% 19%;
-    --accent-foreground: 220 8% 93%;
-    --destructive: 351 74% 73%;
-    --destructive-foreground: 220 6% 10%;
-    --border: 220 6% 22%;
-    --input: 220 6% 22%;
-    --ring: 217 66% 52%;
-    --chart-1: 333 20.78% 38.04%;
-    --chart-2: 193 19.61% 38.04%;
-    --chart-3: 224 26.67% 41.18%;
-    --chart-4: 30 8.24% 42.35%;
-    --chart-5: 139 10.98% 38.82%;
-    --sidebar: 220 7% 5%;
-    --sidebar-background: 220 7% 5%;
-    --sidebar-foreground: 220 8% 93%;
-    --sidebar-primary: 217 66% 62%;
-    --sidebar-primary-foreground: 220 6% 10%;
+    --background: hsl(220 6% 10%);
+    --foreground: hsl(220 8% 93%);
+    --card: hsl(220 6% 10%);
+    --card-foreground: hsl(220 8% 93%);
+    --popover: hsl(220 6% 13%);
+    --popover-foreground: hsl(220 8% 93%);
+    --primary: hsl(217 66% 62%);
+    --primary-foreground: hsl(220 6% 10%);
+    --secondary: hsl(220 6% 16%);
+    --secondary-foreground: hsl(220 8% 93%);
+    --muted: hsl(220 6% 16%);
+    --muted-foreground: hsl(220 7% 64%);
+    --huddle-drawer-surface: hsl(220 6% 13%);
+    --huddle-control-surface: hsl(220 6% 20%);
+    --huddle-control-hover-surface: hsl(220 6% 24%);
+    --huddle-control-chevron-surface: hsl(220 6% 17%);
+    --huddle-control-chevron-hover-surface: hsl(220 6% 20%);
+    --huddle-control-foreground: hsl(220 8% 93%);
+    --huddle-popover-surface: hsl(220 6% 17%);
+    --huddle-popover-border: hsl(220 6% 24%);
+    --huddle-tooltip-surface: hsl(220 6% 20%);
+    --huddle-tooltip-foreground: hsl(220 8% 93%);
+    --accent: hsl(220 6% 19%);
+    --accent-foreground: hsl(220 8% 93%);
+    --destructive: hsl(351 74% 73%);
+    --destructive-foreground: hsl(220 6% 10%);
+    --border: hsl(220 6% 22%);
+    --input: hsl(220 6% 22%);
+    --ring: hsl(217 66% 52%);
+    --chart-1: hsl(333 20.78% 38.04%);
+    --chart-2: hsl(193 19.61% 38.04%);
+    --chart-3: hsl(224 26.67% 41.18%);
+    --chart-4: hsl(30 8.24% 42.35%);
+    --chart-5: hsl(139 10.98% 38.82%);
+    --sidebar: hsl(220 7% 5%);
+    --sidebar-background: hsl(220 7% 5%);
+    --sidebar-foreground: hsl(220 8% 93%);
+    --sidebar-primary: hsl(217 66% 62%);
+    --sidebar-primary-foreground: hsl(220 6% 10%);
     --sidebar-active: var(--sidebar-primary);
     --sidebar-active-foreground: var(--sidebar-primary-foreground);
-    --sidebar-accent: 220 6% 13%;
-    --sidebar-accent-foreground: 220 8% 93%;
-    --sidebar-border: 220 6% 18%;
-    --sidebar-ring: 220 6% 22%;
+    --sidebar-accent: hsl(220 6% 13%);
+    --sidebar-accent-foreground: hsl(220 8% 93%);
+    --sidebar-border: hsl(220 6% 18%);
+    --sidebar-ring: hsl(220 6% 22%);
   }
 
   * {
@@ -263,7 +263,7 @@
   --buzz-nav-fg: inherit;
   --buzz-hover-surface: rgb(0 0 0 / 4%);
   --buzz-sidebar-scrollbar-thumb: var(--buzz-hover-surface);
-  --buzz-active-fill: 0 0% 0%;
+  --buzz-active-fill: hsl(0 0% 0%);
   --buzz-active-foreground: var(--foreground);
 }
 
@@ -280,8 +280,8 @@
   --buzz-search-surface: rgb(255 255 255 / 4%);
   --buzz-chrome-foreground: rgb(255 255 255 / 50%);
   --buzz-hover-surface: rgb(255 255 255 / 4%);
-  --buzz-active-fill: 0 0% 100%;
-  --buzz-active-foreground: 0 0% 100%;
+  --buzz-active-fill: hsl(0 0% 100%);
+  --buzz-active-foreground: hsl(0 0% 100%);
 }
 
 /*
@@ -289,28 +289,28 @@
  * Other themes retain the standard popover treatment.
  */
 :root[data-buzz-sidebar] [data-buzz-selection-formatting-tray] {
-  border-color: hsl(var(--primary-foreground) / 0.18);
-  background-color: hsl(var(--primary));
-  color: hsl(var(--primary-foreground));
+  border-color: hsl(from var(--primary-foreground) h s l / 0.18);
+  background-color: var(--primary);
+  color: var(--primary-foreground);
 }
 
 :root[data-buzz-sidebar] [data-buzz-selection-formatting-tray] button {
-  color: hsl(var(--primary-foreground));
+  color: var(--primary-foreground);
 }
 
 :root[data-buzz-sidebar] [data-buzz-selection-formatting-tray] button:hover,
 :root[data-buzz-sidebar]
   [data-buzz-selection-formatting-tray]
   button[aria-pressed="true"] {
-  background-color: hsl(var(--primary-foreground) / 0.16);
-  color: hsl(var(--primary-foreground));
+  background-color: hsl(from var(--primary-foreground) h s l / 0.16);
+  color: var(--primary-foreground);
 }
 
 /* Keep the subtle content-card lift in Buzz Light only. */
 :root[data-buzz-sidebar]:not(.dark)
   [data-buzz-content-surface]:not([data-buzz-content-unframed]) {
   box-shadow:
-    -1px -1px 0 0 hsl(var(--sidebar-border) / 0.45),
+    -1px -1px 0 0 hsl(from var(--sidebar-border) h s l / 0.45),
     0 0 4px 0 rgb(0 0 0 / 7%);
 }
 
@@ -330,7 +330,7 @@
  */
 :root[data-buzz-sidebar].dark [data-buzz-content-surface] {
   --background: var(--buzz-content-dark);
-  background-color: hsl(var(--background));
+  background-color: var(--background);
   box-shadow: inset 1px 1px 0 0 rgb(255 255 255 / 7%);
 }
 
@@ -683,7 +683,7 @@
  */
 :root[data-glass-background] {
   --glass-sidebar-surface: hsl(
-    var(--sidebar-background) /
+    from var(--sidebar-background) h s l /
     var(--glass-background-opacity, 65%)
   );
   --buzz-translucency-gradient-alpha: var(--glass-background-opacity, 65%);
@@ -933,14 +933,14 @@
 :root[data-glass-background]
   .buzz-huddle-shell[data-huddle-window="true"]
   .buzz-huddle-app-surface-open::after {
-  background: hsl(var(--buzz-huddle-drawer-surface));
+  background: var(--buzz-huddle-drawer-surface);
 }
 
 /* Keep the Buzz gradient in the lifted app surface. The shell beneath it is
  * strictly the huddle drawer, so its dark surface is revealed at the rounded
  * lower corners instead of the theme gradient bleeding through there. */
 :root[data-buzz-sidebar] .buzz-huddle-shell[data-huddle-open="true"] {
-  background-color: hsl(var(--buzz-huddle-drawer-surface));
+  background-color: var(--buzz-huddle-drawer-surface);
   background-image: none;
 }
 
@@ -954,7 +954,7 @@
  * two gradient layers) sits above it. This prevents the default gradient
  * backing from ever replacing the huddle drawer at the exposed corners. */
 :root[data-buzz-sidebar] .buzz-huddle-shell[data-huddle-open="true"]::before {
-  background: hsl(var(--buzz-huddle-drawer-surface));
+  background: var(--buzz-huddle-drawer-surface);
   content: "";
   inset: 0;
   pointer-events: none;

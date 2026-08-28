@@ -49,7 +49,7 @@ test("Share compute chooses a model before sharing", async ({ page }) => {
   await expect(card).toContainText(
     "ABY downloads remote models when sharing starts",
   );
-  await expect(toggle).toBeChecked();
+  await expect(toggle).toHaveAttribute("data-selected", "true");
   await expect(
     page.getByTestId("mesh-share-compute-sharing-status"),
   ).toContainText("SmolLM2 135M with relay members");
@@ -72,7 +72,7 @@ test("Share compute chooses a model before sharing", async ({ page }) => {
     });
 
   await toggle.click();
-  await expect(toggle).not.toBeChecked();
+  await expect(toggle).not.toHaveAttribute("data-selected", "true");
   await expect(card).not.toContainText("Not sharing right now");
   await expect(
     page.getByTestId("mesh-share-compute-options-motion"),
@@ -122,7 +122,7 @@ test("a consuming client can switch to sharing its saved local model", async ({
     "This machine is currently using another member's shared compute",
   );
   await expect(card).toContainText("ABY may briefly restart");
-  await expect(toggle).not.toBeChecked();
+  await expect(toggle).not.toHaveAttribute("data-selected", "true");
   await expect(
     page.getByTestId("mesh-share-compute-options-motion"),
   ).toHaveCount(0);
@@ -133,7 +133,7 @@ test("a consuming client can switch to sharing its saved local model", async ({
   await expect(customModel).toBeVisible();
   await customModel.fill("hf://demo/replacement-model:Q4_K_M");
   await toggle.click();
-  await expect(toggle).toBeChecked();
+  await expect(toggle).toHaveAttribute("data-selected", "true");
 
   const commands = await page.evaluate(() => ({
     names: (window as E2eWindow).__BUZZ_E2E_COMMANDS__ ?? [],

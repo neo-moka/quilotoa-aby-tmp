@@ -1,6 +1,6 @@
 import * as React from "react";
 import { useQueryClient } from "@tanstack/react-query";
-import { toast } from "sonner";
+import { toast } from "@/shared/ui/toast";
 
 import { channelsQueryKey } from "@/features/channels/hooks";
 import { useHuddle } from "@/features/huddle";

@@ -38,6 +38,10 @@ before(() => {
     document: dom.window.document,
     HTMLElement: dom.window.HTMLElement,
     IS_REACT_ACT_ENVIRONMENT: true,
+    // The retry card's button renders React Aria's press handling, whose
+    // teardown narrows event targets with `target instanceof SVGElement`;
+    // without the global that throws from inside cleanup.
+    SVGElement: dom.window.SVGElement,
     window: dom.window,
   });
   dom.window.matchMedia = () => ({

@@ -167,7 +167,15 @@ Object.assign(globalThis, {
   IS_REACT_ACT_ENVIRONMENT: true,
   IntersectionObserver: NoopObserver,
   MutationObserver: dom.window.MutationObserver,
+  // React Aria's tab panel walks for a tabbable child with a TreeWalker, which
+  // reads Node.ELEMENT_NODE and NodeFilter.SHOW_ELEMENT off the globals.
+  Node: dom.window.Node,
+  NodeFilter: dom.window.NodeFilter,
   ResizeObserver: NoopObserver,
+  // React Aria narrows event targets with `target instanceof SVGElement`, so
+  // the constructor has to exist even though this tree renders no SVG.
+  // `heroControls` and `MentionAutocomplete` register it for the same reason.
+  SVGElement: dom.window.SVGElement,
   document: dom.window.document,
   getComputedStyle: (...args) => dom.window.getComputedStyle(...args),
   localStorage: dom.window.localStorage,

@@ -24,6 +24,10 @@ before(() => {
       observe() {}
       unobserve() {}
     },
+    // React Aria's press handling narrows event targets with
+    // `target instanceof SVGElement` on unmount; without the global it throws
+    // a ReferenceError from inside cleanup rather than from the assertion.
+    SVGElement: dom.window.SVGElement,
     window: dom.window,
   });
 });
@@ -76,7 +80,9 @@ test("agent rows offer automatic mention controls", async () => {
     name: "Automatically mention Agent Ada",
   });
   assert.equal(action.getAttribute("aria-pressed"), "false");
-  assert.equal(action.getAttribute("data-state"), "off");
+  // HeroUI's ToggleButton marks selection with `data-selected`, present only
+  // while on — Radix's `data-state="off"/"on"` is gone.
+  assert.equal(action.getAttribute("data-selected"), null);
   fireEvent.click(action);
   assert.deepEqual(toggled, [suggestion]);
   assert.deepEqual(selected, [suggestion]);
@@ -91,7 +97,7 @@ test("agent rows offer automatic mention controls", async () => {
     name: "Stop automatically mentioning Agent Ada",
   });
   assert.equal(selectedAction.getAttribute("aria-pressed"), "true");
-  assert.equal(selectedAction.getAttribute("data-state"), "on");
+  assert.equal(selectedAction.getAttribute("data-selected"), "true");
   fireEvent.click(selectedAction);
   assert.deepEqual(toggled, [suggestion, suggestion]);
 });
@@ -130,7 +136,9 @@ test("options expand in place without replacing the people list", async () => {
   const toggle = view.getByRole("switch", {
     name: "Automatically mention agents",
   });
-  assert.equal(toggle.getAttribute("data-state"), "checked");
+  // The `role="switch"` node is now the hidden input HeroUI drives, so state
+  // reads off `checked` rather than off Radix's `data-state`.
+  assert.equal(toggle.checked, true);
   assert.ok(view.getByText("After you mention them once"));
   assert.ok(view.getByRole("button", { name: "Mention Agent Ada" }));
 

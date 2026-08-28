@@ -65,10 +65,10 @@ export function ProminentActiveTabSetting() {
         </p>
       </div>
       <Switch
-        checked={prominentActiveTab}
+        isSelected={prominentActiveTab}
         data-testid="prominent-active-tab-toggle"
         id="prominent-active-tab-switch"
-        onCheckedChange={setProminentActiveTab}
+        onChange={setProminentActiveTab}
       />
     </SettingsOptionRow>
   );
@@ -288,8 +288,8 @@ function buzzGradientSampleImage(isDark: boolean): string {
     ? readToken("--buzz-gradient-dark-bottom", "#0a1423")
     : readToken("--buzz-gradient-light-bottom", "#c4d0da");
   const shapeToken = isDark ? "--foreground" : "--background";
-  const shapeFallback = isDark ? "0 0% 98%" : "0 0% 100%";
-  const shape = `hsl(${readToken(shapeToken, shapeFallback)})`;
+  const shapeFallback = isDark ? "hsl(0 0% 98%)" : "hsl(0 0% 100%)";
+  const shape = readToken(shapeToken, shapeFallback);
   const shapeOpacities = isDark ? [0.5, 0.38, 0.28] : [0.82, 0.68, 0.52];
   const svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 382 200"><defs><linearGradient id="g" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="${top}"/><stop offset="1" stop-color="${bottom}"/></linearGradient></defs><rect width="382" height="200" fill="url(#g)"/><rect x="76" y="64" width="72" height="72" rx="22" fill="${shape}" opacity="${shapeOpacities[0]}"/><rect x="168" y="76" width="96" height="18" rx="9" fill="${shape}" opacity="${shapeOpacities[1]}"/><rect x="168" y="106" width="138" height="18" rx="9" fill="${shape}" opacity="${shapeOpacities[2]}"/></svg>`;
   return `data:image/svg+xml;utf8,${encodeURIComponent(svg)}`;
@@ -459,11 +459,11 @@ export function GlassBackgroundSetting() {
           </p>
         </div>
         <Switch
-          checked={glassBackgroundSupported && glassBackground}
+          isSelected={glassBackgroundSupported && glassBackground}
           data-testid="glass-background-toggle"
-          disabled={!glassBackgroundSupported}
+          isDisabled={!glassBackgroundSupported}
           id="glass-background-switch"
-          onCheckedChange={setGlassBackground}
+          onChange={setGlassBackground}
         />
       </SettingsOptionRow>
       {shouldReduceMotion ? (
@@ -512,12 +512,12 @@ function ThreadLayoutDiagram({ mode }: { mode: ThreadViewMode }) {
   const gradientBottom = isDark
     ? "var(--buzz-gradient-dark-bottom, #0a1423)"
     : "var(--buzz-gradient-light-bottom, #c4d0da)";
-  const channelSurface = "hsl(var(--muted))";
-  const threadSurface = "hsl(var(--background))";
+  const channelSurface = "var(--muted)";
+  const threadSurface = "var(--background)";
   const channelOpacity = isDark ? 0.88 : 0.78;
   const threadOpacity = isDark ? 0.98 : 0.96;
-  const bar = "hsl(var(--foreground) / 0.24)";
-  const barSoft = "hsl(var(--foreground) / 0.14)";
+  const bar = "hsl(from var(--foreground) h s l / 0.24)";
+  const barSoft = "hsl(from var(--foreground) h s l / 0.14)";
 
   const isFocus = mode === "focus";
   // Inner content area: 10..230 x 10..122 (inside the frame padding).
@@ -679,9 +679,7 @@ export function AccentPickerContent({
           {ACCENT_COLORS.map((color) => {
             const isNeutral = color.value === NEUTRAL_ACCENT;
             const isSelected = accentColor === color.value;
-            const swatchColor = isNeutral
-              ? "hsl(var(--foreground))"
-              : color.value;
+            const swatchColor = isNeutral ? "var(--foreground)" : color.value;
             const selectionColor = isNeutral
               ? isDark
                 ? "#000000"

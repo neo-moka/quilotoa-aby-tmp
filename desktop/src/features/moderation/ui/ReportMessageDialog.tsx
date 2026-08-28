@@ -1,6 +1,6 @@
 import { Flag } from "lucide-react";
 import * as React from "react";
-import { toast } from "sonner";
+import { toast } from "@/shared/ui/toast";
 
 import { useSubmitReportMutation } from "@/features/moderation/hooks";
 import type { ReportType } from "@/features/moderation/hooks";

@@ -1,5 +1,5 @@
 import { ChevronDown } from "lucide-react";
-import { toast } from "sonner";
+import { toast } from "@/shared/ui/toast";
 
 import { Spinner } from "@/shared/ui/spinner";
 import React from "react";
@@ -19,6 +19,7 @@ import { Button } from "@/shared/ui/button";
 import {
   DropdownMenu,
   DropdownMenuContent,
+  DropdownMenuPanel,
   DropdownMenuRadioGroup,
   DropdownMenuRadioItem,
   DropdownMenuTrigger,
@@ -234,12 +235,12 @@ export function ModelPicker({
           onCloseAutoFocus={(event) => event.preventDefault()}
         >
           {loading ? (
-            <div className="flex items-center gap-2 px-3 py-2 text-sm text-muted-foreground">
+            <DropdownMenuPanel className="flex items-center gap-2 px-3 py-2 text-sm text-muted-foreground">
               <Spinner className="h-4 w-4 border-2" />
               Loading models...
-            </div>
+            </DropdownMenuPanel>
           ) : error ? (
-            <div className="space-y-2 px-3 py-2 text-sm">
+            <DropdownMenuPanel className="space-y-2 px-3 py-2 text-sm">
               <p className="text-destructive">Failed to load models.</p>
               <button
                 className="text-xs text-muted-foreground underline underline-offset-2 hover:text-foreground"
@@ -251,13 +252,13 @@ export function ModelPicker({
               >
                 Retry
               </button>
-            </div>
+            </DropdownMenuPanel>
           ) : !modelsData ? (
-            <div className="px-3 py-2 text-sm text-muted-foreground">
+            <DropdownMenuPanel className="px-3 py-2 text-sm text-muted-foreground">
               Open to load available models.
-            </div>
+            </DropdownMenuPanel>
           ) : !modelsData.supportsSwitching ? (
-            <div className="px-3 py-2 text-sm text-muted-foreground">
+            <DropdownMenuPanel className="px-3 py-2 text-sm text-muted-foreground">
               {agent.model ? (
                 <>
                   <p className="font-medium text-foreground">
@@ -270,7 +271,7 @@ export function ModelPicker({
               ) : (
                 "This agent uses the runtime's default model."
               )}
-            </div>
+            </DropdownMenuPanel>
           ) : (
             <DropdownMenuRadioGroup
               onValueChange={handleModelChange}

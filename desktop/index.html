@@ -45,7 +45,7 @@
           }
           parsed = JSON.parse(cached);
           bg = parsed.vars["--background"];
-          if (bg) document.documentElement.style.backgroundColor = `hsl(${bg})`;
+          if (bg) document.documentElement.style.backgroundColor = bg;
           // Match the cached light/dark class so themed vars resolve correctly
           // before ThemeProvider mounts.
           document.documentElement.classList.add(parsed.isDark ? "dark" : "light");

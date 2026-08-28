@@ -309,8 +309,8 @@ export function InboxListPane({
       agentPubkeys?.has(normalizePubkey(item.item.pubkey)) === true;
     const profileRole = isSenderAgent ? "bot" : undefined;
     const rowHighlightColor = isSelected
-      ? "color-mix(in srgb, hsl(var(--background)) 70%, hsl(var(--muted)) 30%)"
-      : "color-mix(in srgb, hsl(var(--background)) 75%, hsl(var(--muted)) 25%)";
+      ? "color-mix(in srgb, var(--background) 70%, var(--muted) 30%)"
+      : "color-mix(in srgb, var(--background) 75%, var(--muted) 25%)";
     const handleRowContentClick = (event: React.MouseEvent<HTMLElement>) => {
       const target = event.target;
       if (
@@ -571,12 +571,13 @@ export function InboxListPane({
                       Show unread only
                     </label>
                     <Switch
-                      checked={unreadOnly}
-                      className="shadow-none [&>span]:shadow-none"
+                      className="shadow-none"
                       data-testid="inbox-unread-only-toggle"
-                      disabled={isReminders || isDrafts}
                       id="inbox-unread-only-switch"
-                      onCheckedChange={onUnreadOnlyChange}
+                      isDisabled={isReminders || isDrafts}
+                      isSelected={unreadOnly}
+                      onChange={onUnreadOnlyChange}
+                      thumbClassName="shadow-none"
                     />
                   </div>
                   <Separator className="my-1 bg-muted" />
