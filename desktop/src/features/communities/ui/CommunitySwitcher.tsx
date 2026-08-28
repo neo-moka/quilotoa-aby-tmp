@@ -8,6 +8,7 @@ import {
   Settings2,
   LogOut,
   Ticket,
+  Users,
   WifiOff,
 } from "lucide-react";
 import * as React from "react";
@@ -36,6 +37,7 @@ import {
 } from "@/shared/ui/menu-item";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/shared/ui/tooltip";
 import { cn } from "@/shared/lib/cn";
+import { getInitials } from "@/shared/lib/initials";
 import type { ConnectionState } from "@/shared/api/relayClientShared";
 import {
   isRelayConnectionDegraded,
@@ -75,12 +77,23 @@ type CommunitySwitcherProps = {
   onRemoveCommunity: (id: string) => Promise<LeaveCommunityResult | undefined>;
 };
 
+/**
+ * Community avatar: its picture, or its initials.
+ *
+ * The initials are honest here in a way they are not for a person — a community
+ * always has a real, chosen name, so its first letters stand for something.
+ * (Contrast `SidebarProfileCard`, where the "name" is a truncated npub and
+ * initials of it are invented.) This mirrors `CommunityRail`, which already
+ * shows `getInitials(community.name)`.
+ */
 export function CommunityEmojiIcon({
   className,
   iconUrl,
+  name,
 }: {
   className: string;
   iconUrl?: string | null;
+  name?: string | null;
 }) {
   if (iconUrl) {
     return (
@@ -97,11 +110,18 @@ export function CommunityEmojiIcon({
       </span>
     );
   }
-  // No icon rather than a stand-in. The bee that used to sit here was Buzz's
-  // mark, and after the ABY rename it read as decoration nobody chose — the
-  // same reason it came out of the sidebar profile card. A community without
-  // an icon shows its name, which is the thing being identified.
-  return null;
+
+  const initials = name ? getInitials(name) : "";
+
+  return (
+    <span aria-hidden="true" className={className}>
+      {initials ? (
+        <span className="font-semibold leading-none">{initials}</span>
+      ) : (
+        <Users className="h-3 w-3" />
+      )}
+    </span>
+  );
 }
 
 export function CommunitySwitcher({
@@ -226,6 +246,7 @@ export function CommunitySwitcher({
               : "flex w-5 shrink-0 items-center justify-center text-xs"
           }
           iconUrl={activeIcon}
+          name={activeCommunity?.name}
         />
       )}
       <span

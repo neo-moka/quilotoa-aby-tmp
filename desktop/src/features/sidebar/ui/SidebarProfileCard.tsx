@@ -211,6 +211,11 @@ export function SidebarProfileCard({
           avatarUrl={avatarUrl}
           currentStatus={selfPresenceStatus}
           displayName={resolvedDisplayName}
+          // The popover is a second rendering of this same identity. Both read
+          // it from these two values so the card cannot show an identicon while
+          // the menu that opens from it shows invented initials.
+          hasProfileName={hasProfileName}
+          identiconSeed={identiconSeed}
           isStatusPending={isPresencePending}
           onClearUserStatus={onClearUserStatus}
           onOpenSettings={onOpenSettings}
