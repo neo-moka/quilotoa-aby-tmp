@@ -254,4 +254,18 @@ export async function runDocSectionCheck({
       console.log(`    ${item.file}:${item.line}: §${item.id}`);
     }
   }
+
+  // The anchor list is curated, so adding a citation without adding its anchor
+  // is a manual step that would otherwise be invisible — and an unanchored
+  // citation is covered only by existence, which is the weaker half of this
+  // check. Naming them keeps that gap visible without making it a rule.
+  const anchored = new Set(anchors.map((anchor) => anchor.section));
+  const unanchored = [...citedIds].filter((id) => !anchored.has(id)).sort();
+  if (unanchored.length > 0) {
+    console.log(
+      `  note: ${unanchored.length} cited section(s) have no anchor, so only ` +
+        `their existence is checked, not that the number still names them: ` +
+        `${unanchored.map((id) => `§${id}`).join(", ")}`,
+    );
+  }
 }
