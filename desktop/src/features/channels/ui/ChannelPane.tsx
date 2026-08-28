@@ -853,6 +853,11 @@ export const ChannelPane = React.memo(function ChannelPane({
           wrapAux(
             <AgentActivityPanel
               canResetWidth={canResetThreadPanelWidth}
+              isSinglePanelView={
+                useSplitAuxiliaryPane ? false : isSinglePanelView
+              }
+              layout={useSplitAuxiliaryPane ? "split" : "standalone"}
+              transparentChrome={useSplitAuxiliaryPane}
               onClose={closeAgentActivityPanel}
               onResetWidth={onResetThreadPanelWidth}
               onResizeStart={onThreadPanelResizeStart}

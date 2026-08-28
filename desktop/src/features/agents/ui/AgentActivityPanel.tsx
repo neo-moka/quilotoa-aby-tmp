@@ -38,21 +38,34 @@ import { ManagedAgentSessionPanel } from "./ManagedAgentSessionPanel";
  */
 export function AgentActivityPanel({
   canResetWidth,
+  isSinglePanelView = false,
+  layout,
   onClose,
   onResetWidth,
   onResizeStart,
   onSelectAgent,
   profiles,
   selectedPubkey,
+  transparentChrome = false,
   widthPx,
 }: {
   canResetWidth?: boolean;
+  isSinglePanelView?: boolean;
+  /**
+   * Split when the panel sits inside the channel's `RightAuxiliaryPane`, which
+   * already draws the surface and the divider. Left at the default the panel
+   * paints its own chrome on top of that one and reads as a box inside a
+   * panel — the same doubling every sibling in that chain avoids by passing
+   * these through.
+   */
+  layout?: "standalone" | "split";
   onClose: () => void;
   onResetWidth?: () => void;
   onResizeStart?: (event: React.PointerEvent<HTMLButtonElement>) => void;
   onSelectAgent: (pubkey: string) => void;
   profiles?: UserProfileLookup;
   selectedPubkey: string | null;
+  transparentChrome?: boolean;
   widthPx: number;
 }) {
   const managedAgentsQuery = useManagedAgentsQuery();
@@ -114,6 +127,9 @@ export function AgentActivityPanel({
   return (
     <AuxiliaryPanel
       canResetWidth={canResetWidth}
+      isSinglePanelView={isSinglePanelView}
+      layout={layout}
+      transparentChrome={transparentChrome}
       header={
         <AuxiliaryPanelHeader>
           <AuxiliaryPanelHeaderGroup>
