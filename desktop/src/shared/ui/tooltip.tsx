@@ -4,52 +4,69 @@ import * as TooltipPrimitive from "@radix-ui/react-tooltip";
 import { cn } from "@/shared/lib/cn";
 
 /**
- * Still Radix. Re-verified against the installed packages rather than the
- * previous summary; the gap is real and narrower than it was written.
+ * Still Radix. The call-site cost is *not* the reason — that part is solvable,
+ * see the end. The reason is that this wrapper configures four behaviours and
+ * React Aria can express two of them.
  *
- * `skipDelayDuration` has no HeroUI equivalent. HeroUI's `Tooltip` forwards
- * only `delay` and `closeDelay` to React Aria's `useTooltipTriggerState`
- * (react-stately 3.49.0), where the warmup lives in *module-level* state:
- * `globalWarmedUp` is set on every open and cleared by a timeout of
- * `Math.max(TOOLTIP_COOLDOWN, closeDelay)` with `TOOLTIP_COOLDOWN` a hardcoded
- * 500. While it is set, `warmupTooltip()` takes its `showTooltip(true)` branch
- * and the next trigger opens with no dwell at all. No prop reaches that
- * variable, and `closeDelay` can only make the warm window *longer* — so the
- * `delayDuration` / `skipDelayDuration={0}` pair below has no expressible
- * counterpart, and adopting HeroUI would invert the deliberate anti-cascade
- * behaviour across all 86 trigger sites at once. `shouldSkipAnimation` is a
- * different thing: it only restores the fade when one tooltip replaces another.
+ * `delayDuration` → `delay` and the close delay → `closeDelay` both map. The
+ * other two have no prop, at any layer, in any version installed here:
  *
- * The one remaining path is to drive `isOpen` from this wrapper and
- * re-implement the dwell here — a second timing state machine wrapped around
- * one built for the opposite behaviour, per trigger, also intercepting the
- * focus-open path. Not worth it while Radix expresses the same thing in one
- * prop.
+ * **1. `skipDelayDuration={0}` — the anti-cascade dwell.** HeroUI forwards
+ * `delay`/`closeDelay` to React Aria's `useTooltipTriggerState` (react-stately
+ * 3.49.0), where the warmup is *module-level* state: `globalWarmedUp` is set on
+ * every open and cleared by a timeout of `Math.max(TOOLTIP_COOLDOWN, closeDelay)`
+ * — `TOOLTIP_COOLDOWN` a hardcoded 500. While set, `warmupTooltip()` takes its
+ * `showTooltip(true)` branch and the next trigger opens with **no dwell**.
+ * Nothing reaches that variable and `closeDelay` can only make the window
+ * longer. (`shouldSkipAnimation` is unrelated — it only restores the fade.)
  *
- * The second half of the cost is the call sites, and it is the larger half.
- * Every trigger in the app wraps its child in Radix's `asChild`; React Aria has
- * no `Slot`, so each one has to be re-expressed. Lote B priced this for the
- * menus and needed *two* different translations there — `Pressable` for the
- * dropdown trigger, the `render` prop for the context menu, because Pro's own
- * trigger renders a positioned `<div>` — so this is not one mechanical
- * substitution repeated N times.
+ * **2. `disableHoverableContent` — dismissal on leave.** `useTooltip` in
+ * react-aria 3.51.0 unconditionally attaches
+ * `useHover({ onHoverStart: () => state.open(true), onHoverEnd: … })` to the
+ * *tooltip popup*, and RAC's `Tooltip` merges those handlers onto the element
+ * (Tooltip.mjs:108,114). `useTooltip(props, state)` takes no flag. React Aria
+ * tooltips are hoverable content, always.
  *
- * The N, counted on this branch and confirmed on `heroui-integration` and
- * `heroui-lote-f-button`: **86** `TooltipTrigger asChild` across 53 modules.
- * There is no `asChild` on `Tooltip` or on `TooltipContent` anywhere in
- * `desktop/src`; `web/` has 2 more triggers, but that app is outside this
- * migration and keeps its own Radix dependency.
+ * How much rides on the two that don't map:
  *
- * One friction is smaller than previously recorded: HeroUI's trigger does
- * hardcode `role="button"`, but it spreads caller props *after* it, so a
- * caller-supplied `role` simply wins — nothing has to be stripped.
+ * - **53 of the 86 triggers (62%)** sit in the 18 modules that render two or
+ *   more, and the top five are toolbars whose triggers are adjacent siblings:
+ *   `ComposerAttachments` 10, `HuddleBar` 5, `NoteCard` 4,
+ *   `MessageComposerToolbar` 4, `MessageActionBar` 4 — 27 triggers in five rows,
+ *   which is exactly the geometry the warmup turns into a cascade.
+ * - **30 call sites re-declare these two props explicitly** even though the
+ *   wrapper already defaults them: 25 × `disableHoverableContent` across 10
+ *   modules, 5 × `skipDelayDuration={0}` across 4. They are asserted at the
+ *   point of use, not passively inherited.
+ * - Both are pinned by `tests/e2e/composer-tooltip-dismiss.spec.ts`, a spec file
+ *   that exists for nothing else. Its second test is named *"adjacent composer
+ *   tooltips each require a fresh dwell"* (hover, wait 400 ms, assert absent,
+ *   twice in a row); the other two slide the cursor onto the popup and assert
+ *   `toBeHidden()`. Its header names the product consequence of gap 2 — the
+ *   tooltip "camping it over the message editor".
+ *
+ * So the trade is: adopt HeroUI, and 86 triggers lose two behaviours that 30 of
+ * them ask for by name, to delete a 20-line wrapper.
+ *
+ * **The call sites are not the obstacle.** All 86 use Radix's `asChild`, and
+ * React Aria has no `Slot` — but RAC ships `Focusable`, and HeroUI's own trigger
+ * is already built on `useFocusable`, so this is the lote B `Pressable` pattern
+ * (51 `DropdownMenuTrigger` sites) with `Focusable` in its place: one
+ * translation, 86 times, mechanical. Recorded so the next attempt does not
+ * re-litigate the easy half. Likewise `role="button"` on HeroUI's trigger is
+ * hardcoded but spread *before* caller props, so passing `role` overrides it.
+ *
+ * Count, verified on this branch and on `heroui-integration` and
+ * `heroui-lote-f-button`: 86 `TooltipTrigger asChild` across 53 modules, and no
+ * `asChild` on `Tooltip` or `TooltipContent` anywhere in `desktop/src`.
  *
  * See docs/heroui-migration/component-map.md §7.2.
  */
 
 // Hover-only disclosure should require deliberate pointer dwell. Disabling Radix's
 // skip-delay grace prevents tooltips from cascading open while the pointer moves
-// across adjacent controls. Callers may override both values for a proven case.
+// across adjacent controls; 5 call sites re-assert it by name. Callers may
+// override both values for a proven case.
 const DEFAULT_TOOLTIP_DELAY_MS = 500;
 const DEFAULT_TOOLTIP_SKIP_DELAY_MS = 0;
 
