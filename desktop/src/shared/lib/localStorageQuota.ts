@@ -128,7 +128,7 @@ function notifyStorageFull(): void {
   if (warnedPersistentFailure) return;
   warnedPersistentFailure = true;
   // Dynamic import keeps this module usable from node unit tests.
-  import("sonner")
+  import("@/shared/ui/toast")
     .then(({ toast }) => {
       toast.error("Local storage is full", {
         description:
