@@ -57,6 +57,7 @@ import {
   DropdownMenuTrigger,
 } from "@/shared/ui/dropdown-menu";
 import { Input } from "@/shared/ui/input";
+import { Select } from "@/shared/ui/select";
 import { Textarea } from "@/shared/ui/textarea";
 
 export function ChannelTemplatesSettingsCard() {
@@ -773,8 +774,8 @@ function RuntimeRow({
         )}
         <span className="truncate text-sm">{label}</span>
       </div>
-      <select
-        className="h-7 rounded-md border border-input bg-background px-2 text-xs shadow-xs focus-visible:outline-hidden focus-visible:ring-1 focus-visible:ring-ring"
+      <Select
+        className="h-7 w-auto px-2 text-xs"
         disabled={disabled}
         onChange={(e) => onChange(e.target.value)}
         value={value}
@@ -785,7 +786,7 @@ function RuntimeRow({
             {runtime.label}
           </option>
         ))}
-      </select>
+      </Select>
     </div>
   );
 }

@@ -27,6 +27,7 @@ import {
 import { SettingsSectionHeader } from "@/features/settings/ui/SettingsSectionHeader";
 import { setExplicitAgentMetricArchiveChoice } from "../agentMetricArchivePreference";
 import { setExplicitObserverArchiveChoice } from "../observerArchivePreference";
+import { Select } from "@/shared/ui/select";
 
 import {
   buildSubscriptionRequest,
@@ -332,8 +333,7 @@ function AddSubscriptionForm({
           >
             Channel
           </label>
-          <select
-            className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+          <Select
             data-testid="local-archive-channel-select"
             id="local-archive-channel-select"
             onChange={(e) => setSelectedChannelId(e.target.value)}
@@ -345,7 +345,7 @@ function AddSubscriptionForm({
                 {ch.name}
               </option>
             ))}
-          </select>
+          </Select>
         </div>
 
         {/* Event types (per-kind checklist) */}
