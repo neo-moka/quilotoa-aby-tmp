@@ -18,7 +18,7 @@ import { JSDOM } from "jsdom";
  * A verdict written in prose gets re-litigated; a verdict with a test gets
  * re-checked. If any group here starts failing, upstream has closed the gap and
  * adopting `EmojiReactionButton` is worth reconsidering — which is the whole
- * point. See `docs/heroui-migration/component-map.md` §6quinquies.
+ * point. See `docs/heroui-migration/component-map.md` §6septies.
  *
  * Same shape as `buttonHeroUiGap.test.mjs`, which pins the equivalent gap in
  * HeroUI's `Button` — and the same ending, which is the surprise. `title` is

@@ -71,7 +71,7 @@ export interface UseHoverPopoverResult {
  * Radix stays the engine underneath. React Aria's non-modal popover derives
  * `isDismissable` from its modality and closes on ancestor scroll, which in an
  * auto-scrolling message timeline means the card vanishes whenever a message
- * arrives; see `docs/heroui-migration/component-map.md` §6ter and §6quinquies.
+ * arrives; see `docs/heroui-migration/component-map.md` §6ter and §6septies.
  *
  * @example
  * const hover = useHoverPopover({ closeDelay: 150 });
