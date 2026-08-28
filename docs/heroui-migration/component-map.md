@@ -73,14 +73,52 @@ No alcanza con renombrar imports.
 ### `asChild` → composición
 
 Radix usa `Slot` para fusionar props en un hijo arbitrario. HeroUI/react-aria
-no tiene ese patrón. Hay **285 usos de `asChild`**, concentrados en:
+no tiene ese patrón.
 
-`shared/ui/sidebar.tsx` (16), `features/messages/ui/ComposerAttachments.tsx`
-(11), `features/workflows/ui/WorkflowDialog.tsx` (8),
-`features/sidebar/ui/CustomChannelSection.tsx` (6),
-`features/messages/ui/MessageActionBar.tsx` (6),
-`features/huddle/components/HuddleBar.tsx` (6), `shared/ui/attachment.tsx` (5),
-`features/sidebar/ui/SidebarProjectsSection.tsx` (5), y el resto disperso.
+> **Corrección (resultado del Lote F).** Una versión anterior de este documento
+> decía "285 usos de `asChild`" y los concentraba por archivo
+> (`sidebar.tsx` 16, `ComposerAttachments.tsx` 11, `WorkflowDialog.tsx` 8, …).
+> Ese conteo era de líneas con `grep`, no de sitios de llamada, y sobreestima el
+> trabajo por un factor de diez.
+
+Escaneando cada tag JSX de apertura completo (no líneas) y resolviendo el tag a
+su import: **296 ocurrencias de la palabra, de las cuales 39 no son atributos
+JSX** (declaraciones `asChild?: boolean`, destructuring, la línea
+`const Comp = asChild ? Slot : …`, el `type={asChild ? … }` de
+`attachment.tsx`, y comentarios). **Atributos JSX: 257**, de los cuales 256 son
+sitios de llamada — el restante está dentro de un comentario en `markdown.tsx`.
+Se reparten así:
+
+| Grupo | n | Qué implica |
+|---|---|---|
+| Sobre Radix que **se queda en Radix** (§6ter) | 179 | No se tocan |
+| Sobre wrappers **ya migrados**, que conservan `asChild` como API propia | 58 | Ya resueltos en los lotes B y D |
+| Sobre nuestros propios wrappers con `Slot` | 19 | El alcance real del Lote F |
+
+Desglose del primer grupo: `TooltipTrigger` 86, `PopoverTrigger` 29,
+`AlertDialogCancel` 17, `AlertDialogAction` 16, `PopoverAnchor` 13,
+`DialogClose` 9, `DialogTrigger` 3, `DialogPrimitive.*` 3 (Radix directo), y uno
+cada uno de `AlertDialogTrigger`, `DialogDescription` y `FocusScope`.
+**`tooltip.tsx` sigue en Radix** (el Lote D descartó el `Tooltip` de HeroUI por
+`skipDelayDuration`), así que sus **86** usos son `Slot` de verdad, no API
+propia.
+
+> **Cuidado con el conteo del tooltip.** Un `grep -A4 '<TooltipContent'` sugiere
+> 3 `TooltipContent asChild` y 1 `Tooltip asChild`; **son falsos positivos.** Lo
+> que matchean son líneas `<TooltipTrigger asChild>` de bloques vecinos. Ni
+> `Tooltip`, ni `TooltipContent`, ni `TooltipProvider` llevan `asChild` en
+> ningún sitio: el total de la familia es 86, todo en `TooltipTrigger`. Es el
+> mismo error de proximidad que inflaba el "285" original — cualquier conteo por
+> líneas de contexto lo repite.
+
+Segundo grupo: `DropdownMenuTrigger` 51 (compone vía `Pressable`),
+`ContextMenuTrigger` 7 (vía el `render` de Pro).
+
+Tercer grupo: `Button` 6, `Card` 6, `SidebarGroupLabel` 5, `AttachmentTrigger`
+2. **`sidebar.tsx` declara `asChild` en cinco componentes pero solo
+`SidebarGroupLabel` tiene sitios de llamada** — los otros cuatro
+(`SidebarGroupAction`, `SidebarMenuButton`, `SidebarMenuAction`,
+`SidebarMenuSubButton`) tienen la prop muerta.
 
 Cada uno requiere decisión: o el componente de HeroUI acepta el rol
 directamente, o se usa su render prop, o se conserva un wrapper propio.
@@ -162,7 +200,7 @@ Lotes independientes, un agente cada uno:
 | **C — Controles de formulario** | `switch.tsx`, `checkbox.tsx`, `toggle.tsx`, `input.tsx`, `textarea.tsx` | |
 | **D — Display** | `tooltip.tsx`, `avatar.tsx`, `separator.tsx`, `badge.tsx`, `card.tsx`, `skeleton.tsx` | El más mecánico. |
 | **E — Navegación** | `tabs.tsx`, `segmented-control.tsx`, `step-progress.tsx`, `progress.tsx` | |
-| **F — Botón + `asChild`** | `button.tsx` + los 285 `asChild` | **Toca todos los lotes.** Va secuencial, después de A–E, o se coordina explícitamente. |
+| **F — Botón + `asChild`** | `button.tsx` + los `asChild` | **HECHO. Ver §6quater.** Migrado vía la prop `render`, que mantiene abierto el contrato de props; los 523 sitios de llamada quedan sin tocar. `asChild` conserva `Slot` (6 sitios, envuelven un `<a>`). Los `asChild` reales del lote eran 19, no 285 (§4). |
 | **G — Toasts** | `sonner.tsx` | Independiente. |
 
 Los lotes A–E y G son paralelos entre sí. F depende de todos.
@@ -380,6 +418,114 @@ pone `tabIndex={0}` en la raíz, y no exporta el tipo `CarouselApi`.
 Revisar si la tarjeta de actividad deja de depender de una altura fija llena, o
 si Pro expone su viewport. Adoptar dots/thumbnails/flechas de Pro es otra
 pregunta: el consumidor no usa ninguno.
+
+## 6quater. El botón migra vía `render`, no vía props
+
+Resultado del Lote F. **`button.tsx` pasa al `Button` de HeroUI.** Los 523
+sitios de llamada quedan sin tocar. Pinneado en
+`desktop/src/shared/ui/buttonHeroUiGap.test.mjs`, que asserta las dos mitades:
+el hueco de HeroUI crudo y el wrapper cerrándolo.
+
+> **Corrección.** Una primera versión de esta sección declaraba el botón
+> *conservado*, con el argumento de que el contrato de props se angosta a una
+> allowlist. El hueco es real —está medido abajo— pero la conclusión era falsa:
+> **`Button` tiene una prop `render`** que reemplaza el elemento emitido, y ahí
+> se pueden poner los atributos que `filterDOMProps` descarta. El error salió de
+> leer el `.d.ts` compilado de `ButtonRoot` (que tipa `...rest` contra
+> `react-aria-components`, donde `render` no aparece) en vez de la
+> documentación. **Antes de conservar un componente por falta de escape hatch,
+> mirá los docs además del `.d.ts`.**
+
+### El hueco que había que cerrar
+
+`ButtonProps` extiende `ButtonHTMLAttributes`, así que los **523 sitios de
+llamada** se escribieron contra un pass-through abierto. `filterDOMProps` de
+React Aria admite una allowlist fija: `id`, `data-*`,
+`dir/lang/hidden/inert/translate`, eventos globales de mouse/pointer/touch y un
+conjunto cerrado de `aria-*`. Todo lo demás se descarta sin error.
+
+Medido contra los sitios de llamada actuales:
+
+| Prop | n | Qué pasa |
+|---|---|---|
+| `disabled` | 269 | **Se ignora** — React Aria lee `isDisabled`. El botón queda habilitado **y `onClick` igual dispara**. |
+| `title` | 35 | Se descarta. `toggle.tsx` lo resolvió con un `<span>` envolvente; sirve para un puñado, no para 35 botones dentro de filas flex. |
+| `role` + `aria-selected` | 6 | Se descartan. Los seis son `PulseTabBar.tsx`: un tablist queda como seis botones sueltos, y `pulse` no emite testids (§6bis). |
+| `aria-busy` | 2 | Se descarta. |
+| `aria-hidden` | 1 | Se descarta. |
+| `tabIndex` | 3 | **Se sobrescribe a `0`** — un botón deliberadamente fuera del orden de tabulación se vuelve tabulable. La forma soportada es `excludeFromTabOrder`. |
+
+### Cómo se cierra
+
+`render` reemplaza el elemento que HeroUI emitiría, así que el wrapper spreadea
+el resto de los atributos HTML del caller **sobre el mismo nodo y después** de
+los de React Aria. El contrato queda abierto en vez de angostarse: no hay una
+lista de props que haya que enumerar, y una prop futura fuera de la allowlist
+llega igual. `disabled` se traduce a `isDisabled` en el wrapper.
+
+Tres decisiones deliberadas, todas verificadas en los tests:
+
+- **`onClick` sigue siendo handler del DOM**, encadenado después del de React
+  Aria en vez de traducido a `onPress`. Ver el relevamiento de abajo.
+- **`asChild` conserva `Slot`.** `render` solo devuelve legítimamente un
+  `<button>`: con un `<a>` HeroUI avisa *"Unexpected DOM element returned by
+  custom `render` function"*, porque el comportamiento de press y foco que
+  instala asume semántica de botón. Los seis sitios `asChild` envuelven un `<a>`.
+- **Las variantes de Buzz se quedan; las de HeroUI se neutralizan.** Como
+  `@heroui/styles/components/index.css` se importa para toda la app, `.button`
+  aplica se opte o no. La base del `cva` cancela lo que asomaría: `static` e
+  `isolation-auto` (`.button` es `relative isolate`, que reancla hijos
+  posicionados y abre un stacking context), `[--button-bg:transparent]` y
+  `[--button-fg:inherit]` (`.button` pinta desde esos tokens y teñiría `ghost`,
+  `outline` y `link`, que a propósito no declaran fondo ni color),
+  `[&_svg]:m-0` (`.button` da `-mx-0.5 my-0.5` a los íconos) y `scale-100` en
+  press (`.button:active` aplica `scale(0.97)`).
+
+Lo que **no** se adopta: las variantes de color de HeroUI resuelven de
+`--accent`, deliberadamente sin mapear ([theming-contract §4](theming-contract.md),
+trampa 2), y `variant="link"`, `xs` e `icon-xs` no tienen análogo. Paridad
+primero, como en los controles de formulario.
+
+### `onClick`: 15 sitios de 418, y por eso no va a `onPress`
+
+Relevado caso por caso porque §4 lo marca como trampa. De los **418 `onClick`
+sobre `<Button>`**, **403 no declaran parámetro de evento** (`() => hacerAlgo()`).
+Los 15 que sí tocan el objeto son la razón por la que el wrapper **deja `onClick`
+como handler del DOM en vez de traducirlo**: `usePress` igual lo llamaría, pero
+en el camino de teclado sintetiza un `MouseEvent`, que **pierde `currentTarget` y
+deja `detail` en 0**. Encadenarlo detrás del handler de React Aria mantiene los
+418 idénticos y conserva el bookkeeping de press.
+
+| Qué usan | n | Sitios |
+|---|---|---|
+| `preventDefault` | 6 | `ChannelManagementModerationActions:134`, `JoinPolicyNotice:72` y `:86`, `MergePullRequestButton:215`, `ProjectCards:421`, `SidebarProjectsSection:422` |
+| `stopPropagation` | 4 | `AddMemberSearchResultRow:78`, `ChannelBrowserDialog:819`, `UserProfilePanelTabs:638`, `ProjectListRowMenu:21` |
+| ambos | 1 | `DraftsPanel:174` |
+| `currentTarget` | 1 | `AgentsView:140` |
+| lo reciben y lo pasan | 3 | `ThreadViewModeToggle:66` (`event.detail`), `HuddleProfileControl:160`, `sidebar.tsx:402` |
+
+Los dos que fuerzan la decisión:
+
+- **`AgentsView:140` hace `openAiDefaults(event.currentTarget)`** — ancla un
+  popover al botón. Con el evento sintético `currentTarget` viene `undefined`.
+- **`ThreadViewModeToggle:66` lee `event.detail`** para distinguir activación por
+  teclado (`detail === 0`) de click, que es justo la distinción que el evento
+  sintético borra.
+
+Y los `preventDefault` dentro de `AlertDialogAction`/`AlertDialogCancel` no son
+cosméticos: cancelan el cierre automático del diálogo, y solo funcionan mientras
+el handler del caller y el de Radix compartan el mismo objeto de evento.
+
+Nada de esto lo ve typecheck ni build. Está cubierto por un test que dispara un
+`MouseEvent` real y assertea `currentTarget`, `detail`, `preventDefault` y
+`stopPropagation`.
+
+### Lo que queda afuera
+
+`isPending` — la única capacidad nueva que trae HeroUI — no se expone todavía:
+ningún sitio la usa, y agregar API sin consumidores es lo mismo que se objetó de
+las props `asChild` muertas de `sidebar.tsx`. Está a una prop de distancia
+cuando haga falta.
 
 ## 6bis. `data-testid` NO es solo contrato de test
 

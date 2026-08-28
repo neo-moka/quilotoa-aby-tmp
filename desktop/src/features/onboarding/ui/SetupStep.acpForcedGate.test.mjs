@@ -28,6 +28,10 @@ Object.assign(globalThis, {
     unobserve() {}
     disconnect() {}
   },
+  // The Next button renders React Aria's press handling, whose teardown narrows
+  // event targets with `target instanceof SVGElement`; without the global that
+  // throws from inside cleanup.
+  SVGElement: dom.window.SVGElement,
   document: dom.window.document,
   localStorage: dom.window.localStorage,
   self: dom.window,

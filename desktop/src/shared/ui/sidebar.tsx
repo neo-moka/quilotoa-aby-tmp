@@ -676,6 +676,24 @@ const SidebarGroup = React.forwardRef<
 });
 SidebarGroup.displayName = "SidebarGroup";
 
+/**
+ * `asChild` inventory for this file, from Lote F (component-map §4). Five
+ * components here declare the prop and only this one has call sites — five of
+ * them: `CustomChannelSection` (×2), `SidebarProjectsSection`, `SidebarSection`
+ * and `sidebarLoadingSkeleton`.
+ *
+ * The prop is dead on `SidebarGroupAction`, `SidebarMenuButton`,
+ * `SidebarMenuAction` and `SidebarMenuSubButton`, and it is kept deliberately
+ * rather than trimmed. This is vendored shadcn, where
+ * `<SidebarMenuButton asChild><a … /></SidebarMenuButton>` is the documented
+ * way to render a sidebar row as a link; dropping it buys nothing at runtime
+ * (dead code, tree-shaken) and breaks the next person following upstream docs.
+ * `SidebarGroupAction` and `SidebarMenuSubButton` have no call sites at all.
+ *
+ * `Slot` therefore stays in this file — as it does in `button.tsx` (whose
+ * `asChild` sites wrap an `<a>`, which HeroUI's `render` cannot produce),
+ * `card.tsx` and `attachment.tsx`. See §6quater.
+ */
 const SidebarGroupLabel = React.forwardRef<
   HTMLDivElement,
   React.ComponentProps<"div"> & { asChild?: boolean }
