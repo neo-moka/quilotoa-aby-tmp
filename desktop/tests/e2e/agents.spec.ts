@@ -106,9 +106,9 @@ async function sharePersonaToCatalog(
   await page.getByLabel(`Open actions for ${displayName}`).click();
   await page.getByRole("menuitem", { name: "Share" }).click();
   const catalogToggle = page.getByTestId("persona-share-catalog-access");
-  await expect(catalogToggle).not.toBeChecked();
+  await expect(catalogToggle).not.toHaveAttribute("data-selected", "true");
   await catalogToggle.click();
-  await expect(catalogToggle).toBeChecked();
+  await expect(catalogToggle).toHaveAttribute("data-selected", "true");
   await page
     .getByTestId("persona-share-dialog")
     .getByRole("button", { name: "Close" })
@@ -1543,9 +1543,9 @@ This deliberately long fenced-code example must not establish the minimum width 
   expect(catalogSectionBox?.y ?? 0).toBeGreaterThanOrEqual(
     (shareMainCardBox?.y ?? 0) + (shareMainCardBox?.height ?? 0),
   );
-  await expect(catalogAccess).not.toBeChecked();
+  await expect(catalogAccess).not.toHaveAttribute("data-selected", "true");
   await catalogAccess.click();
-  await expect(catalogAccess).toBeChecked();
+  await expect(catalogAccess).toHaveAttribute("data-selected", "true");
   const storedPersonas = await invokeTauri<
     Array<{ id: string; shared: boolean }>
   >(page, "list_personas");
@@ -1635,9 +1635,9 @@ This deliberately long fenced-code example must not establish the minimum width 
 
   await page.getByLabel("Open actions for Catalog Analyst").click();
   await page.getByRole("menuitem", { name: "Share" }).click();
-  await expect(catalogAccess).toBeChecked();
+  await expect(catalogAccess).toHaveAttribute("data-selected", "true");
   await catalogAccess.click();
-  await expect(catalogAccess).not.toBeChecked();
+  await expect(catalogAccess).not.toHaveAttribute("data-selected", "true");
   await page
     .getByTestId("persona-share-dialog")
     .getByRole("button", { name: "Close" })
