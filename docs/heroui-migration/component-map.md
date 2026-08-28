@@ -157,7 +157,7 @@ Lotes independientes, un agente cada uno:
 
 | Lote | Archivos | Notas |
 |---|---|---|
-| **A — Overlays** | `dialog.tsx`, `alert-dialog.tsx`, `sheet.tsx`, `popover.tsx` | El más riesgoso: focus, portales, backdrop. Ojo con `modalBackdrop.ts`, `modalMotion.ts`, `deferredModalOpen.ts`, `popoverSurface.ts`. |
+| **A — Overlays** | `dialog.tsx`, `alert-dialog.tsx`, `sheet.tsx`, `popover.tsx` | **BLOQUEADO — se conserva Radix. Ver §6ter.** React Aria no puede expresar el control de foco del que dependen 34 sitios de llamada. |
 | **B — Menús** | `dropdown-menu.tsx`, `context-menu.tsx` | `context-menu` viene de Pro, no de OSS. |
 | **C — Controles de formulario** | `switch.tsx`, `checkbox.tsx`, `toggle.tsx`, `input.tsx`, `textarea.tsx` | |
 | **D — Display** | `tooltip.tsx`, `avatar.tsx`, `separator.tsx`, `badge.tsx`, `card.tsx`, `skeleton.tsx` | El más mecánico. |
@@ -166,6 +166,99 @@ Lotes independientes, un agente cada uno:
 | **G — Toasts** | `sonner.tsx` | Independiente. |
 
 Los lotes A–E y G son paralelos entre sí. F depende de todos.
+
+## 6ter. El control de foco no tiene equivalente en React Aria
+
+Resultado del Lote A. **Los cuatro overlays se conservan en Radix.** No es una
+preferencia: es una capacidad que la librería no expone.
+
+### Lo que Radix da y React Aria no
+
+`Dialog.Content` de Radix emite dos eventos cancelables — `onOpenAutoFocus` y
+`onCloseAutoFocus` — que permiten decir "abrí este overlay **sin** mover el
+foco" y "cerralo **sin** devolver el foco al trigger". React Aria no tiene
+ninguno de los dos, y no por omisión de la API pública:
+
+| Verificado en | Qué dice |
+|---|---|
+| `react-aria/dist/private/overlays/Overlay.mjs` | Todo overlay se envuelve en `FocusScope` con **`restoreFocus: true` hardcodeado**. El único escape es `disableFocusManagement`. |
+| `react-aria-components/dist/private/Modal.mjs` | Llama a `Overlay` pasando solo `isExiting` y `portalContainer`. Nunca `disableFocusManagement`. |
+| `react-aria-components/dist/private/Popover.mjs:206,228` | Igual: solo pasa `shouldContainFocus`. Nunca `disableFocusManagement`. |
+| `react-aria-components/dist/private/Dialog.mjs` | Usa `useDialog`, que mueve el foco al montar. Sin prop de opt-out. |
+
+HeroUI construye `Modal`, `AlertDialog`, `Drawer` y `Popover` sobre esos
+componentes, así que hereda el hueco entero. No hay prop, contexto ni render
+prop que lo puentee.
+
+### Cuánto pesa
+
+Sitios de llamada que hoy dependen de esos dos eventos, por wrapper:
+
+| Wrapper | `onOpenAutoFocus` | `onCloseAutoFocus` | `onInteractOutside` | Consumidores |
+|---|---|---|---|---|
+| `popover.tsx` | 17 | 8 | 6 | 34 |
+| `dialog.tsx` | 3 | 3 | — | 60 |
+| `sheet.tsx` | — | 2 | — | 2 |
+| `alert-dialog.tsx` | — | 1 | — | 30 |
+
+**34 sitios sin traducción posible.** No son detalles cosméticos: el patrón
+`onOpenAutoFocus={e => e.preventDefault()}` es lo que mantiene el foco y el
+caret en el composer mientras se abre un popover. Si el foco se va, el emoji
+picker, las menciones y los tres combobox de typeahead **dejan de aceptar
+teclado** — no se degradan, se rompen.
+
+`onInteractOutside` sí es mapeable a `shouldCloseOnInteractOutside(element) =>
+boolean` (`AriaPopoverProps`), pero con otra forma: es un predicado sobre el
+elemento, no un evento cancelable.
+
+### Por qué esto no lo agarra ningún comando
+
+Ni `just ci` ni `just check` corren Playwright, no hay `toHaveScreenshot`, y no
+hay una sola aserción de foco en los 156 specs. Un overlay migrado que roba el
+foco **pasa typecheck, lint, build y CI en verde** y se rompe recién en las
+manos del usuario. Por eso la decisión se toma leyendo el upstream y no
+esperando que falle algo.
+
+### Lo que sí encaja, para cuando se destrabe
+
+- `AlertDialog` de HeroUI **sí emite `role="alertdialog"`**
+  (`@heroui/react/dist/components/alert-dialog/alert-dialog.js:154`), así que
+  las 48 aserciones sobre ese rol sobrevivirían. Es el candidato más limpio:
+  **29 de sus 30 consumidores no tocan el foco.** El único que lo hace es
+  `AgentDefaultsDialog.tsx:122`, y no hace `preventDefault` a secas — redirige
+  el foco a un botón concreto. Si algún día se resuelve el hueco de foco,
+  empezar por acá.
+- `ChannelManagementSheet.tsx` tiene un bloqueo aparte: en split layout
+  renderiza su panel **sin portal y no-modal**, para quedar acoplado al flujo
+  del layout. El `Overlay` de React Aria siempre hace `createPortal`.
+
+### Migrar `AlertDialog` solo: evaluado y descartado
+
+Se consideró migrar únicamente `alert-dialog.tsx`, por ser el de mejor encaje.
+**Se decidió que no.** Queda registrado para que no se re-litigue:
+
+1. Ese 1 de 30 no es un caso menor por ser minoría — es *más* peligroso,
+   porque una regresión de teclado en un solo diálogo no la ve nadie.
+2. **Mezclar los dos sistemas reinstala la trampa de la animación.** Si
+   `alert-dialog.tsx` pasa a React Aria y `dialog.tsx` se queda en Radix,
+   `modalMotion.ts` tendría que servir a dos vocabularios de atributos a la vez
+   (`data-state` y `data-entering`/`data-exiting`). Es exactamente el desajuste
+   que dejó todos los diálogos sin animación en silencio y que ningún gate
+   detectó.
+3. El beneficio es chico: se gana un archivo a cambio de una regresión y una
+   superficie mixta, con el resto de los overlays igual en Radix.
+
+**Corolario para cualquier migración parcial:** antes de mover un wrapper solo,
+mirá qué módulos compartidos quedan sirviendo a dos vocabularios de atributos.
+`modalMotion.ts` y `popoverSurface.ts` son los dos que hoy tienen ese riesgo.
+
+### Consecuencia para el Lote B
+
+Los menús viven sobre las mismas primitivas y usan el mismo patrón, con más
+peso todavía: **20 `onCloseAutoFocus` sobre `DropdownMenuContent`, repartidos
+en 20 archivos.** Devolver el foco al trigger después de elegir un item es
+justamente lo que esos sitios cancelan. El veredicto del §6ter les aplica
+igual; conviene resolverlo antes de invertir en la migración de menús.
 
 ## 6bis. `data-testid` NO es solo contrato de test
 
