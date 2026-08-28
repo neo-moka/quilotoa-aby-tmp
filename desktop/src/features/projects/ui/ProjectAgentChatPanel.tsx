@@ -35,6 +35,7 @@ import {
   useAgentCandidates,
 } from "./ProjectsAgentPromptPage";
 import { ProjectAgentContextStrip } from "./ProjectAgentContextStrip";
+import { ProjectEmptyState } from "./ProjectEmptyState";
 import { AgentContextPayloadPreview } from "./AgentContextPayloadPreview";
 import { ProjectAgentSelectionComposerBanner } from "./ProjectAgentSelectionComposerBanner";
 
@@ -261,14 +262,13 @@ export function ProjectAgentChatPanel({
                 opener={conversation.opener}
               />
             ) : (
-              <div className="flex min-h-40 flex-1 flex-col items-center justify-center gap-2 text-center">
-                <p className="text-sm font-medium text-foreground">
-                  Ask about this page
-                </p>
-                <p className="max-w-56 text-xs text-muted-foreground">
-                  Start a conversation with the project agent.
-                </p>
-              </div>
+              <ProjectEmptyState
+                className="min-h-40 flex-1 justify-center"
+                description="Start a conversation with the project agent."
+                descriptionClassName="max-w-56"
+                size="sm"
+                title="Ask about this page"
+              />
             )}
           </div>
           {context.selection?.length ? (

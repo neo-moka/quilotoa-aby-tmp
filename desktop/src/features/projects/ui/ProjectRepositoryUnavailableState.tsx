@@ -19,6 +19,7 @@ import {
 } from "@/features/projects/lib/projectRepoAvailability";
 import { Button } from "@/shared/ui/button";
 import { UserAvatar } from "@/shared/ui/UserAvatar";
+import { ProjectEmptyState } from "./ProjectEmptyState";
 
 const UNAVAILABLE_ICONS = {
   authentication: LockKeyhole,
@@ -141,18 +142,39 @@ export function ProjectRepositoryUnavailableState({
   const UnavailableIcon = UNAVAILABLE_ICONS[reason];
 
   return (
-    <div
-      className="flex min-h-[calc(100dvh-7rem)] flex-col items-center justify-center p-8 text-center"
+    <ProjectEmptyState
+      actions={
+        onRetry || (reason === "access" && onAskForAccess) ? (
+          <>
+            {onRetry ? (
+              <Button
+                disabled={retryPending}
+                onClick={onRetry}
+                size="sm"
+                variant="outline"
+              >
+                {retryPending ? (
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                ) : (
+                  <RefreshCw className="h-4 w-4" />
+                )}
+                {retryPending ? "Retrying…" : "Retry"}
+              </Button>
+            ) : null}
+            {reason === "access" && onAskForAccess ? (
+              <Button onClick={onAskForAccess} size="sm">
+                <MessageCircle className="h-4 w-4" />
+                Ask for access
+              </Button>
+            ) : null}
+          </>
+        ) : null
+      }
+      className="min-h-[calc(100dvh-7rem)] justify-center"
       data-testid="project-repository-unavailable"
-    >
-      <div className="mb-4 flex h-12 w-12 items-center justify-center rounded-xl border border-border/60 bg-muted/40 text-muted-foreground">
-        <UnavailableIcon className="h-6 w-6" />
-      </div>
-      <h3 className="text-base font-semibold text-foreground">
-        {unavailable.title}
-      </h3>
-      <p className="mt-1 max-w-lg text-sm text-muted-foreground">
-        {reason === "access" ? (
+      descriptionClassName="max-w-lg"
+      description={
+        reason === "access" ? (
           <AccessRestrictedDescription
             accessChannelId={accessChannelId}
             ownerAvatarUrl={ownerAvatarUrl}
@@ -161,31 +183,11 @@ export function ProjectRepositoryUnavailableState({
           />
         ) : (
           unavailable.description
-        )}
-      </p>
-      <div className="mt-4 flex flex-wrap items-center justify-center gap-2">
-        {onRetry ? (
-          <Button
-            disabled={retryPending}
-            onClick={onRetry}
-            size="sm"
-            variant="outline"
-          >
-            {retryPending ? (
-              <Loader2 className="h-4 w-4 animate-spin" />
-            ) : (
-              <RefreshCw className="h-4 w-4" />
-            )}
-            {retryPending ? "Retrying…" : "Retry"}
-          </Button>
-        ) : null}
-        {reason === "access" && onAskForAccess ? (
-          <Button onClick={onAskForAccess} size="sm">
-            <MessageCircle className="h-4 w-4" />
-            Ask for access
-          </Button>
-        ) : null}
-      </div>
-    </div>
+        )
+      }
+      icon={UnavailableIcon}
+      mediaVariant="icon"
+      title={unavailable.title}
+    />
   );
 }

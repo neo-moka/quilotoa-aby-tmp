@@ -11,6 +11,7 @@ import {
   MODAL_SEARCH_SHELL_CLASS,
 } from "@/shared/ui/modalSearchStyles";
 import { CreateProjectFormContent } from "./CreateProjectFormContent";
+import { ProjectEmptyState } from "./ProjectEmptyState";
 
 function projectSearchText(project: Project) {
   return [
@@ -175,14 +176,11 @@ export function ProjectBrowserDialog({
                 ))}
               </div>
             ) : (
-              <div className="px-4 py-10 text-center">
-                <p className="text-sm font-medium text-foreground">
-                  No projects found
-                </p>
-                <p className="mt-1 text-xs text-muted-foreground">
-                  Try another search or create a new project.
-                </p>
-              </div>
+              <ProjectEmptyState
+                description="Try another search or create a new project."
+                size="sm"
+                title="No projects found"
+              />
             )}
           </div>
         </ChooserDialogContent>

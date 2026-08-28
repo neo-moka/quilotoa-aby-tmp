@@ -47,6 +47,7 @@ import {
   projectsSectionTitle,
 } from "@/features/projects/ui/projectsSectionMeta";
 import { EmptyState } from "@/features/projects/ui/ProjectCards";
+import { ProjectEmptyState } from "@/features/projects/ui/ProjectEmptyState";
 import {
   ProjectsOverviewProjectItems,
   ProjectsOverviewRepositoryItems,
@@ -582,16 +583,20 @@ export function ProjectsView() {
 
   if (projectsQuery.isError) {
     return (
-      <div className="flex flex-1 flex-col items-center justify-center gap-2 text-muted-foreground">
-        <p className="text-sm text-red-400">Failed to load projects</p>
-        <Button
-          onClick={() => void projectsQuery.refetch()}
-          size="sm"
-          variant="outline"
-        >
-          Retry
-        </Button>
-      </div>
+      <ProjectEmptyState
+        actions={
+          <Button
+            onClick={() => void projectsQuery.refetch()}
+            size="sm"
+            variant="outline"
+          >
+            Retry
+          </Button>
+        }
+        className="flex-1 justify-center"
+        title="Failed to load projects"
+        titleClassName="text-red-400"
+      />
     );
   }
 

@@ -35,6 +35,24 @@
    utility, so `.context-menu__popover`'s padding would beat the app's classes
    on the very elements those classes exist to restyle. */
 @import "@heroui-pro/react/css/components/context-menu.css" layer(components);
+/* `empty-state.css` reads `var(--muted)` twice — on `__media` and, worse, on
+   `__description`, i.e. the body copy. Pro spends that token on muted *text*;
+   this app spends it on a muted *surface* (`--muted: hsl(223 15.91% 82.75%)`
+   light, `hsl(220 6% 16%)` dark), so the description would render pale grey on
+   white and near-black on black. Unreadable in both themes, and no gate catches
+   it. The fix is scoped to the block rather than mapped here: see
+   `PROJECT_EMPTY_STATE_MUTED_SCOPE` in
+   `features/projects/ui/ProjectEmptyState.tsx`. `--default`, which paints the
+   icon chip, is already mapped below and needs nothing.
+
+   Name collision, currently inert: `@heroui/styles` imported above ships its
+   own `.empty-state` (`@apply p-2 text-sm text-muted`) for the OSS component of
+   the same name. Both land in `layer(components)`, so Pro's rules — imported
+   second — win the properties they share and OSS's padding is overridden by
+   `.empty-state--*`. Nothing in the app renders the OSS `EmptyState` today, so
+   this costs nothing; but adopting it would give a one-line "No results found"
+   Pro's full centred-column layout. Reach for `ProjectEmptyState` instead. */
+@import "@heroui-pro/react/css/components/empty-state.css" layer(components);
 
 /* The app's radius scale wins.
  *

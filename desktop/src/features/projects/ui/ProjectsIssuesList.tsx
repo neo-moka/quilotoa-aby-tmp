@@ -25,6 +25,7 @@ import { Card } from "@/shared/ui/card";
 import { DropdownMenuItem } from "@/shared/ui/dropdown-menu";
 import { CopyShareLinkMenuItem } from "./CopyShareLinkMenuItem";
 import { ProjectAuthorIdentity } from "./ProjectAuthorIdentity";
+import { ProjectEmptyState } from "./ProjectEmptyState";
 import { ProjectEntityListRow } from "./ProjectEntityListRow";
 import { ProjectEventTypeIcon } from "./ProjectEventTypeIcon";
 import { PROJECT_GRID_CARD_BODY_CLASS } from "./projectGridCardStyles";
@@ -260,14 +261,7 @@ export function ProjectsIssuesList({
     return (
       <div className="space-y-3">
         {loadNotice}
-        <div
-          className={cn(
-            "px-4 py-12 text-center text-sm text-muted-foreground",
-            !embedded && "border border-dashed border-border/60",
-          )}
-        >
-          {emptyMessage}
-        </div>
+        <ProjectEmptyState description={emptyMessage} outline={!embedded} />
       </div>
     );
   }

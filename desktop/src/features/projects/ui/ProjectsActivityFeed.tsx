@@ -49,6 +49,7 @@ import {
   PROJECT_EVENT_VISUALS,
   type ProjectEventKind,
 } from "./ProjectEventTypeIcon";
+import { ProjectEmptyState } from "./ProjectEmptyState";
 import { ProjectEntitySelectControl } from "./ProjectEntityListRow";
 
 type ActivityKind = ProjectEventKind;
@@ -638,14 +639,11 @@ export function ProjectsActivityFeed(props: ProjectsActivityFeedProps) {
 
   if (items.length === 0) {
     return (
-      <div className="rounded-xl border border-dashed border-border/60 px-4 py-12 text-center">
-        <p className="text-sm font-medium text-foreground">
-          No project activity yet
-        </p>
-        <p className="mt-1 text-sm text-muted-foreground">
-          Commits, reviews, review decisions, and tasks will appear here.
-        </p>
-      </div>
+      <ProjectEmptyState
+        description="Commits, reviews, review decisions, and tasks will appear here."
+        outline
+        title="No project activity yet"
+      />
     );
   }
 
