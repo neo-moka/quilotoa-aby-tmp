@@ -1,184 +1,426 @@
 import * as React from "react";
-import * as ContextMenuPrimitive from "@radix-ui/react-context-menu";
-import { Check, ChevronRight, Circle } from "lucide-react";
+import { Header } from "@heroui/react";
+import { ContextMenu as HeroContextMenu } from "@heroui-pro/react";
+import { mergeProps, mergeRefs } from "@react-aria/utils";
+import { Check, Circle } from "lucide-react";
 
 import { cn } from "@/shared/lib/cn";
+import type { MenuSelectEventHandler } from "@/shared/ui/menuCollection";
 import {
-  POPOVER_RADIX_MOTION_CLASS,
-  POPOVER_RADIX_SIDE_MOTION_CLASS,
+  MENU_INDICATOR_SLOT_CLASS,
+  MENU_ITEM_CLASS,
+  MENU_LIST_CLASS,
+  MENU_POPOVER_CLASS,
+  MENU_POPOVER_MOTION_CLASS,
+  MENU_POPOVER_SIDE_MOTION_CLASS,
+  MENU_SELECTABLE_ITEM_CLASS,
+  MENU_SUB_TRIGGER_CLASS,
+  runSelectHandler,
+  syntheticClick,
+  useMenuItemNode,
+  useTextValue,
+} from "@/shared/ui/menuCollection";
+import {
   POPOVER_SHADOW_STYLE,
   POPOVER_SURFACE_CLASS,
 } from "@/shared/ui/popoverSurface";
 
-const ContextMenu = ContextMenuPrimitive.Root;
+/**
+ * Radix-shaped surface over HeroUI Pro's `ContextMenu`, mirroring
+ * `dropdown-menu.tsx` — same role mapping, same `onSelect` semantics, same
+ * split between popover and menu. Two things are specific to this one:
+ *
+ * - **The trigger keeps being the caller's element.** Pro's trigger renders a
+ *   positioned `<div>` of its own, which would slip an extra box between the
+ *   sidebar's `<ul>` and its rows. Its `render` prop is HeroUI's answer to
+ *   `asChild`, so the caller's element takes the handlers instead, and gets
+ *   `relative` because Pro anchors the popover to a zero-sized child.
+ * - **Open state is held here.** Pro's root exposes no imperative close, so the
+ *   surface controls it and hands `close()` to items that need to close after
+ *   an `onSelect` that did not prevent the default.
+ */
 
-const ContextMenuTrigger = ContextMenuPrimitive.Trigger;
+type ContextMenuContextValue = {
+  close: () => void;
+  isOpen: boolean;
+};
 
-const ContextMenuGroup = ContextMenuPrimitive.Group;
+const ContextMenuContext = React.createContext<ContextMenuContextValue | null>(
+  null,
+);
 
-const ContextMenuPortal = ContextMenuPrimitive.Portal;
+const useContextMenuClose = () => {
+  const context = React.useContext(ContextMenuContext);
+  return React.useCallback(() => {
+    context?.close();
+  }, [context]);
+};
 
-const ContextMenuSub = ContextMenuPrimitive.Sub;
+type ContextMenuProps = {
+  children?: React.ReactNode;
+  /** Radix-only. React Aria hides outside content from assistive tech while an
+   * overlay is open regardless; accepted so call sites keep compiling. */
+  modal?: boolean;
+  onOpenChange?: (open: boolean) => void;
+};
 
-const ContextMenuRadioGroup = ContextMenuPrimitive.RadioGroup;
+const ContextMenu = ({ children, onOpenChange }: ContextMenuProps) => {
+  const [open, setOpen] = React.useState(false);
 
-const ContextMenuSubTrigger = React.forwardRef<
-  React.ElementRef<typeof ContextMenuPrimitive.SubTrigger>,
-  React.ComponentPropsWithoutRef<typeof ContextMenuPrimitive.SubTrigger> & {
-    inset?: boolean;
+  const handleOpenChange = React.useCallback(
+    (isOpen: boolean) => {
+      setOpen(isOpen);
+      onOpenChange?.(isOpen);
+    },
+    [onOpenChange],
+  );
+
+  const context = React.useMemo<ContextMenuContextValue>(
+    () => ({ close: () => handleOpenChange(false), isOpen: open }),
+    [handleOpenChange, open],
+  );
+
+  return (
+    <ContextMenuContext.Provider value={context}>
+      <HeroContextMenu onOpenChange={handleOpenChange} open={open}>
+        {children}
+      </HeroContextMenu>
+    </ContextMenuContext.Provider>
+  );
+};
+ContextMenu.displayName = "ContextMenu";
+
+type ContextMenuTriggerChild = React.ReactElement<{
+  [prop: string]: unknown;
+  children?: React.ReactNode;
+  className?: string;
+  ref?: React.Ref<HTMLElement>;
+}>;
+
+type ContextMenuTriggerProps = {
+  /** Props injected by a wrapping `asChild` parent, which Radix used to pass
+   * down the tree. */
+  [prop: string]: unknown;
+  asChild?: boolean;
+  children: React.ReactNode;
+  className?: string;
+};
+
+const ContextMenuTrigger = ({
+  asChild,
+  children,
+  className,
+  ...forwarded
+}: ContextMenuTriggerProps) => {
+  const context = React.useContext(ContextMenuContext);
+  // Radix marked the trigger with `data-state`; React Aria does not, and
+  // trigger styles here depend on it.
+  const dataState = context?.isOpen ? "open" : "closed";
+
+  if (!asChild) {
+    return (
+      <HeroContextMenu.Trigger
+        {...forwarded}
+        className={className}
+        data-state={dataState}
+      >
+        {children}
+      </HeroContextMenu.Trigger>
+    );
   }
->(({ className, inset, children, ...props }, ref) => (
-  <ContextMenuPrimitive.SubTrigger
-    ref={ref}
-    className={cn(
-      "flex min-h-9 cursor-default select-none items-center gap-2 rounded-lg py-2 pl-2 pr-4 text-sm outline-hidden focus:bg-muted/50 data-[state=open]:bg-muted/50 [&_svg]:pointer-events-none [&_svg]:size-4 [&_svg]:shrink-0",
-      inset && "pl-8",
-      className,
-    )}
-    {...props}
-  >
-    {children}
-    <ChevronRight className="ml-auto" />
-  </ContextMenuPrimitive.SubTrigger>
-));
-ContextMenuSubTrigger.displayName = ContextMenuPrimitive.SubTrigger.displayName;
 
-const ContextMenuSubContent = React.forwardRef<
-  React.ElementRef<typeof ContextMenuPrimitive.SubContent>,
-  React.ComponentPropsWithoutRef<typeof ContextMenuPrimitive.SubContent>
->(({ className, style, ...props }, ref) => (
-  <ContextMenuPrimitive.SubContent
-    ref={ref}
+  const child = React.Children.only(children) as ContextMenuTriggerChild;
+
+  return (
+    <HeroContextMenu.Trigger
+      render={({ children: triggerChildren, ref, ...triggerProps }) => {
+        // Pro appends a zero-sized anchor the popover positions against. It has
+        // to travel into the caller's element, which then also has to be the
+        // anchor's containing block.
+        const [anchor] = React.Children.toArray(triggerChildren).slice(-1);
+
+        return React.cloneElement(child, {
+          ...mergeProps(child.props, triggerProps, forwarded),
+          "data-state": dataState,
+          children: (
+            <>
+              {child.props.children}
+              {anchor}
+            </>
+          ),
+          className: cn(child.props.className, "relative", className),
+          ref: mergeRefs(child.props.ref, ref as React.Ref<HTMLElement>),
+        });
+      }}
+    >
+      {null}
+    </HeroContextMenu.Trigger>
+  );
+};
+ContextMenuTrigger.displayName = "ContextMenuTrigger";
+
+type ContextMenuContentProps = {
+  children?: React.ReactNode;
+  className?: string;
+  style?: React.CSSProperties;
+};
+
+const ContextMenuContent = ({
+  children,
+  className,
+  style,
+  ...props
+}: ContextMenuContentProps) => (
+  <HeroContextMenu.Popover
+    data-state="open"
     className={cn(
-      "z-50 origin-(--radix-context-menu-content-transform-origin) overflow-hidden rounded-xl p-1",
-      POPOVER_RADIX_MOTION_CLASS,
-      POPOVER_RADIX_SIDE_MOTION_CLASS,
+      MENU_POPOVER_CLASS,
+      MENU_POPOVER_MOTION_CLASS,
+      MENU_POPOVER_SIDE_MOTION_CLASS,
       POPOVER_SURFACE_CLASS,
       className,
       "min-w-60",
     )}
     style={{ ...POPOVER_SHADOW_STYLE, ...style }}
     {...props}
-  />
-));
-ContextMenuSubContent.displayName = ContextMenuPrimitive.SubContent.displayName;
+  >
+    <HeroContextMenu.Menu className={MENU_LIST_CLASS}>
+      {children}
+    </HeroContextMenu.Menu>
+  </HeroContextMenu.Popover>
+);
+ContextMenuContent.displayName = "ContextMenuContent";
 
-const ContextMenuContent = React.forwardRef<
-  React.ElementRef<typeof ContextMenuPrimitive.Content>,
-  React.ComponentPropsWithoutRef<typeof ContextMenuPrimitive.Content>
->(({ className, style, ...props }, ref) => (
-  <ContextMenuPrimitive.Portal>
-    <ContextMenuPrimitive.Content
-      ref={ref}
-      className={cn(
-        "z-50 max-h-[var(--radix-context-menu-content-available-height)] overflow-y-auto overflow-x-hidden rounded-xl p-1",
-        "origin-(--radix-context-menu-content-transform-origin)",
-        POPOVER_RADIX_MOTION_CLASS,
-        POPOVER_RADIX_SIDE_MOTION_CLASS,
-        POPOVER_SURFACE_CLASS,
-        className,
-        "min-w-60",
-      )}
-      style={{ ...POPOVER_SHADOW_STYLE, ...style }}
+type ContextMenuItemProps = {
+  "aria-label"?: string;
+  children?: React.ReactNode;
+  className?: string;
+  disabled?: boolean;
+  inset?: boolean;
+  onClick?: (event: React.MouseEvent<HTMLDivElement>) => void;
+  onSelect?: MenuSelectEventHandler;
+  textValue?: string;
+  title?: string;
+};
+
+const ContextMenuItem = ({
+  children,
+  className,
+  disabled,
+  inset,
+  onClick,
+  onSelect,
+  textValue,
+  title,
+  ...props
+}: ContextMenuItemProps) => {
+  const [ref, setNode] = useMenuItemNode(title);
+  const close = useContextMenuClose();
+  const resolvedTextValue = useTextValue(children, textValue);
+
+  const handleAction = () => {
+    const prevented = onSelect ? runSelectHandler(onSelect) : false;
+    onClick?.(syntheticClick(ref.current));
+    if (onSelect && !prevented) close();
+  };
+
+  return (
+    <HeroContextMenu.Item
+      className={cn(MENU_ITEM_CLASS, inset && "pl-8", className)}
+      isDisabled={disabled}
+      onAction={handleAction}
+      ref={setNode}
+      shouldCloseOnSelect={onSelect ? false : undefined}
+      textValue={resolvedTextValue}
       {...props}
-    />
-  </ContextMenuPrimitive.Portal>
-));
-ContextMenuContent.displayName = ContextMenuPrimitive.Content.displayName;
+    >
+      {children}
+    </HeroContextMenu.Item>
+  );
+};
+ContextMenuItem.displayName = "ContextMenuItem";
 
-const ContextMenuItem = React.forwardRef<
-  React.ElementRef<typeof ContextMenuPrimitive.Item>,
-  React.ComponentPropsWithoutRef<typeof ContextMenuPrimitive.Item> & {
-    inset?: boolean;
-  }
->(({ className, inset, ...props }, ref) => (
-  <ContextMenuPrimitive.Item
-    ref={ref}
-    className={cn(
-      "relative flex min-h-9 cursor-default select-none items-center gap-2 rounded-lg py-2 pl-2 pr-4 text-sm outline-hidden transition-colors focus:bg-muted/50 focus:text-foreground data-[disabled]:pointer-events-none data-[disabled]:opacity-50 [&>svg]:size-4 [&>svg]:shrink-0",
-      inset && "pl-8",
-      className,
-    )}
-    {...props}
-  />
-));
-ContextMenuItem.displayName = ContextMenuPrimitive.Item.displayName;
+type ContextMenuCheckboxItemProps = {
+  checked?: boolean;
+  children?: React.ReactNode;
+  className?: string;
+  disabled?: boolean;
+  onCheckedChange?: (checked: boolean) => void;
+  onSelect?: MenuSelectEventHandler;
+  textValue?: string;
+};
 
-const ContextMenuCheckboxItem = React.forwardRef<
-  React.ElementRef<typeof ContextMenuPrimitive.CheckboxItem>,
-  React.ComponentPropsWithoutRef<typeof ContextMenuPrimitive.CheckboxItem>
->(({ className, children, checked, ...props }, ref) => (
-  <ContextMenuPrimitive.CheckboxItem
-    ref={ref}
-    className={cn(
-      "relative flex min-h-9 cursor-default select-none items-center rounded-lg py-2 pl-8 pr-4 text-sm outline-hidden transition-colors focus:bg-muted/50 focus:text-foreground data-[disabled]:pointer-events-none data-[disabled]:opacity-50",
-      className,
-    )}
-    checked={checked}
-    {...props}
+const ContextMenuCheckboxItem = ({
+  checked = false,
+  children,
+  className,
+  disabled,
+  onCheckedChange,
+  onSelect,
+  textValue,
+  ...props
+}: ContextMenuCheckboxItemProps) => {
+  const key = React.useId();
+  const close = useContextMenuClose();
+  const resolvedTextValue = useTextValue(children, textValue);
+
+  // Its own single-item multiple-selection section: that is what makes React
+  // Aria emit `menuitemcheckbox` here without touching the plain items around
+  // it.
+  return (
+    <HeroContextMenu.Section
+      onSelectionChange={(keys) => {
+        if (keys === "all") return;
+        onCheckedChange?.(keys.has(key));
+      }}
+      selectedKeys={checked ? [key] : []}
+      selectionMode="multiple"
+    >
+      <HeroContextMenu.Item
+        className={cn(MENU_SELECTABLE_ITEM_CLASS, className)}
+        id={key}
+        isDisabled={disabled}
+        onAction={() => {
+          const prevented = onSelect ? runSelectHandler(onSelect) : false;
+          if (!prevented) close();
+        }}
+        shouldCloseOnSelect={false}
+        textValue={resolvedTextValue}
+        {...props}
+      >
+        <span className={MENU_INDICATOR_SLOT_CLASS}>
+          <HeroContextMenu.ItemIndicator>
+            {({ isSelected }) =>
+              isSelected ? <Check className="h-4 w-4" /> : <span />
+            }
+          </HeroContextMenu.ItemIndicator>
+        </span>
+        {children}
+      </HeroContextMenu.Item>
+    </HeroContextMenu.Section>
+  );
+};
+ContextMenuCheckboxItem.displayName = "ContextMenuCheckboxItem";
+
+type ContextMenuRadioGroupProps = {
+  children?: React.ReactNode;
+  className?: string;
+  onValueChange?: (value: string) => void;
+  value?: string;
+};
+
+const ContextMenuRadioGroup = ({
+  children,
+  className,
+  onValueChange,
+  value,
+}: ContextMenuRadioGroupProps) => (
+  <HeroContextMenu.Section
+    className={className}
+    onSelectionChange={(keys) => {
+      if (keys === "all") return;
+      const [selected] = keys;
+      if (selected == null) return;
+      onValueChange?.(String(selected));
+    }}
+    selectedKeys={value == null ? [] : [value]}
+    selectionMode="single"
   >
-    <span className="absolute left-2 flex h-3.5 w-3.5 items-center justify-center">
-      <ContextMenuPrimitive.ItemIndicator>
-        <Check className="h-4 w-4" />
-      </ContextMenuPrimitive.ItemIndicator>
-    </span>
     {children}
-  </ContextMenuPrimitive.CheckboxItem>
-));
-ContextMenuCheckboxItem.displayName =
-  ContextMenuPrimitive.CheckboxItem.displayName;
+  </HeroContextMenu.Section>
+);
+ContextMenuRadioGroup.displayName = "ContextMenuRadioGroup";
 
-const ContextMenuRadioItem = React.forwardRef<
-  React.ElementRef<typeof ContextMenuPrimitive.RadioItem>,
-  React.ComponentPropsWithoutRef<typeof ContextMenuPrimitive.RadioItem>
->(({ className, children, ...props }, ref) => (
-  <ContextMenuPrimitive.RadioItem
-    ref={ref}
-    className={cn(
-      "relative flex min-h-9 cursor-default select-none items-center rounded-lg py-2 pl-8 pr-4 text-sm outline-hidden transition-colors focus:bg-muted/50 focus:text-foreground data-[disabled]:pointer-events-none data-[disabled]:opacity-50",
-      className,
-    )}
-    {...props}
-  >
-    <span className="absolute left-2 flex h-3.5 w-3.5 items-center justify-center">
-      <ContextMenuPrimitive.ItemIndicator>
-        <Circle className="h-2 w-2 fill-current" />
-      </ContextMenuPrimitive.ItemIndicator>
-    </span>
-    {children}
-  </ContextMenuPrimitive.RadioItem>
-));
-ContextMenuRadioItem.displayName = ContextMenuPrimitive.RadioItem.displayName;
+type ContextMenuRadioItemProps = {
+  "aria-label"?: string;
+  children?: React.ReactNode;
+  className?: string;
+  disabled?: boolean;
+  onSelect?: MenuSelectEventHandler;
+  textValue?: string;
+  value: string;
+};
 
-const ContextMenuLabel = React.forwardRef<
-  React.ElementRef<typeof ContextMenuPrimitive.Label>,
-  React.ComponentPropsWithoutRef<typeof ContextMenuPrimitive.Label> & {
-    inset?: boolean;
-  }
->(({ className, inset, ...props }, ref) => (
-  <ContextMenuPrimitive.Label
-    ref={ref}
+const ContextMenuRadioItem = ({
+  children,
+  className,
+  disabled,
+  onSelect,
+  textValue,
+  value,
+  ...props
+}: ContextMenuRadioItemProps) => {
+  const close = useContextMenuClose();
+  const resolvedTextValue = useTextValue(children, textValue);
+
+  return (
+    <HeroContextMenu.Item
+      className={cn(MENU_SELECTABLE_ITEM_CLASS, className)}
+      id={value}
+      isDisabled={disabled}
+      onAction={
+        onSelect
+          ? () => {
+              if (!runSelectHandler(onSelect)) close();
+            }
+          : undefined
+      }
+      shouldCloseOnSelect={onSelect ? false : undefined}
+      textValue={resolvedTextValue}
+      {...props}
+    >
+      <span className={MENU_INDICATOR_SLOT_CLASS}>
+        <HeroContextMenu.ItemIndicator type="dot">
+          {({ isSelected }) =>
+            isSelected ? <Circle className="h-2 w-2 fill-current" /> : <span />
+          }
+        </HeroContextMenu.ItemIndicator>
+      </span>
+      {children}
+    </HeroContextMenu.Item>
+  );
+};
+ContextMenuRadioItem.displayName = "ContextMenuRadioItem";
+
+type ContextMenuLabelProps = {
+  children?: React.ReactNode;
+  className?: string;
+  inset?: boolean;
+};
+
+const ContextMenuLabel = ({
+  children,
+  className,
+  inset,
+  ...props
+}: ContextMenuLabelProps) => (
+  <Header
     className={cn(
       "px-2 py-1.5 text-sm font-semibold",
       inset && "pl-8",
       className,
     )}
     {...props}
-  />
-));
-ContextMenuLabel.displayName = ContextMenuPrimitive.Label.displayName;
+  >
+    {children}
+  </Header>
+);
+ContextMenuLabel.displayName = "ContextMenuLabel";
 
-const ContextMenuSeparator = React.forwardRef<
-  React.ElementRef<typeof ContextMenuPrimitive.Separator>,
-  React.ComponentPropsWithoutRef<typeof ContextMenuPrimitive.Separator>
->(({ className, ...props }, ref) => (
-  <ContextMenuPrimitive.Separator
-    ref={ref}
-    className={cn("-mx-1 my-1 h-px bg-muted", className)}
+type ContextMenuSeparatorProps = {
+  className?: string;
+};
+
+const ContextMenuSeparator = ({
+  className,
+  ...props
+}: ContextMenuSeparatorProps) => (
+  <HeroContextMenu.Separator
+    className={cn("-mx-1 my-1 h-px w-auto bg-muted", className)}
     {...props}
   />
-));
-ContextMenuSeparator.displayName = ContextMenuPrimitive.Separator.displayName;
+);
+ContextMenuSeparator.displayName = "ContextMenuSeparator";
 
 const ContextMenuShortcut = ({
   className,
@@ -192,6 +434,103 @@ const ContextMenuShortcut = ({
   );
 };
 ContextMenuShortcut.displayName = "ContextMenuShortcut";
+
+type ContextMenuGroupProps = {
+  children?: React.ReactNode;
+  className?: string;
+};
+
+/** A section with no `selectionMode` inherits the surrounding one, so grouped
+ * items keep the plain `menuitem` role. */
+const ContextMenuGroup = ({ children, className }: ContextMenuGroupProps) => (
+  <HeroContextMenu.Section className={className}>
+    {children}
+  </HeroContextMenu.Section>
+);
+ContextMenuGroup.displayName = "ContextMenuGroup";
+
+/** React Aria portals overlays itself; kept so Radix-shaped trees still compile. */
+const ContextMenuPortal = ({ children }: { children?: React.ReactNode }) => (
+  <>{children}</>
+);
+ContextMenuPortal.displayName = "ContextMenuPortal";
+
+const ContextMenuSub = ({ children }: { children?: React.ReactNode }) => (
+  <HeroContextMenu.SubmenuTrigger>
+    {
+      // React Aria reads the trigger item and its popover positionally.
+      React.Children.toArray(children) as [
+        React.ReactElement,
+        React.ReactElement,
+      ]
+    }
+  </HeroContextMenu.SubmenuTrigger>
+);
+ContextMenuSub.displayName = "ContextMenuSub";
+
+type ContextMenuSubTriggerProps = {
+  children?: React.ReactNode;
+  className?: string;
+  disabled?: boolean;
+  inset?: boolean;
+  textValue?: string;
+};
+
+const ContextMenuSubTrigger = ({
+  children,
+  className,
+  disabled,
+  inset,
+  textValue,
+  ...props
+}: ContextMenuSubTriggerProps) => {
+  const resolvedTextValue = useTextValue(children, textValue);
+
+  return (
+    <HeroContextMenu.Item
+      className={cn(MENU_SUB_TRIGGER_CLASS, inset && "pl-8", className)}
+      isDisabled={disabled}
+      textValue={resolvedTextValue}
+      {...props}
+    >
+      {children}
+      <HeroContextMenu.SubmenuIndicator className="ml-auto" />
+    </HeroContextMenu.Item>
+  );
+};
+ContextMenuSubTrigger.displayName = "ContextMenuSubTrigger";
+
+type ContextMenuSubContentProps = {
+  children?: React.ReactNode;
+  className?: string;
+  style?: React.CSSProperties;
+};
+
+const ContextMenuSubContent = ({
+  children,
+  className,
+  style,
+  ...props
+}: ContextMenuSubContentProps) => (
+  <HeroContextMenu.Popover
+    data-state="open"
+    className={cn(
+      MENU_POPOVER_CLASS,
+      MENU_POPOVER_MOTION_CLASS,
+      MENU_POPOVER_SIDE_MOTION_CLASS,
+      POPOVER_SURFACE_CLASS,
+      className,
+      "min-w-60",
+    )}
+    style={{ ...POPOVER_SHADOW_STYLE, ...style }}
+    {...props}
+  >
+    <HeroContextMenu.Menu className={MENU_LIST_CLASS}>
+      {children}
+    </HeroContextMenu.Menu>
+  </HeroContextMenu.Popover>
+);
+ContextMenuSubContent.displayName = "ContextMenuSubContent";
 
 export {
   ContextMenu,

@@ -1,3 +1,4 @@
+import { Fragment } from "react";
 import { ChevronDown } from "lucide-react";
 
 import type { InboxFilter } from "@/features/home/lib/inbox";
@@ -72,7 +73,9 @@ export function InboxFilterMenu({
           value={filter}
         >
           {INBOX_FILTER_OPTIONS.map((option) => (
-            <div key={option.value}>
+            // A fragment, not an element: the menu is a collection, and a wrapper
+            // element inside it discards every item.
+            <Fragment key={option.value}>
               {option.value === "reminders" ? (
                 <DropdownMenuSeparator className="my-2 bg-border/60" />
               ) : null}
@@ -98,7 +101,7 @@ export function InboxFilterMenu({
                   </span>
                 </span>
               </DropdownMenuRadioItem>
-            </div>
+            </Fragment>
           ))}
         </DropdownMenuRadioGroup>
       </DropdownMenuContent>

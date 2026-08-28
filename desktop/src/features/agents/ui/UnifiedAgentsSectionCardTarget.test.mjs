@@ -135,6 +135,20 @@ before(async () => {
     value: dom.window.navigator,
     writable: true,
   });
+  // The card's menus run on React Aria, whose press handling reads DOM
+  // constructors off the global scope (`SVGElement` while restoring text
+  // selection on unmount). Mirror whatever jsdom provides and is still missing.
+  for (const key of Object.getOwnPropertyNames(dom.window)) {
+    if (key in globalThis) continue;
+    try {
+      Object.defineProperty(globalThis, key, {
+        configurable: true,
+        get: () => dom.window[key],
+      });
+    } catch {
+      // A few window properties cannot be mirrored onto globalThis; skip them.
+    }
+  }
   dom.window.matchMedia = () => ({
     matches: true,
     addEventListener() {},

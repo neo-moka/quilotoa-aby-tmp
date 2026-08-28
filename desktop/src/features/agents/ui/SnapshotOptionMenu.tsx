@@ -59,7 +59,7 @@ export function SnapshotOptionMenu({
         onCloseAutoFocus={(event) => event.preventDefault()}
         sideOffset={4}
         style={{
-          minWidth: "max(var(--radix-dropdown-menu-trigger-width), 13rem)",
+          minWidth: "max(var(--trigger-width), 13rem)",
         }}
       >
         <DropdownMenuRadioGroup onValueChange={onValueChange} value={value}>

@@ -140,9 +140,11 @@ export function RepositoryBranchDropdown({
                   Create branch…
                 </DropdownMenuItem>
                 {createBranchDisabled && createBranchTitle ? (
-                  <p className="max-w-56 px-2 py-1 text-xs text-muted-foreground">
+                  // A header, not a paragraph: only collection nodes survive
+                  // inside a React Aria menu, and this hint sits between items.
+                  <DropdownMenuLabel className="max-w-56 px-2 py-1 text-xs font-normal text-muted-foreground">
                     {createBranchTitle}
-                  </p>
+                  </DropdownMenuLabel>
                 ) : null}
               </>
             ) : null}
