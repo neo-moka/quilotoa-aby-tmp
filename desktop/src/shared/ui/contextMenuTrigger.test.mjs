@@ -109,6 +109,9 @@ test("the trigger stays the caller's element, in place", async () => {
   // containing block.
   assert.ok(row.className.includes("relative"));
   assert.equal(row.getAttribute("data-state"), "closed");
+  // No injected `role`: the trigger may be a plain list row, and a `button`
+  // role on it would be a lie to assistive tech.
+  assert.equal(row.getAttribute("role"), null);
   assert.ok(row.textContent?.startsWith("general"));
 });
 
