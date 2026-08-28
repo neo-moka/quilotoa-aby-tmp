@@ -31,6 +31,15 @@ import { cn } from "@/shared/lib/cn";
  * pass `appearance-none pr-8` and position their own; `cn` is tailwind-merge
  * backed, so any caller class wins over the defaults here, which is also how
  * the compact row variants keep their smaller height.
+ *
+ * That arrow is also the second, independent reason Pro could not be the base,
+ * and it is worth recording because it is not visible from the docs. In the
+ * shipped `dist`, `.native-select__select` sets `appearance: none` in its base
+ * rule — no modifier, no opt-out — and `NativeSelect.Trigger` renders an
+ * indicator whenever the caller does not supply one (verified by rendering it,
+ * not by reading). So "Pro's structure with the native arrow" is not a
+ * configuration that exists: moving onto Pro would have swapped the arrow at
+ * every call site, which is the change this file exists to avoid.
  */
 const SELECT_CLASS =
   "flex h-9 w-full rounded-lg border border-input/40 bg-background px-3 py-1 text-base transition-colors focus-visible:outline-hidden focus-visible:ring-1 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50 md:text-sm";
