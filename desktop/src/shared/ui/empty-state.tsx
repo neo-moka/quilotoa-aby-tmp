@@ -17,9 +17,14 @@ import { HERO_MUTED_SCOPE } from "@/shared/ui/heroMutedScope";
  * Two things it does not inherit:
  *
  * - **`--muted`.** Pro paints `.empty-state__media` and `__description` with
- *   it, and in this app that token is a surface, not a foreground. The root
- *   carries {@link HERO_MUTED_SCOPE}; see that file for why the fix cannot be
- *   global. Do not use `bg-muted` inside an `EmptyState` — it flips meaning.
+ *   it, and in this app that token is a surface, not a foreground. Those two
+ *   elements are the *only* places this stylesheet reads the token, and both
+ *   are leaves, so {@link HERO_MUTED_SCOPE} goes on them rather than on the
+ *   root. That is deliberate: the root wraps caller markup, and the app's
+ *   `Button` uses `hover:bg-muted/70` for its `outline` variant — under a root
+ *   scope every outline button in an empty state would hover to the *text*
+ *   grey. Scoping the leaves keeps the re-point off caller content entirely,
+ *   so `bg-muted` still means a surface anywhere inside an `EmptyState`.
  * - **`Media`'s `icon` variant.** Pro's is a `rounded-full` `bg-default` well.
  *   The app's icon frames vary per surface (rounded square with a border, bare
  *   glyph, avatar), so the default unopinionated variant is the one to reach
@@ -33,7 +38,7 @@ import { HERO_MUTED_SCOPE } from "@/shared/ui/heroMutedScope";
 type EmptyStateProps = React.ComponentProps<typeof HeroEmptyState>;
 
 const EmptyState = ({ className, ...props }: EmptyStateProps) => (
-  <HeroEmptyState className={cn(HERO_MUTED_SCOPE, className)} {...props} />
+  <HeroEmptyState className={className} {...props} />
 );
 EmptyState.displayName = "EmptyState";
 
@@ -46,8 +51,11 @@ EmptyStateHeader.displayName = "EmptyStateHeader";
 
 type EmptyStateMediaProps = React.ComponentProps<typeof HeroEmptyState.Media>;
 
-const EmptyStateMedia = (props: EmptyStateMediaProps) => (
-  <HeroEmptyState.Media {...props} />
+const EmptyStateMedia = ({ className, ...props }: EmptyStateMediaProps) => (
+  <HeroEmptyState.Media
+    className={cn(HERO_MUTED_SCOPE, className)}
+    {...props}
+  />
 );
 EmptyStateMedia.displayName = "EmptyStateMedia";
 
@@ -62,8 +70,14 @@ type EmptyStateDescriptionProps = React.ComponentProps<
   typeof HeroEmptyState.Description
 >;
 
-const EmptyStateDescription = (props: EmptyStateDescriptionProps) => (
-  <HeroEmptyState.Description {...props} />
+const EmptyStateDescription = ({
+  className,
+  ...props
+}: EmptyStateDescriptionProps) => (
+  <HeroEmptyState.Description
+    className={cn(HERO_MUTED_SCOPE, className)}
+    {...props}
+  />
 );
 EmptyStateDescription.displayName = "EmptyStateDescription";
 
