@@ -212,9 +212,7 @@ mod tests {
         let nvm = result
             .find("/home/user/.nvm/versions/node/v20.0.0/bin")
             .unwrap();
-        let exe = result
-            .find("/Applications/ABY.app/Contents/MacOS")
-            .unwrap();
+        let exe = result.find("/Applications/ABY.app/Contents/MacOS").unwrap();
         assert!(local < nvm && nvm < exe, "{result}");
         assert!(result.ends_with(":/usr/bin:/bin"), "{result}");
     }
