@@ -73,14 +73,42 @@ No alcanza con renombrar imports.
 ### `asChild` → composición
 
 Radix usa `Slot` para fusionar props en un hijo arbitrario. HeroUI/react-aria
-no tiene ese patrón. Hay **285 usos de `asChild`**, concentrados en:
+no tiene ese patrón.
 
-`shared/ui/sidebar.tsx` (16), `features/messages/ui/ComposerAttachments.tsx`
-(11), `features/workflows/ui/WorkflowDialog.tsx` (8),
-`features/sidebar/ui/CustomChannelSection.tsx` (6),
-`features/messages/ui/MessageActionBar.tsx` (6),
-`features/huddle/components/HuddleBar.tsx` (6), `shared/ui/attachment.tsx` (5),
-`features/sidebar/ui/SidebarProjectsSection.tsx` (5), y el resto disperso.
+> **Corrección (resultado del Lote F).** Una versión anterior de este documento
+> decía "285 usos de `asChild`" y los concentraba por archivo
+> (`sidebar.tsx` 16, `ComposerAttachments.tsx` 11, `WorkflowDialog.tsx` 8, …).
+> Ese conteo era de líneas con `grep`, no de sitios de llamada, y sobreestima el
+> trabajo por un factor de diez.
+
+Resolviendo cada `asChild` a su tag JSX contenedor y el tag a su import: **296
+ocurrencias de la palabra, de las cuales 38 no son JSX** (declaraciones
+`asChild?: boolean`, destructuring, la línea `const Comp = asChild ? Slot : …`,
+comentarios). **Atributos JSX reales: 258**, y se reparten así:
+
+| Grupo | n | Qué implica |
+|---|---|---|
+| Sobre Radix que **se queda en Radix** (§6ter) | 179 | No se tocan |
+| Sobre wrappers **ya migrados**, que conservan `asChild` como API propia | 58 | Ya resueltos en los lotes B y D |
+| Sobre nuestros propios wrappers con `Slot` | 19 | El alcance real del Lote F |
+| No son sitios de llamada (implementación de `attachment.tsx`, un comentario en `markdown.tsx`) | 2 | — |
+
+Desglose del primer grupo: `TooltipTrigger` 86, `PopoverTrigger` 29,
+`AlertDialogCancel` 17, `AlertDialogAction` 16, `PopoverAnchor` 13,
+`DialogClose` 9, `DialogTrigger` 3, `DialogPrimitive.*` 3 (Radix directo),
+`TooltipContent` 3, y uno cada uno de `Tooltip`, `AlertDialogTrigger`,
+`DialogDescription`, `FocusScope`. **`tooltip.tsx` sigue en Radix** (el Lote D
+descartó el `Tooltip` de HeroUI por `skipDelayDuration`), así que sus 90 usos
+son `Slot` de verdad, no API propia.
+
+Segundo grupo: `DropdownMenuTrigger` 51 (compone vía `Pressable`),
+`ContextMenuTrigger` 7 (vía el `render` de Pro).
+
+Tercer grupo: `Button` 6, `Card` 6, `SidebarGroupLabel` 5, `AttachmentTrigger`
+2. **`sidebar.tsx` declara `asChild` en cinco componentes pero solo
+`SidebarGroupLabel` tiene sitios de llamada** — los otros cuatro
+(`SidebarGroupAction`, `SidebarMenuButton`, `SidebarMenuAction`,
+`SidebarMenuSubButton`) tienen la prop muerta.
 
 Cada uno requiere decisión: o el componente de HeroUI acepta el rol
 directamente, o se usa su render prop, o se conserva un wrapper propio.
@@ -162,7 +190,7 @@ Lotes independientes, un agente cada uno:
 | **C — Controles de formulario** | `switch.tsx`, `checkbox.tsx`, `toggle.tsx`, `input.tsx`, `textarea.tsx` | |
 | **D — Display** | `tooltip.tsx`, `avatar.tsx`, `separator.tsx`, `badge.tsx`, `card.tsx`, `skeleton.tsx` | El más mecánico. |
 | **E — Navegación** | `tabs.tsx`, `segmented-control.tsx`, `step-progress.tsx`, `progress.tsx` | |
-| **F — Botón + `asChild`** | `button.tsx` + los 285 `asChild` | **Toca todos los lotes.** Va secuencial, después de A–E, o se coordina explícitamente. |
+| **F — Botón + `asChild`** | `button.tsx` + los `asChild` | **BLOQUEADO — se conserva el wrapper propio. Ver §6quater.** El contrato de props se angosta de pass-through a allowlist, y 47 sitios ya dependen de props que quedarían afuera. Los `asChild` reales son 19, no 285 (§4). |
 | **G — Toasts** | `sonner.tsx` | Independiente. |
 
 Los lotes A–E y G son paralelos entre sí. F depende de todos.
@@ -259,6 +287,59 @@ peso todavía: **20 `onCloseAutoFocus` sobre `DropdownMenuContent`, repartidos
 en 20 archivos.** Devolver el foco al trigger después de elegir un item es
 justamente lo que esos sitios cancelan. El veredicto del §6ter les aplica
 igual; conviene resolverlo antes de invertir en la migración de menús.
+
+## 6quater. El botón se conserva: el contrato de props se angosta en silencio
+
+Resultado del Lote F. **`button.tsx` se queda sobre su propio `<button>`.**
+Pinneado en `desktop/src/shared/ui/buttonHeroUiGap.test.mjs`, que asserta el
+hueco en vez de describirlo: si HeroUI o React Aria empiezan a reenviar esos
+atributos, los tests fallan y la decisión se revisa.
+
+### El bloqueo
+
+`ButtonProps` extiende `ButtonHTMLAttributes`, así que los **523 sitios de
+llamada** se escribieron contra un pass-through abierto. `filterDOMProps` de
+React Aria admite una allowlist fija: `id`, `data-*`,
+`dir/lang/hidden/inert/translate`, eventos globales de mouse/pointer/touch y un
+conjunto cerrado de `aria-*`. Todo lo demás se descarta sin error.
+
+Medido contra los sitios de llamada actuales:
+
+| Prop | n | Qué pasa |
+|---|---|---|
+| `disabled` | 269 | **Se ignora** — React Aria lee `isDisabled`. El botón queda habilitado **y `onClick` igual dispara**. |
+| `title` | 35 | Se descarta. `toggle.tsx` lo resolvió con un `<span>` envolvente; sirve para un puñado, no para 35 botones dentro de filas flex. |
+| `role` + `aria-selected` | 6 | Se descartan. Los seis son `PulseTabBar.tsx`: un tablist queda como seis botones sueltos, y `pulse` no emite testids (§6bis). |
+| `aria-busy` | 2 | Se descarta. |
+| `aria-hidden` | 1 | Se descarta. |
+| `tabIndex` | 3 | **Se sobrescribe a `0`** — un botón deliberadamente fuera del orden de tabulación se vuelve tabulable. La forma soportada es `excludeFromTabOrder`. |
+
+Un wrapper puede traducir `disabled` y `tabIndex`, y podría cargar el resto
+imperativamente. Lo que no puede es **mantener el contrato abierto**: toda prop
+futura fuera de la allowlist falla igual de callada, con typecheck, lint, tests
+unitarios y build en verde.
+
+### Lo que acota el beneficio
+
+- **No saca nada de Radix.** Lo único Radix acá es `Slot`, y `Slot` se queda de
+  todos modos: lo usan `card.tsx`, `sidebar.tsx` y `attachment.tsx`, y **86
+  padres `asChild` de Radix envuelven un `<Button>`** — tooltip 27,
+  `AlertDialogCancel` 17, `AlertDialogAction` 16, `PopoverTrigger` 11,
+  `DialogClose` 9, `DialogTrigger` 3, `PopoverAnchor` 3. Todos overlays que el
+  Lote A dejó en Radix.
+- **Su capa visual no es aprovechable.** Las variantes resuelven de `--accent` /
+  `--default` / `--danger`, y `--accent` está deliberadamente sin mapear
+  ([theming-contract §4](theming-contract.md), trampa 2). `variant="link"` no
+  tiene análogo, `xs` e `icon-xs` (h-6) quedan bajo el piso de h-8 de HeroUI, y
+  la base trae `rounded-3xl`, `md:h-9` y `sm:size-4` — dimensionado dependiente
+  del viewport que la rampa plana de esta app no tiene. Se importaría la hoja de
+  estilos solo para pisarla.
+
+### Qué cambiaría la decisión
+
+Que React Aria reenvíe atributos desconocidos, o que HeroUI exponga un escape
+hatch a nivel de elemento como el `render` de `Tabs`; más `--accent` cargando
+`--primary` en toda la app.
 
 ## 6bis. `data-testid` NO es solo contrato de test
 
