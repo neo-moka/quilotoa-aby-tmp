@@ -200,6 +200,39 @@ test("the wrapper neutralises HeroUI's own paint and geometry", async () => {
   }
 });
 
+test("HeroUI only prepends to the class attribute, never reorders it", async () => {
+  const React = await import("react");
+  const { render } = await import("@testing-library/react");
+  const { Button, buttonVariants } = await import("./button.tsx");
+  const { cn } = await import("@/shared/lib/cn");
+
+  // Three E2E assertions name two classes in order separated by `.*`
+  // (tooltip-semantics.spec.ts:101, agents.spec.ts:1016 and :2037). None of
+  // them targets a button, but the invariant is worth pinning for every
+  // `toHaveClass` regex in the suite: inserting classes is safe, reordering
+  // the tokens is not, and nothing but Playwright would catch a reorder.
+  for (const args of [
+    { className: "my-caller-class", size: "default", variant: "default" },
+    { className: "shrink-0 my-2", size: "icon", variant: "ghost" },
+    { className: undefined, size: "sm", variant: "outline" },
+  ]) {
+    const view = render(React.createElement(Button, { ...args }, "Label"));
+    const actual = view.container.firstElementChild.getAttribute("class");
+    const composedByTheApp = cn(buttonVariants(args));
+
+    // The app's own string survives contiguously and last, so the caller's
+    // className keeps winning under tailwind-merge and relative order holds.
+    assert.ok(
+      actual.endsWith(composedByTheApp),
+      `expected the app's classes as a contiguous suffix.\n  app:    ${composedByTheApp}\n  actual: ${actual}`,
+    );
+    assert.equal(
+      actual.slice(0, actual.length - composedByTheApp.length).trim(),
+      "button button--md button--primary",
+    );
+  }
+});
+
 test("asChild still renders the caller's element through Slot", async () => {
   const React = await import("react");
   const { render } = await import("@testing-library/react");
