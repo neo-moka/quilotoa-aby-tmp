@@ -1,4 +1,4 @@
-import { LogIn, SquareTerminal } from "lucide-react";
+import { LogIn, Radio, SquareTerminal } from "lucide-react";
 import type * as React from "react";
 
 import { ChatHeader } from "@/features/chat/ui/ChatHeader";
@@ -17,6 +17,11 @@ import { UserProfilePopover } from "@/features/profile/ui/UserProfilePopover";
 import { Button } from "@/shared/ui/button";
 import type { Channel, PresenceStatus } from "@/shared/api/types";
 import { UserAvatar } from "@/shared/ui/UserAvatar";
+import { useActiveAgentTurnsByChannel } from "@/features/agents/activeAgentTurnsStore";
+import {
+  toggleAgentActivityPanel,
+  useAgentActivityPanel,
+} from "@/features/agents/agentActivityPanelStore";
 import {
   toggleTerminalPanel,
   useTerminalPanel,
@@ -79,6 +84,7 @@ export function ChannelScreenHeader({
     onJoinChannel;
 
   const terminalPanel = useTerminalPanel();
+  const activeChannelTurns = useActiveAgentTurnsByChannel();
   const terminalButton = activeChannel ? (
     <Button
       aria-label={
@@ -91,6 +97,42 @@ export function ChannelScreenHeader({
       variant={terminalPanel.mode === "closed" ? "outline" : "secondary"}
     >
       <SquareTerminal />
+    </Button>
+  ) : null;
+
+  // Opening from a channel header preselects an agent working *here* — the
+  // gesture reads as "show me what's happening in this channel". The panel's
+  // own picker still reaches every agent, so this is a starting point, not a
+  // scope: `openAgentActivityPanel` keeps the previous choice when this channel
+  // has nobody working, rather than clearing it.
+  const activityPanel = useAgentActivityPanel();
+  const channelWorkingPubkey = activeChannel
+    ? (activeChannelTurns.find(
+        (channel) => channel.channelId === activeChannel.id,
+      )?.agentPubkeys[0] ?? null)
+    : null;
+  const activityButton = activeChannel ? (
+    <Button
+      aria-label={
+        activityPanel.isOpen ? "Hide agent activity" : "Show agent activity"
+      }
+      aria-pressed={activityPanel.isOpen}
+      className="relative"
+      data-testid="channel-header-agent-activity"
+      onClick={() => toggleAgentActivityPanel(channelWorkingPubkey)}
+      size="icon"
+      title="Agent activity"
+      type="button"
+      variant={activityPanel.isOpen ? "secondary" : "outline"}
+    >
+      <Radio />
+      {channelWorkingPubkey ? (
+        <span
+          aria-hidden="true"
+          className="absolute right-1 bottom-1 h-2 w-2 rounded-full bg-primary ring-2 ring-background"
+          data-testid="channel-header-agent-activity-live"
+        />
+      ) : null}
     </Button>
   ) : null;
   const channelActions = activeChannel ? (
@@ -119,6 +161,7 @@ export function ChannelScreenHeader({
   const actions = activeChannel ? (
     <div className="flex items-center gap-1">
       {terminalButton}
+      {activityButton}
       {channelActions}
     </div>
   ) : null;
