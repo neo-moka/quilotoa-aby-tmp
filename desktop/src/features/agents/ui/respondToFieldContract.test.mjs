@@ -21,9 +21,11 @@ for (const label of ["Only me (default)", "Selected people", "Anyone"]) {
 }
 
 test("native and persona controls share one option list", () => {
+  // `<Select>` is the shared bordered-select primitive, which renders a native
+  // `<select>`; the assertion is about both branches mapping one option list.
   assert.match(
     respondToFieldSource,
-    /<select[\s\S]*RESPOND_TO_OPTIONS\.map\(\(option\) => \([\s\S]*<option/,
+    /<Select[\s\S]*RESPOND_TO_OPTIONS\.map\(\(option\) => \([\s\S]*<option/,
   );
 });
 

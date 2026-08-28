@@ -25,6 +25,7 @@ import type {
   ChannelRole,
 } from "@/shared/api/types";
 import { Button } from "@/shared/ui/button";
+import { Select } from "@/shared/ui/select";
 import {
   Dialog,
   DialogContent,
@@ -205,8 +206,7 @@ export function AddTeamToChannelDialog({
               <label className="text-sm font-medium" htmlFor="team-channel-id">
                 Channel
               </label>
-              <select
-                className="flex h-9 w-full rounded-md border border-input bg-background px-3 py-2 text-sm shadow-xs"
+              <Select
                 disabled={channels.length === 0 || deployMutation.isPending}
                 id="team-channel-id"
                 onChange={(event) => setChannelId(event.target.value)}
@@ -220,7 +220,7 @@ export function AddTeamToChannelDialog({
                     {channel.name} · {channel.visibility}
                   </option>
                 ))}
-              </select>
+              </Select>
             </div>
 
             <div className="space-y-1.5">
@@ -230,8 +230,7 @@ export function AddTeamToChannelDialog({
               >
                 Role
               </label>
-              <select
-                className="flex h-9 w-full rounded-md border border-input bg-background px-3 py-2 text-sm shadow-xs"
+              <Select
                 disabled={deployMutation.isPending}
                 id="team-channel-role"
                 onChange={(event) =>
@@ -243,7 +242,7 @@ export function AddTeamToChannelDialog({
                 <option value="member">member</option>
                 <option value="guest">guest</option>
                 <option value="admin">admin</option>
-              </select>
+              </Select>
             </div>
 
             {missingPersonaCount > 0 ? (
