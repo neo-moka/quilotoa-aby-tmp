@@ -498,8 +498,7 @@ function ImportAgentPane({ onImport }: { onImport: () => void }) {
       </span>
       <span className="mt-4 text-base font-semibold">Import an agent</span>
       <span className="mt-2 max-w-sm text-sm text-muted-foreground">
-        Drop an .agent.json or .agent.png file anywhere in this window, or
-        choose a file.
+        Drop an .agent.json or .agent.png file here, or choose a file.
       </span>
       <span className="mt-5 rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground">
         Choose file
