@@ -19,18 +19,31 @@ const SIZE_CLASSES: Record<SegmentedControlSize, string> = {
 /**
  * A mutually exclusive control with equal-width, optionally scrubbable options.
  *
- * **Not migrated to `@heroui-pro/react/segment`** — three gaps, each of which
- * would cost behaviour or break the E2E contract:
+ * **Not migrated to `@heroui-pro/react/segment`** — three gaps, re-verified
+ * against the installed `@heroui-pro/react` 1.0.0-beta.8 and react-aria 3.51.0,
+ * each of which would cost behaviour or break the E2E contract:
  *
- * - `Segment` is a `ToggleButtonGroup` pinned to `selectionMode="single"`, and
- *   React Aria's `useToggleButtonGroupItem` then rewrites every item to
- *   `role="radio"` with `aria-checked` and **deletes `aria-pressed`**. The
- *   buttons below are toggle buttons inside a `fieldset`/`legend`, and
- *   `messaging.spec.ts` asserts `aria-pressed` on `link-preview-style-rich`.
+ * - `SegmentRoot` is a `ToggleButtonGroup` with `selectionMode: "single"`
+ *   hardcoded and omitted from its prop type. React Aria's
+ *   `useToggleButtonGroupItem` then sets `role="radio"` and `aria-checked` on
+ *   every item, **deletes `aria-pressed`**, and turns the group into a
+ *   `role="radiogroup"`. Unlike the menus batch, this cannot be re-emitted from
+ *   the outside: `ToggleButton` builds its DOM props with
+ *   `filterDOMProps(props, { global: true })`, which forwards only `id`,
+ *   `dir`/`lang`/`hidden`/`inert`/`translate`, `data-*` and global events, so
+ *   `role` and `aria-pressed` never reach the element — and it merges React
+ *   Aria's `buttonProps` after them, so the radio role would win even if they
+ *   did. The buttons below are toggle buttons inside a `fieldset`/`legend`:
+ *   `messaging.spec.ts` asserts `aria-pressed` on `link-preview-style-rich`,
+ *   and `appearance-previews.spec.ts` finds the current option with
+ *   `button[aria-pressed="true"]`.
  * - `Segment.Item` renders its own `SelectionIndicator`, so the indicator
- *   becomes one node per option. This control emits a single sliding indicator
- *   under `indicatorTestId`, which `buzz-theme-screenshots.spec.ts` resolves as
- *   one element and asserts a border radius on.
+ *   becomes one node per option, mounted only while that option is selected and
+ *   moved by `SharedElement`'s FLIP pass (`element.style.translate` plus
+ *   `getAnimations()`), not by a CSS transition. This control emits a single
+ *   persistent sliding indicator under `indicatorTestId`, which
+ *   `buzz-theme-screenshots.spec.ts` resolves as one element and asserts
+ *   `transition-duration: 0.2s` and `transition-property: transform` on.
  * - `onPreviewChange` — the pointer-capture scrub that live-previews a value
  *   while dragging across the control, used by all four appearance settings —
  *   has no counterpart, and `ToggleButtonGroup`'s own press handling would
