@@ -176,9 +176,16 @@ Ninguno de estos se tocó. Si aparecen fallas raras, empezá por acá.
    contratos que cambian igual, puede seguir pasando.
 2. **`agents.spec.ts:2031`** — `toHaveCSS("cursor", "default")` sobre el mismo
    locator `getByLabel` de A-2030. Antes medía el `<button>` de Radix; ahora
-   mide el input escondido dentro del `VisuallyHidden`. El valor computado de
-   `cursor` ahí no es el mismo y no se puede predecir sin un browser. **Es el
-   candidato más probable a falla residual del lote.**
+   mide el input escondido dentro del `VisuallyHidden`. **Es el candidato más
+   probable a falla residual del lote.** `styles.css` de HeroUI no declara
+   `cursor` ni una vez (`grep -c "cursor:"` → 0), así que el input no recibe
+   nada de la librería y hereda de la cadena de ancestros. Si nadie en esa
+   cadena lo fija, el valor computado es `auto`, no `default`, y la aserción
+   falla — el `default` de antes venía de la hoja de estilos del navegador
+   para `<button>`, que ya no aplica. Confirmarlo requiere un browser.
+   Si falla, el arreglo es afirmar sobre el field (`[data-slot="switch"]`) o
+   borrar la aserción: medía que el control deshabilitado no mostrara la
+   manito, y ese estilo ahora vive en el field, no en el input.
 3. **`toBeEnabled()` sobre un field quedó vacío de contenido.** Deshabilitado
    se renderiza como `data-disabled="true"` sobre un `div`, y Playwright solo
    considera deshabilitado un control nativo con `disabled` o algo con
