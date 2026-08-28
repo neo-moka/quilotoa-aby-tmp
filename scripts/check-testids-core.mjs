@@ -91,8 +91,12 @@ const CARRIER_NAME_RE = /test-?id|prefix|[a-z0-9]Id$/i;
 // `data-testid`, or any identifier that reads as a testid prop (`testId`,
 // `listTestId`, `dataTestid`, `testIds`), followed by `:` or `=`. The negative
 // lookahead keeps `===`, `==` and `=>` out.
+// The `_?` matters: module constants are conventionally SCREAMING_SNAKE
+// (`AUXILIARY_PANEL_CLOSE_TEST_ID`), and without it the scanner skips every
+// testid held in one — which reads as "this testid has no emitter" rather than
+// as a gap in the scanner.
 const SINK_RE =
-  /(data-testid|[A-Za-z_$][\w$]*[Tt]est[Ii]ds?|[Tt]est[Ii]ds?)\s*\??\s*[:=](?![=>])/g;
+  /(data-testid|[A-Za-z_$][\w$]*[Tt][Ee][Ss][Tt]_?[Ii][Dd]s?|[Tt][Ee][Ss][Tt]_?[Ii][Dd]s?)\s*\??\s*[:=](?![=>])/g;
 
 const GET_BY_TEST_ID_RE = /\bgetByTestId\s*\(\s*/g;
 // `[data-testid="x"]`, `[data-testid^="x"]`, … in stylesheets and in selector
@@ -101,7 +105,13 @@ const GET_BY_TEST_ID_RE = /\bgetByTestId\s*\(\s*/g;
 const SELECTOR_RE = /\[\s*data-testid\s*([~^|*$]?)=\s*(["']?)([^\]"']*)\2\s*\]/g;
 const SAME_FILE_CONST_RE =
   /\bconst\s+([A-Za-z_$][\w$]*)\s*(?::[^=]*)?=\s*(["'`])/g;
-const ABSENCE_RE = /\.toHaveCount\(\s*0\s*,?\s*\)/;
+// A spec can consume a testid precisely to assert the element is *not* there.
+// Such a consumer needs no emitter — it is satisfied by absence — so counting
+// it as orphaned reports a passing test as a broken contract. Beyond
+// `toHaveCount(0)`, Playwright spells this as a detached/hidden `waitFor`, a
+// negated visibility expectation, or `toBeHidden`.
+const ABSENCE_RE =
+  /\.toHaveCount\(\s*0\s*,?\s*\)|state:\s*["'](?:detached|hidden)["']|\.not\.\s*to(?:BeVisible|BeAttached|BeInTheDocument)\(|\.toBeHidden\(/;
 // A spec building its own element: `el.dataset.testid = …` /
 // `el.setAttribute("data-testid", …)`.
 const SPEC_INJECTION_RE =
@@ -505,6 +515,28 @@ export function buildEmitterIndex(emitters) {
     const pattern = parseTestIdPattern(emitter.raw);
     if (!pattern.dynamic) {
       if (!literals.has(emitter.raw)) literals.set(emitter.raw, emitter);
+      // A literal handed to a component as a testid prop is a family root, not
+      // a leaf: `<UserAvatar testId="message-avatar" />` makes the avatar emit
+      // `message-avatar-image` and `message-avatar-fallback` from a different
+      // file. Resolving that properly means following the prop across modules,
+      // which this scanner does not do, so the literal is registered as
+      // covering its own `-` descendants too.
+      //
+      // Deliberately widening: it can mask the loss of one member of a family
+      // whose root still exists. The alternative — reporting every prop-passed
+      // family as orphaned — produces noise that gets the whole guard ignored,
+      // which costs more.
+      patterns.push({
+        ...emitter,
+        pattern: {
+          raw: `${emitter.raw}-\${*}`,
+          dynamic: true,
+          prefix: `${emitter.raw}-`,
+          literalLength: emitter.raw.length + 1,
+          regex: new RegExp(`^${escapeRegExp(`${emitter.raw}-`)}.+$`),
+          sample: `${emitter.raw}-`,
+        },
+      });
       continue;
     }
     const entry = { ...emitter, pattern };
