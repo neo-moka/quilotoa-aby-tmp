@@ -191,7 +191,19 @@ export default defineConfig({
     },
   ],
   webServer: {
-    command: "python3 -m http.server 4173 -d dist",
+    // `python3 -m http.server` is single-threaded: it serves one request at a
+    // time. The shell pulls dozens of chunks, fonts and assets, and Chromium
+    // opens several connections at once, so under load the backlog overflows
+    // and a request dies with ERR_CONNECTION_RESET. When the casualty is a
+    // module the entry depends on, React never mounts and the test sees a
+    // blank page — no page error, just a missing testid. It reproduced on
+    // roughly a quarter of runs and looked exactly like a product regression.
+    // ThreadingHTTPServer is the same server with one thread per request, and
+    // HTTP/1.1 lets Chromium keep connections alive instead of reopening one
+    // per asset — the handler already sends Content-Length, so it is safe.
+    // Threading alone took the failure rate from ~25% to ~7%; both together
+    // hold at 0/40.
+    command: `python3 -c "import functools, http.server as s; H = type('H', (s.SimpleHTTPRequestHandler,), {'protocol_version': 'HTTP/1.1'}); s.ThreadingHTTPServer(('127.0.0.1', 4173), functools.partial(H, directory='dist')).serve_forever()"`,
     cwd: ".",
     reuseExistingServer: !process.env.CI,
     url: "http://127.0.0.1:4173",
