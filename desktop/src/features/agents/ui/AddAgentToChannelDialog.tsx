@@ -11,6 +11,7 @@ import {
 import type { Channel, ChannelRole, ManagedAgent } from "@/shared/api/types";
 import { normalizePubkey } from "@/shared/lib/pubkey";
 import { Button } from "@/shared/ui/button";
+import { Select } from "@/shared/ui/select";
 import {
   Dialog,
   DialogContent,
@@ -126,8 +127,7 @@ export function AddAgentToChannelDialog({
               <label className="text-sm font-medium" htmlFor="agent-channel-id">
                 Channel
               </label>
-              <select
-                className="flex h-9 w-full rounded-md border border-input bg-background px-3 py-2 text-sm shadow-xs"
+              <Select
                 disabled={
                   channels.length === 0 || attachAgentMutation.isPending
                 }
@@ -143,7 +143,7 @@ export function AddAgentToChannelDialog({
                     {channel.name} · {channel.visibility}
                   </option>
                 ))}
-              </select>
+              </Select>
               <p className="text-xs text-muted-foreground">
                 Only channels accessible to the current desktop user are shown
                 here.
@@ -164,8 +164,7 @@ export function AddAgentToChannelDialog({
               >
                 Role
               </label>
-              <select
-                className="flex h-9 w-full rounded-md border border-input bg-background px-3 py-2 text-sm shadow-xs"
+              <Select
                 disabled={attachAgentMutation.isPending}
                 id="agent-channel-role"
                 onChange={(event) =>
@@ -177,7 +176,7 @@ export function AddAgentToChannelDialog({
                 <option value="member">member</option>
                 <option value="guest">guest</option>
                 <option value="admin">admin</option>
-              </select>
+              </Select>
             </div>
 
             <div className="rounded-2xl border border-border/70 bg-muted/20 p-4">

@@ -7,6 +7,7 @@
  */
 import * as React from "react";
 import { Input } from "@/shared/ui/input";
+import { Select } from "@/shared/ui/select";
 import { cn } from "@/shared/lib/cn";
 import type { EnvVarsValue } from "./EnvVarsEditor";
 import type { NumericDescriptor } from "../lib/agentConfigCore";
@@ -142,11 +143,8 @@ export function EffortSelectField({
           value={currentEffort}
         />
       ) : (
-        <select
-          className={cn(
-            "flex h-9 w-full rounded-md border border-input bg-background px-3 py-2 text-sm shadow-xs disabled:cursor-not-allowed disabled:opacity-60",
-            selectClassName,
-          )}
+        <Select
+          className={selectClassName}
           data-testid={testId}
           disabled={disabled}
           id={htmlFor}
@@ -162,7 +160,7 @@ export function EffortSelectField({
               {option.label}
             </option>
           ))}
-        </select>
+        </Select>
       )}
     </div>
   );

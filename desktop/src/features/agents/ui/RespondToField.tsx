@@ -13,6 +13,7 @@ import { cn } from "@/shared/lib/cn";
 import { Input } from "@/shared/ui/input";
 import { Textarea } from "@/shared/ui/textarea";
 import { UserAvatar } from "@/shared/ui/UserAvatar";
+import { Select } from "@/shared/ui/select";
 import {
   type AgentRunLocation,
   agentAccessWarningText,
@@ -216,8 +217,7 @@ export function CreateAgentRespondToField({
           value={mode}
         />
       ) : (
-        <select
-          className="flex h-9 w-full rounded-md border border-input bg-background px-3 py-2 text-sm shadow-xs"
+        <Select
           data-testid="agent-respond-to-select"
           disabled={disabled}
           id="agent-respond-to"
@@ -229,7 +229,7 @@ export function CreateAgentRespondToField({
               {option.label}
             </option>
           ))}
-        </select>
+        </Select>
       )}
       {disabledReason ? (
         <p

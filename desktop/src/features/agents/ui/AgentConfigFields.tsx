@@ -63,6 +63,7 @@ import { SettingsOptionGroup } from "@/features/settings/ui/SettingsOptionGroup"
 import { AdvancedRequiredBadge } from "./AdvancedRequiredBadge";
 import { CardMintKeyCue } from "./CardMintKeyCue";
 import { getGlobalAgentCredentialState } from "./globalAgentCredentialState";
+import { Select } from "@/shared/ui/select";
 
 export const EMPTY_GLOBAL_CONFIG: GlobalAgentConfig = {
   env_vars: {},
@@ -691,9 +692,8 @@ export function AgentConfigFields({
       value={providerSelectValue}
     />
   ) : (
-    <select
+    <Select
       className={cn(
-        "flex h-9 w-full rounded-md border border-input bg-background px-3 py-2 text-sm shadow-xs",
         useChevronSelectIcon && "appearance-none pr-10",
         selectClassName,
       )}
@@ -706,7 +706,7 @@ export function AgentConfigFields({
           {option.label}
         </option>
       ))}
-    </select>
+    </Select>
   );
 
   const providerContent = providerFieldVisible ? (

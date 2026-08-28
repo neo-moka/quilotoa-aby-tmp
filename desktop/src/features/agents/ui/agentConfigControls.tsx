@@ -11,6 +11,7 @@ import type { AcpRuntimeCatalogEntry } from "@/shared/api/types";
 import { cn } from "@/shared/lib/cn";
 import { Input } from "@/shared/ui/input";
 import { Popover, PopoverContent, PopoverTrigger } from "@/shared/ui/popover";
+import { Select } from "@/shared/ui/select";
 import {
   AUTO_MODEL_DROPDOWN_VALUE,
   AUTO_PROVIDER_DROPDOWN_VALUE,
@@ -552,13 +553,9 @@ export function AgentModelField({
       value={modelSelectValue}
     />
   ) : (
-    <select
+    <Select
       aria-required={isRequired}
-      className={cn(
-        "flex h-9 w-full rounded-md border border-input bg-background px-3 py-2 text-sm shadow-xs disabled:cursor-not-allowed disabled:opacity-60",
-        useChevronIcon && "appearance-none pr-10",
-        selectClassName,
-      )}
+      className={cn(useChevronIcon && "appearance-none pr-10", selectClassName)}
       disabled={selectDisabled}
       id={id}
       onChange={(event) => handleModelSelectChange(event.target.value)}
@@ -573,7 +570,7 @@ export function AgentModelField({
           {option.label}
         </option>
       ))}
-    </select>
+    </Select>
   );
 
   return (
@@ -646,9 +643,8 @@ export function AgentProviderField({
       <RequiredFieldLabel htmlFor="agent-provider" isRequired={isRequired}>
         LLM provider
       </RequiredFieldLabel>
-      <select
+      <Select
         aria-required={isRequired}
-        className="flex h-9 w-full rounded-md border border-input bg-background px-3 py-2 text-sm shadow-xs disabled:cursor-not-allowed disabled:opacity-60"
         disabled={disabled}
         id="agent-provider"
         onChange={(event) => onProviderChange(event.target.value)}
@@ -665,7 +661,7 @@ export function AgentProviderField({
         <option value={CUSTOM_PROVIDER_DROPDOWN_VALUE}>
           Custom provider...
         </option>
-      </select>
+      </Select>
       {isCustomProviderEditing ? (
         <Input
           aria-label="Custom provider ID"
