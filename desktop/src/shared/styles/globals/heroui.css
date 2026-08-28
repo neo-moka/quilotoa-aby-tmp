@@ -1,0 +1,79 @@
+/* HeroUI v3 — structural styles, dressed in the app's palette.
+ *
+ * HeroUI's component CSS mostly `@apply`s Tailwind utilities (`bg-surface`,
+ * `bg-separator`), which resolve through the `@theme inline` block in its
+ * default theme; a smaller set of tokens is read raw (`var(--accent)`,
+ * `var(--ease-out)`). Importing the default theme therefore buys both the
+ * `--color-*` mapping and the non-colour primitives — easings, cursors, the
+ * radius scale, shadow and scroll-shadow sizes — which would otherwise have to
+ * be reinvented here.
+ *
+ * Its oklch colour values come along too, but they are only defaults: the block
+ * below re-declares every seed the app has an equivalent for, unlayered so it
+ * wins over `layer(theme)`. Tokens the app already owns under the same name
+ * (`--background`, `--foreground`, `--border`) need no mapping at all — since
+ * the token format was unified they are already complete colour values, and
+ * ThemeProvider writes them inline on `<html>`, so HeroUI picks up whichever of
+ * the 61 themes is active for free, light or dark.
+ *
+ * See docs/heroui-migration/theming-contract.md.
+ */
+
+@import "@heroui/styles/themes/default/index.css";
+@import "@heroui/styles/components/index.css" layer(components);
+/* Unlayered, matching HeroUI's own entrypoint. Its component CSS `@apply`s
+   custom utilities defined here (`no-highlight`), so skipping this import
+   fails the build rather than degrading quietly. */
+@import "@heroui/styles/utilities";
+@import "@heroui/styles/variants";
+
+/* Unlayered on purpose: beats HeroUI's `layer(theme)` defaults without
+   `!important`, the same trick theme.css uses for the Buzz sidebar gradient. */
+:root {
+  /* Surfaces */
+  --surface: var(--card);
+  --surface-foreground: var(--card-foreground);
+  --overlay: var(--popover);
+  --overlay-foreground: var(--popover-foreground);
+
+  /* Neutral action — HeroUI's `default` is a button surface, i.e. `secondary` */
+  --default: var(--secondary);
+  --default-foreground: var(--secondary-foreground);
+
+  /* Separator and focus ring */
+  --separator: var(--border);
+  --focus: var(--ring);
+
+  /* Destructive */
+  --danger: var(--destructive);
+  --danger-foreground: var(--destructive-foreground);
+
+  /* Form fields */
+  --field-background: var(--input);
+  --field-foreground: var(--foreground);
+  --field-placeholder: var(--muted-foreground);
+
+  /* Links follow the app's brand colour rather than body text */
+  --link: var(--primary);
+}
+
+/* Note for when the Pro layer arrives: `@heroui-pro/react/css` derives
+   --chart-1..5 from --accent and would quietly replace the hand-picked ramp
+   theme.css defines and animations.css consumes. This file is imported before
+   theme.css precisely so the app's declarations land last; keep that order, or
+   re-declare the ramp after the Pro import. Only @heroui/styles is imported
+   today, so the clash is not live yet. */
+
+/* ── Known gap ────────────────────────────────────────────────────────────
+ * `--accent` is NOT mapped. HeroUI reads it as the brand/action colour (it
+ * also derives `--focus` from it) while the app uses it as a subtle hover
+ * tint, and ThemeProvider writes the app's value inline on <html>, which beats
+ * any stylesheet rule. Mapping it here would be silently overridden at
+ * runtime.
+ *
+ * Resolving it means freeing the name — pointing the app's `accent` Tailwind
+ * utility at a renamed token so `--accent` can carry `--primary` for HeroUI.
+ * Until then, HeroUI components tinted with `accent` (primary buttons, focus
+ * rings) render with the app's hover tint instead of its brand colour.
+ * Components that avoid `accent` are unaffected.
+ * ─────────────────────────────────────────────────────────────────────── */
