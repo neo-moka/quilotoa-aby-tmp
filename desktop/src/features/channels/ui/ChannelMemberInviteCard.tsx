@@ -13,6 +13,7 @@ import type {
 } from "@/shared/api/types";
 import { Button } from "@/shared/ui/button";
 import { Input } from "@/shared/ui/input";
+import { Select } from "@/shared/ui/select";
 import { UserAvatar } from "@/shared/ui/UserAvatar";
 
 function formatSearchUserName(user: UserSearchResult) {
@@ -332,8 +333,8 @@ export function ChannelMemberInviteCard({
         </label>
         <div className="flex items-center gap-2">
           <span className="text-xs text-muted-foreground">Role</span>
-          <select
-            className="h-8 rounded-md border border-input bg-background px-2.5 text-sm"
+          <Select
+            className="h-8 w-auto px-2.5 text-sm"
             data-testid="channel-management-add-role"
             disabled={isPending}
             id="channel-member-role"
@@ -349,7 +350,7 @@ export function ChannelMemberInviteCard({
                 {role}
               </option>
             ))}
-          </select>
+          </Select>
         </div>
         <Button
           className="min-w-24"

@@ -144,7 +144,7 @@ test.describe("welcome and channel agent entry points", () => {
     await page
       .locator("#persona-system-prompt")
       .fill("Research a topic and return a concise brief.");
-    await page.getByRole("tab", { name: "Customize for this agent" }).click();
+    await page.getByTestId("agent-ai-configuration-mode-custom").click();
     const provider = page.locator("#persona-llm-provider");
     await provider.press("Enter");
     await page
@@ -152,7 +152,7 @@ test.describe("welcome and channel agent entry points", () => {
       .click();
     await page.locator("#persona-model").click();
     await page
-      .getByRole("button", { name: "Custom model...", exact: true })
+      .getByRole("option", { name: "Custom model...", exact: true })
       .click();
     await page.getByLabel("Custom model ID").fill("claude-opus-4-5");
     await page.getByLabel("Anthropic API Key").fill("sk-test-api-key-for-e2e");
