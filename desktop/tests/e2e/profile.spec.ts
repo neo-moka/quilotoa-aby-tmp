@@ -1684,10 +1684,13 @@ test("renders agent profile ingress subviews from the Playwright mock bridge", a
   ).toHaveCount(0);
   await expect(startOnLaunchRow).not.toContainText("Yes");
   await expect(startOnLaunchRow).toBeChecked();
-  await expect(startOnLaunchToggle).toHaveAttribute("data-state", "checked");
+  await expect(startOnLaunchToggle).toHaveAttribute("data-selected", "true");
   await startOnLaunchRow.click();
   await expect(startOnLaunchRow).not.toBeChecked();
-  await expect(startOnLaunchToggle).toHaveAttribute("data-state", "unchecked");
+  await expect(startOnLaunchToggle).not.toHaveAttribute(
+    "data-selected",
+    "true",
+  );
   await expectHashSearchParam(page, "profileTab", "runtime");
   const instancesSection = page.getByTestId("user-profile-instances-section");
   await expect(
