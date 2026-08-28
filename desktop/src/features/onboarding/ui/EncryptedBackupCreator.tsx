@@ -38,6 +38,7 @@ import {
   initialBackupTestProgress,
 } from "./BackupTestFlow";
 import { BackupPasswordTimeline } from "./BackupPasswordTimeline";
+import { Select } from "@/shared/ui/select";
 import {
   ONBOARDING_SECURITY_PRIMARY_CTA_CLASS,
   ONBOARDING_SECONDARY_CTA_CLASS,
@@ -402,8 +403,8 @@ function PassphraseGeneratorPopover({
           >
             Separator
           </label>
-          <select
-            className="h-8 rounded-lg border border-border bg-background px-2 text-sm text-foreground outline-hidden focus-visible:ring-1 focus-visible:ring-ring"
+          <Select
+            className="h-8 w-auto px-2 text-sm"
             id="backup-passphrase-separator"
             data-testid="backup-passphrase-separator"
             onChange={(event) => setSeparator(event.target.value)}
@@ -414,7 +415,7 @@ function PassphraseGeneratorPopover({
                 {option.label}
               </option>
             ))}
-          </select>
+          </Select>
         </div>
 
         {error ? (

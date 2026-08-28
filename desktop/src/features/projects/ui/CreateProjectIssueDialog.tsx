@@ -4,6 +4,7 @@ import { toast } from "@/shared/ui/toast";
 import type { Project, Repository } from "@/features/projects/hooks";
 import { useCreateProjectIssueMutation } from "@/features/projects/issueMutations";
 import { selectProjectRepository } from "@/features/projects/projectModels";
+import { Select } from "@/shared/ui/select";
 import {
   CreateProjectWorkItemDialog,
   type CreateProjectWorkItemDialogInput,
@@ -78,11 +79,15 @@ export function CreateProjectIssueDialog({
       title="Create a task"
       titlePlaceholder="Describe the task"
     >
-      <label className="block space-y-1.5 text-sm font-medium">
+      <label
+        className="block space-y-1.5 text-sm font-medium"
+        htmlFor="create-issue-repository"
+      >
         <span>Repository</span>
-        <select
-          className="h-10 w-full rounded-lg border border-input bg-background px-3 text-sm font-normal outline-hidden focus:ring-1 focus:ring-ring"
+        <Select
+          className="h-10 text-sm font-normal"
           data-testid="create-issue-repository"
+          id="create-issue-repository"
           disabled={createMutation.isPending}
           onChange={(event) => setRepositoryId(event.target.value)}
           value={repository?.id ?? ""}
@@ -97,7 +102,7 @@ export function CreateProjectIssueDialog({
                 : candidate.project.name}
             </option>
           ))}
-        </select>
+        </Select>
       </label>
     </CreateProjectWorkItemDialog>
   );
