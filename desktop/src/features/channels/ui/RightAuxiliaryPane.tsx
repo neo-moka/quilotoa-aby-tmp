@@ -27,7 +27,12 @@ export function RightAuxiliaryPane({
   return (
     <aside
       className={cn(
-        "group/right-pane relative flex h-full shrink-0 flex-col overflow-hidden bg-background",
+        // `bg-sidebar`, not `bg-background`: this pane is chrome, and the app
+        // already separates chrome from content with `--sidebar` — the left
+        // sidebar uses it. Painting the right pane in the content surface left
+        // a 1px rule as the only thing dividing it from the conversation, which
+        // is why it read as part of the chat rather than beside it.
+        "group/right-pane relative flex h-full shrink-0 flex-col overflow-hidden bg-sidebar",
         detached
           ? "bg-transparent"
           : "before:pointer-events-none before:absolute before:bottom-0 before:left-0 before:top-0 before:z-50 before:w-px before:bg-border/80 before:content-['']",
