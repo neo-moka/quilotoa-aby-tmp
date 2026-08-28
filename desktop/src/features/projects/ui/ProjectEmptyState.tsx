@@ -25,6 +25,36 @@ import { cn } from "@/shared/lib/cn";
  *   `filterDOMProps` — spreads what it is given. `data-testid`, `role` and
  *   `aria-*` all survive on the root, so the ids `theme.css` and the specs
  *   select on can move onto this component unchanged.
+ *
+ * ## What else was weighed, and left alone
+ *
+ * The rest of the Pro data-display set was measured against this surface and
+ * not adopted. Recorded here so the next pass does not re-litigate it:
+ *
+ * - **`item-card` / `item-card-group`** — the four grid cards
+ *   (`ProjectGridCard`, `IssueGridCard`, `PullRequestGridCard`,
+ *   `RepositoryGridCard`) are strictly more. Each seats a full-bleed
+ *   `<button className="absolute inset-0">` under a `pointer-events-none`
+ *   content layer with `pointer-events-auto` islands for the actions menu, a
+ *   choreography `item-card` has no shape for; and they carry
+ *   `data-projects-grid-card` / `data-projects-text-priority`, which the
+ *   density pass reads.
+ * - **`data-grid`** — the repository table in `ProjectRepositoryPanel` is not a
+ *   data grid. Its `<thead>` is a latest-commit banner spanning three columns,
+ *   rows carry their own keyboard handling, and paging is a progressive "show
+ *   next N". Pro would bring a competing selection and sort model for no gain.
+ *   `ProjectsWorkItemTable` is a `sr-only` `<thead>` over a CSS grid — pure
+ *   accessibility scaffolding, with no markup to replace.
+ * - **`timeline` / `agenda`** — `ProjectsActivityFeed` already groups by day and
+ *   is wired into the view's multi-item selection, which Pro knows nothing of.
+ * - **`kanban`** — genuinely absent, and left that way on scope rather than
+ *   quality: Pro ships its own drag-and-drop against the app's `@dnd-kit`, and
+ *   work-item status is derived from Nostr status events, so a
+ *   drag-to-change-status board is a write path into the event contracts.
+ * - **`file-tree`** — the repository browser is flat-plus-breadcrumbs by
+ *   design, in the GitHub idiom. Not a tree done badly; a different decision.
+ * - **`stepper`, `drop-zone`, `kpi`** — no multi-step flow, no file upload and
+ *   no repository metrics exist on this surface. Nothing to fill.
  */
 
 /**
