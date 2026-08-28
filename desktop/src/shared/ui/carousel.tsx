@@ -7,6 +7,37 @@ import { ArrowLeft, ArrowRight } from "lucide-react";
 import { cn } from "@/shared/lib/cn";
 import { Button } from "@/shared/ui/button";
 
+/**
+ * CONSERVED. The component map marks this "Reemplazar" with Pro's `Carousel`;
+ * that entry does not survive contact with the component or its consumer.
+ *
+ * Pro's Carousel *is* this carousel. It imports `embla-carousel-react` and
+ * declares both embla packages as required peers
+ * (`@heroui-pro/react/dist/components/carousel/carousel.js`), down to the same
+ * `role="region"`, `aria-roledescription`, and ArrowLeft/ArrowRight capture.
+ * Adopting it removes no dependency — it adds one, since `embla-carousel` is
+ * currently only transitive and would have to become direct to satisfy the
+ * peer. So the usual reason to replace a wrapper does not apply here.
+ *
+ * What it would cost is real. Pro's `Carousel.Content` renders three nested
+ * divs — viewport wrapper, viewport, content — and gives the caller a
+ * `className` on the innermost one only; `.carousel__viewport-wrapper` and
+ * `.carousel__viewport` carry `position: relative` and `overflow: hidden` and
+ * no sizing at all. The sole consumer
+ * (`features/profile/ui/UserProfilePanelTabs.tsx`) is a fixed `h-56` activity
+ * card whose slides fill it, which works because the viewport below is
+ * `h-full`. Under Pro that height chain breaks at two divs the caller cannot
+ * reach, recoverable only by aiming descendant arbitrary variants at Pro's
+ * private `data-slot` values. Pro also has no `orientation` prop (this wrapper
+ * supports a vertical axis), puts `tabIndex={0}` on the root, and exports no
+ * `CarouselApi` type.
+ *
+ * Revisit if the activity card stops depending on a filled fixed height, or if
+ * Pro exposes its viewport for styling. Adopting Pro's dots, thumbnails and
+ * arrows is a separate question — the one consumer uses none of them, and
+ * builds its own dots as a `tablist` with its own testids.
+ */
+
 type CarouselApi = UseEmblaCarouselType[1];
 type UseCarouselParameters = Parameters<typeof useEmblaCarousel>;
 type CarouselOptions = UseCarouselParameters[0];
