@@ -18,6 +18,14 @@ import {
   projectRepoUnavailablePresentation,
 } from "@/features/projects/lib/projectRepoAvailability";
 import { Button } from "@/shared/ui/button";
+import {
+  EmptyState,
+  EmptyStateContent,
+  EmptyStateDescription,
+  EmptyStateHeader,
+  EmptyStateMedia,
+  EmptyStateTitle,
+} from "@/shared/ui/empty-state";
 import { UserAvatar } from "@/shared/ui/UserAvatar";
 
 const UNAVAILABLE_ICONS = {
@@ -141,29 +149,34 @@ export function ProjectRepositoryUnavailableState({
   const UnavailableIcon = UNAVAILABLE_ICONS[reason];
 
   return (
-    <div
-      className="flex min-h-[calc(100dvh-7rem)] flex-col items-center justify-center p-8 text-center"
+    <EmptyState
+      className="min-h-[calc(100dvh-7rem)] justify-center px-8"
       data-testid="project-repository-unavailable"
     >
-      <div className="mb-4 flex h-12 w-12 items-center justify-center rounded-xl border border-border/60 bg-muted/40 text-muted-foreground">
-        <UnavailableIcon className="h-6 w-6" />
-      </div>
-      <h3 className="text-base font-semibold text-foreground">
-        {unavailable.title}
-      </h3>
-      <p className="mt-1 max-w-lg text-sm text-muted-foreground">
-        {reason === "access" ? (
-          <AccessRestrictedDescription
-            accessChannelId={accessChannelId}
-            ownerAvatarUrl={ownerAvatarUrl}
-            ownerIsAgent={ownerIsAgent}
-            ownerName={ownerName}
-          />
-        ) : (
-          unavailable.description
-        )}
-      </p>
-      <div className="mt-4 flex flex-wrap items-center justify-center gap-2">
+      {/* `gap-1` + the media's `mb-3` reproduce the hand-rolled 1rem drop below
+          the icon well and 0.25rem above the description; Pro's own header gap
+          is a uniform 0.5rem. `bg-secondary` rather than `bg-muted` because the
+          root re-points `--muted` to the foreground grey — the two tokens carry
+          identical values in both themes, so this is a rename, not a restyle. */}
+      <EmptyStateHeader className="gap-1">
+        <EmptyStateMedia className="mb-3 h-12 w-12 rounded-xl border border-border/60 bg-secondary/40 text-muted-foreground">
+          <UnavailableIcon className="h-6 w-6" />
+        </EmptyStateMedia>
+        <EmptyStateTitle>{unavailable.title}</EmptyStateTitle>
+        <EmptyStateDescription className="max-w-lg">
+          {reason === "access" ? (
+            <AccessRestrictedDescription
+              accessChannelId={accessChannelId}
+              ownerAvatarUrl={ownerAvatarUrl}
+              ownerIsAgent={ownerIsAgent}
+              ownerName={ownerName}
+            />
+          ) : (
+            unavailable.description
+          )}
+        </EmptyStateDescription>
+      </EmptyStateHeader>
+      <EmptyStateContent>
         {onRetry ? (
           <Button
             disabled={retryPending}
@@ -185,7 +198,7 @@ export function ProjectRepositoryUnavailableState({
             Ask for access
           </Button>
         ) : null}
-      </div>
-    </div>
+      </EmptyStateContent>
+    </EmptyState>
   );
 }

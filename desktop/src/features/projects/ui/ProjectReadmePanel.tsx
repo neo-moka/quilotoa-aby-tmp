@@ -12,6 +12,14 @@ import type { ProjectRepoUnavailableReason } from "@/features/projects/lib/proje
 import { formatLastChangedAt } from "@/features/projects/lib/projectsViewHelpers";
 import { Button } from "@/shared/ui/button";
 import { BuzzLoadingState } from "@/shared/ui/BuzzLoadingState";
+import {
+  EmptyState,
+  EmptyStateContent,
+  EmptyStateDescription,
+  EmptyStateHeader,
+  EmptyStateMedia,
+  EmptyStateTitle,
+} from "@/shared/ui/empty-state";
 import { Markdown, SyntaxHighlightedCode } from "@/shared/ui/markdown";
 import { baseName, languageForPath } from "./ProjectRepositoryPanel";
 import {
@@ -196,32 +204,36 @@ export function ReadmePanel({
 
     return (
       <section className="overflow-hidden">
-        <div className="flex min-h-64 flex-col items-center justify-center p-8 text-center">
-          <div className="mb-4 flex h-12 w-12 items-center justify-center rounded-xl border border-border/60 bg-muted/40 text-muted-foreground">
-            {externalHost === "github.com" ? (
-              <GitHubMark className="h-6 w-6" />
-            ) : (
-              <Globe className="h-6 w-6" />
-            )}
-          </div>
-          <h3 className="text-base font-semibold text-foreground">
-            Code hosted on {externalHost}
-          </h3>
-          <p className="mt-1 max-w-lg text-sm text-muted-foreground">
-            Clone this repository locally to explore its files, commits, and
-            contributors in ABY.
-          </p>
-          {externalOpenUrl ? (
-            <a
-              className="mt-2 max-w-lg truncate font-mono text-xs text-primary hover:underline focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ring"
-              href={externalOpenUrl}
-              rel="noreferrer"
-              target="_blank"
-            >
-              {externalOpenUrl}
-            </a>
-          ) : null}
-          <div className="mt-4 flex flex-wrap items-center justify-center gap-2">
+        <EmptyState className="min-h-64 justify-center px-8">
+          {/* Same spacing note as ProjectRepositoryUnavailableState: `gap-1`
+              plus the media's `mb-3` reproduce the original 1rem / 0.25rem
+              rhythm, and `bg-secondary` stands in for `bg-muted` because the
+              root re-points `--muted`. */}
+          <EmptyStateHeader className="gap-1">
+            <EmptyStateMedia className="mb-3 h-12 w-12 rounded-xl border border-border/60 bg-secondary/40 text-muted-foreground">
+              {externalHost === "github.com" ? (
+                <GitHubMark className="h-6 w-6" />
+              ) : (
+                <Globe className="h-6 w-6" />
+              )}
+            </EmptyStateMedia>
+            <EmptyStateTitle>Code hosted on {externalHost}</EmptyStateTitle>
+            <EmptyStateDescription className="max-w-lg">
+              Clone this repository locally to explore its files, commits, and
+              contributors in ABY.
+            </EmptyStateDescription>
+            {externalOpenUrl ? (
+              <a
+                className="mt-1 max-w-lg truncate font-mono text-xs text-primary hover:underline focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ring"
+                href={externalOpenUrl}
+                rel="noreferrer"
+                target="_blank"
+              >
+                {externalOpenUrl}
+              </a>
+            ) : null}
+          </EmptyStateHeader>
+          <EmptyStateContent>
             {sourceControls?.onCloneLocal ? (
               <Button
                 disabled={sourceControls.clonePending}
@@ -244,8 +256,8 @@ export function ReadmePanel({
                 </a>
               </Button>
             ) : null}
-          </div>
-        </div>
+          </EmptyStateContent>
+        </EmptyState>
       </section>
     );
   }
