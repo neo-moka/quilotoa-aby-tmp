@@ -43,7 +43,7 @@ individual:
 | `switch.tsx` | `react-switch` | `Switch` | OSS |
 | `checkbox.tsx` | `react-checkbox` | `Checkbox` | OSS |
 | `avatar.tsx` | `react-avatar` | `Avatar` | OSS |
-| `separator.tsx` | `react-separator` | `Separator` | OSS |
+| `separator.tsx` | `react-separator` | `Separator` | OSS — migrado, ver §6quater |
 | `toggle.tsx` | `react-toggle` | `ToggleButton` | OSS |
 | `button.tsx` | `react-slot` | `Button` | OSS |
 
@@ -59,7 +59,7 @@ individual:
 | Librería | HeroUI | Decisión |
 |---|---|---|
 | `sonner` | `Toast` (OSS) | **Reemplazar** — equivalencia limpia |
-| `embla-carousel-react` | `Carousel` (Pro) | **Reemplazar** |
+| `embla-carousel-react` | `Carousel` (Pro) | ~~Reemplazar~~ → **CONSERVAR.** Ver §6quater. |
 | `tiptap` + `tiptap-markdown` | `RichTextEditor` (Pro) | **CONSERVAR.** El composer es superficie de producto central: menciones, markdown, atajos, caret. Un reemplazo acá es un proyecto propio, no parte de esta migración. |
 | `virtua` | `ListView` (Pro) | **CONSERVAR.** Está parchado (`patchedDependencies: virtua@0.49.3`); reemplazarlo tira el parche a la basura. |
 | `@dnd-kit/*` | — | **CONSERVAR.** `Kanban` de Pro trae su propio DnD pero no es un reemplazo general. |
@@ -259,6 +259,49 @@ peso todavía: **20 `onCloseAutoFocus` sobre `DropdownMenuContent`, repartidos
 en 20 archivos.** Devolver el foco al trigger después de elegir un item es
 justamente lo que esos sitios cancelan. El veredicto del §6ter les aplica
 igual; conviene resolverlo antes de invertir en la migración de menús.
+
+## 6quater. Cierre de wrappers: `separator` y `carousel`
+
+Los dos huecos que ningún lote cerró. Resultados opuestos, por la misma regla
+del §7.2.
+
+### `separator.tsx` — migrado, con el `render` como muleta
+
+HeroUI **no tiene `decorative`**, y React Aria tampoco acepta que el rol venga
+del caller: `filterDOMProps` descarta `aria-hidden`, y el `role="separator"` de
+`useSeparator` gana el merge de `mergeProps`. Los 8 sitios de llamada usan el
+default `decorative` del wrapper, así que una migración literal metía 8
+divisores decorativos en el árbol de accesibilidad — y sumaba nodos a las dos
+aserciones `getByRole("separator")).toHaveCount(1)` de
+`community-rail.spec.ts`.
+
+La prop `render` sí sirve. Con `elementType="div"` fijando el elemento que
+HeroUI espera (si no, renderiza `<hr>` en horizontal y advierte en cada render
+que el `render` devolvió otra cosa), el DOM emitido queda idéntico al de Radix.
+Verificado renderizando todas las combinaciones, no leyendo documentación, y
+fijado en `separator.test.mjs` porque ningún spec E2E mira estos nodos.
+
+### `carousel.tsx` — conservado
+
+**El `Carousel` de Pro es este mismo carousel.** Importa `embla-carousel-react`
+y declara los dos paquetes de embla como peers obligatorios, con el mismo
+`role="region"`, `aria-roledescription` y captura de ArrowLeft/ArrowRight.
+Adoptarlo no saca una dependencia: agrega una, porque `embla-carousel` hoy es
+transitiva y pasaría a directa. **`embla-carousel-react` no es una dependencia
+muerta y no se saca.**
+
+Y cuesta. `Carousel.Content` de Pro renderiza tres divs anidados y solo expone
+`className` en el más interno; `.carousel__viewport-wrapper` y
+`.carousel__viewport` no llevan ningún sizing. Su único consumidor
+(`UserProfilePanelTabs.tsx`) es una tarjeta `h-56` cuyos slides la llenan, y eso
+funciona porque el viewport propio es `h-full`. Con Pro esa cadena de altura se
+corta en dos divs inalcanzables, recuperables solo apuntando variantes
+arbitrarias a los `data-slot` privados de Pro. Pro tampoco tiene `orientation`,
+pone `tabIndex={0}` en la raíz, y no exporta el tipo `CarouselApi`.
+
+Revisar si la tarjeta de actividad deja de depender de una altura fija llena, o
+si Pro expone su viewport. Adoptar dots/thumbnails/flechas de Pro es otra
+pregunta: el consumidor no usa ninguno.
 
 ## 6bis. `data-testid` NO es solo contrato de test
 
