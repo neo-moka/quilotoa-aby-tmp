@@ -110,6 +110,11 @@ export function AgentActivityPanel({
   const selectedAgent =
     agents.find((agent) => agent.pubkey === resolvedPubkey) ?? null;
 
+  // A one-option picker is chrome that chooses nothing: a full-width selected
+  // row, an avatar and a tick, to pick the only agent there is. Below two
+  // agents the header names it instead.
+  const showPicker = agents.length > 1;
+
   const showRaw = rawState.pubkey === resolvedPubkey && rawState.show;
   const activeTurns = React.useMemo(
     () =>
@@ -133,7 +138,14 @@ export function AgentActivityPanel({
       header={
         <AuxiliaryPanelHeader>
           <AuxiliaryPanelHeaderGroup>
-            <AuxiliaryPanelTitle>Agent activity</AuxiliaryPanelTitle>
+            {/* With one agent the title names it, because the picker is hidden
+                in that case and the panel would otherwise not say whose work
+                this is. */}
+            <AuxiliaryPanelTitle>
+              {showPicker || !selectedAgent
+                ? "Agent activity"
+                : selectedAgent.name}
+            </AuxiliaryPanelTitle>
           </AuxiliaryPanelHeaderGroup>
           <AuxiliaryPanelHeaderActions>
             {selectedAgent ? (
@@ -174,14 +186,16 @@ export function AgentActivityPanel({
           </p>
         ) : (
           <>
-            <div className="shrink-0 border-b border-border/60 px-2 py-1.5">
-              <AgentActivitySelector
-                agents={agents}
-                onSelect={onSelectAgent}
-                selectedPubkey={resolvedPubkey}
-                workingPubkeys={workingPubkeys}
-              />
-            </div>
+            {showPicker ? (
+              <div className="shrink-0 border-b border-border/60 px-2 py-1.5">
+                <AgentActivitySelector
+                  agents={agents}
+                  onSelect={onSelectAgent}
+                  selectedPubkey={resolvedPubkey}
+                  workingPubkeys={workingPubkeys}
+                />
+              </div>
+            ) : null}
             {selectedAgent ? (
               // Embedded, not standalone — the same treatment
               // `AgentSessionThreadPanel` gives it, because both put it under a
