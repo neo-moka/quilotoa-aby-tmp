@@ -34,8 +34,9 @@
    these files ship unlayered, and unlayered rules outrank every Tailwind
    utility, so `.context-menu__popover`'s padding would beat the app's classes
    on the very elements those classes exist to restyle. */
-@import "@heroui-pro/react/css/components/context-menu.css" layer(components);
+/* Alphabetical, so several branches can append here without colliding. */
 @import "@heroui-pro/react/css/components/command.css" layer(components);
+@import "@heroui-pro/react/css/components/context-menu.css" layer(components);
 @import "@heroui-pro/react/css/components/empty-state.css" layer(components);
 
 /* The app's radius scale wins.

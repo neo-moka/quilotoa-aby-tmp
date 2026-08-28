@@ -25,6 +25,11 @@ import { Card } from "@/shared/ui/card";
 import { DropdownMenuItem } from "@/shared/ui/dropdown-menu";
 import { CopyShareLinkMenuItem } from "./CopyShareLinkMenuItem";
 import { ProjectAuthorIdentity } from "./ProjectAuthorIdentity";
+import {
+  EmptyState,
+  EmptyStateDescription,
+  EmptyStateHeader,
+} from "@/shared/ui/empty-state";
 import { ProjectEntityListRow } from "./ProjectEntityListRow";
 import { ProjectEventTypeIcon } from "./ProjectEventTypeIcon";
 import { PROJECT_GRID_CARD_BODY_CLASS } from "./projectGridCardStyles";
@@ -260,14 +265,16 @@ export function ProjectsIssuesList({
     return (
       <div className="space-y-3">
         {loadNotice}
-        <div
+        {/* Description only — see `PullRequestsPanelSurface` for why no title. */}
+        <EmptyState
           className={cn(
-            "px-4 py-12 text-center text-sm text-muted-foreground",
-            !embedded && "border border-dashed border-border/60",
+            !embedded && "rounded-xl border border-dashed border-border/60",
           )}
         >
-          {emptyMessage}
-        </div>
+          <EmptyStateHeader>
+            <EmptyStateDescription>{emptyMessage}</EmptyStateDescription>
+          </EmptyStateHeader>
+        </EmptyState>
       </div>
     );
   }
