@@ -12,13 +12,17 @@ import {
   isPositiveEmojiParticle,
   useEmojiBurst,
 } from "@/shared/ui/EmojiBurstProvider";
-import {
-  DEFAULT_POPOVER_HOVER_OPEN_DELAY_MS,
-  Popover,
-  PopoverContent,
-  PopoverTrigger,
-} from "@/shared/ui/popover";
+import { Popover, PopoverContent, PopoverTrigger } from "@/shared/ui/popover";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/shared/ui/tooltip";
+import { useHoverPopover } from "@/shared/ui/useHoverPopover";
+
+/**
+ * Preserved from this call site's hand-rolled timer rather than taken from
+ * `DEFAULT_POPOVER_HOVER_CLOSE_DELAY_MS` (200ms), so the move to the shared
+ * hook is a pure refactor. The six sites had drifted to 150/180/200ms; picking
+ * one for all of them is a separate, deliberate decision.
+ */
+const REACTION_POPOVER_CLOSE_DELAY_MS = 150;
 
 const REACTION_PILL_BASE_CLASSES =
   "inline-flex h-7 items-center rounded-full border text-xs font-medium leading-none transition-colors";
@@ -366,44 +370,10 @@ function ReactionPill({
   onSelect: (emoji: string) => void;
 }) {
   const { burstEmoji } = useEmojiBurst();
-  const [open, setOpen] = React.useState(false);
-  const openTimeout = React.useRef<ReturnType<typeof setTimeout> | null>(null);
-  const closeTimeout = React.useRef<ReturnType<typeof setTimeout> | null>(null);
-
-  const clearTimers = React.useCallback(() => {
-    if (openTimeout.current) {
-      clearTimeout(openTimeout.current);
-      openTimeout.current = null;
-    }
-    if (closeTimeout.current) {
-      clearTimeout(closeTimeout.current);
-      closeTimeout.current = null;
-    }
-  }, []);
-
-  const handleMouseEnter = React.useCallback(() => {
-    if (reaction.users.length === 0) return;
-    clearTimers();
-    openTimeout.current = setTimeout(
-      () => setOpen(true),
-      DEFAULT_POPOVER_HOVER_OPEN_DELAY_MS,
-    );
-  }, [reaction.users.length, clearTimers]);
-
-  const scheduleClose = React.useCallback(() => {
-    clearTimers();
-    closeTimeout.current = setTimeout(() => setOpen(false), 150);
-  }, [clearTimers]);
-
-  const handleFocus = React.useCallback(() => {
-    if (reaction.users.length === 0) return;
-    clearTimers();
-    setOpen(true);
-  }, [reaction.users.length, clearTimers]);
-
-  React.useEffect(() => {
-    return clearTimers;
-  }, [clearTimers]);
+  const hover = useHoverPopover({
+    closeDelay: REACTION_POPOVER_CLOSE_DELAY_MS,
+    isDisabled: reaction.users.length === 0,
+  });
 
   const setPillRef = React.useCallback(
     (element: HTMLButtonElement | null) => {
@@ -472,16 +442,12 @@ function ReactionPill({
   }
 
   return (
-    <Popover open={open} onOpenChange={setOpen}>
+    <Popover open={hover.open} onOpenChange={hover.setOpen}>
       <PopoverTrigger asChild>
-        {/* biome-ignore lint/a11y/noStaticElementInteractions: span delegates hover/focus to disabled button */}
-        <span
-          className="inline-flex"
-          onMouseEnter={handleMouseEnter}
-          onMouseLeave={scheduleClose}
-          onFocus={handleFocus}
-          onBlur={scheduleClose}
-        >
+        {/* The span exists because the pill below can be `disabled`, and a
+            disabled button emits no pointer events — it has to delegate hover
+            and focus to a wrapper for the "who reacted" popover to open. */}
+        <span className="inline-flex" {...hover.triggerProps}>
           <button
             aria-label={`Toggle ${reaction.emoji} reaction`}
             aria-pressed={reaction.reactedByCurrentUser}
@@ -516,8 +482,7 @@ function ReactionPill({
         side="top"
         sideOffset={6}
         className="w-72 rounded-xl p-3"
-        onMouseEnter={handleMouseEnter}
-        onMouseLeave={scheduleClose}
+        {...hover.contentProps}
         onOpenAutoFocus={(e) => e.preventDefault()}
         onCloseAutoFocus={(e) => e.preventDefault()}
       >
