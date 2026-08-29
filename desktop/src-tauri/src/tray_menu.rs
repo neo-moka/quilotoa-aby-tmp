@@ -104,15 +104,15 @@ fn format_elapsed(elapsed: Duration) -> String {
     format!("{hours}h {minutes}m {seconds}s")
 }
 
-/// The ABY wordmark, pre-rendered as a menu-bar-sized alpha mask.
+/// The ABY bee mark, pre-rendered as a menu-bar-sized alpha mask.
 ///
-/// Area-averaged down from the white lettering of `icons/aby-source.png` and
-/// cropped to the wordmark's bounding box, so the glyph is the letters alone.
-/// Deriving the mask from the artwork keeps the two in step; the letterforms
-/// are too intricate to restate as shape math the way the old bee was.
-const TRAY_WORDMARK_MASK: &[u8] = include_bytes!("../icons/tray-aby.png");
+/// The wordmark it replaces read wide and heavy next to the system's compact
+/// menu-bar glyphs; the bee is the same silhouette the app icon carries
+/// (wings, body, eye and slot cutouts), rendered at 18pt-equivalent height
+/// with a transparent margin.
+const TRAY_BEE_MASK: &[u8] = include_bytes!("../icons/tray-aby.png");
 
-/// Builds the standalone ABY wordmark as a transparent, macOS template image.
+/// Builds the standalone ABY bee mark as a transparent, macOS template image.
 ///
 /// The app icon sits on a filled square, which is what the Dock wants but
 /// looks out of place beside the monochrome menu-bar icons. Only the alpha
@@ -121,8 +121,8 @@ const TRAY_WORDMARK_MASK: &[u8] = include_bytes!("../icons/tray-aby.png");
 ///
 /// `None` only if the embedded mask stops decoding, which the tray treats as
 /// "install the menu without an icon" rather than failing the whole launch.
-fn tray_wordmark_icon() -> Option<Image<'static>> {
-    let mask = image::load_from_memory_with_format(TRAY_WORDMARK_MASK, image::ImageFormat::Png)
+fn tray_mark_icon() -> Option<Image<'static>> {
+    let mask = image::load_from_memory_with_format(TRAY_BEE_MASK, image::ImageFormat::Png)
         .ok()?
         .into_rgba8();
     let (width, height) = mask.dimensions();
@@ -443,7 +443,7 @@ pub fn init<R: Runtime>(app: &AppHandle<R>) -> tauri::Result<()> {
     let mut builder = TrayIconBuilder::with_id(TRAY_ID)
         .menu(&menu)
         .on_menu_event(|app, event| handle_menu_event(app, event.id.as_ref()));
-    if let Some(icon) = tray_wordmark_icon() {
+    if let Some(icon) = tray_mark_icon() {
         builder = builder.icon(icon).icon_as_template(true);
     }
     let tray = builder.build(app)?;
