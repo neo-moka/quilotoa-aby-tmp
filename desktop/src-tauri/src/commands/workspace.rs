@@ -322,6 +322,8 @@ pub async fn apply_workspace(
     // Transfer the apply guard to launch restoration. The command can return
     // promptly, but a queued workspace cannot mutate relay/identity until the
     // restore has completed every mutable workspace read and side effect.
+    // Each cfg arm is the function's tail for its feature set, so neither
+    // build sees unreachable code after the other's early return.
     #[cfg(feature = "mesh-llm")]
     {
         let restore_lock = apply_guard;
@@ -345,28 +347,30 @@ pub async fn apply_workspace(
                 }
             }
         });
-        return Ok(());
+        Ok(())
     }
 
     #[cfg(not(feature = "mesh-llm"))]
-    if restore_pending {
-        let restore_lock = apply_guard;
-        let app = restore_app.clone();
-        tauri::async_runtime::spawn(async move {
-            let _restore_lock = restore_lock;
-            let state = app.state::<AppState>();
-            if let Err(error) =
-                restore_managed_agents_on_launch(&app, &state.shutdown_started).await
-            {
-                eprintln!("buzz-desktop: failed to restore managed agents: {error}");
-            }
-        });
-        return Ok(());
+    {
+        if restore_pending {
+            let restore_lock = apply_guard;
+            let app = restore_app.clone();
+            tauri::async_runtime::spawn(async move {
+                let _restore_lock = restore_lock;
+                let state = app.state::<AppState>();
+                if let Err(error) =
+                    restore_managed_agents_on_launch(&app, &state.shutdown_started).await
+                {
+                    eprintln!("buzz-desktop: failed to restore managed agents: {error}");
+                }
+            });
+            return Ok(());
+        }
+
+        assert_current_apply_generation(&state.workspace_apply_generation, apply_generation)?;
+
+        Ok(())
     }
-
-    assert_current_apply_generation(&state.workspace_apply_generation, apply_generation)?;
-
-    Ok(())
 }
 
 #[cfg(test)]

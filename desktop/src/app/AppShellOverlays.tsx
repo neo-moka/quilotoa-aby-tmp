@@ -3,6 +3,11 @@ import * as React from "react";
 
 import type { Channel } from "@/shared/api/types";
 import type { CreateChannelInput } from "@/features/sidebar/lib/useCreateChannelForm";
+// Static on purpose: ChannelManagementAuxiliaryPanel and HomeView already
+// import this statically, so it lives in the main chunk regardless — a lazy()
+// here can't split it and only draws Rolldown's INEFFECTIVE_DYNAMIC_IMPORT
+// warning.
+import { ChannelManagementSheet } from "@/features/channels/ui/ChannelManagementSheet";
 import { useDeferredModalOpen } from "@/shared/ui/deferredModalOpen";
 import {
   mergeOpenChannelDirectory,
@@ -12,11 +17,6 @@ import {
 const ChannelBrowserDialog = React.lazy(async () => {
   const module = await import("@/features/channels/ui/ChannelBrowserDialog");
   return { default: module.ChannelBrowserDialog };
-});
-
-const ChannelManagementSheet = React.lazy(async () => {
-  const module = await import("@/features/channels/ui/ChannelManagementSheet");
-  return { default: module.ChannelManagementSheet };
 });
 
 const MembersSidebar = React.lazy(async () => {
@@ -110,16 +110,14 @@ export function AppShellOverlays({
       ) : null}
 
       {isChannelManagementOpen && activeChannel !== null ? (
-        <React.Suspense fallback={null}>
-          <ChannelManagementSheet
-            channel={activeChannel}
-            currentPubkey={currentPubkey}
-            onDeleted={onDeleteActiveChannel}
-            onOpenMembers={() => setMembersChannel(activeChannel)}
-            onOpenChange={onChannelManagementOpenChange}
-            open={true}
-          />
-        </React.Suspense>
+        <ChannelManagementSheet
+          channel={activeChannel}
+          currentPubkey={currentPubkey}
+          onDeleted={onDeleteActiveChannel}
+          onOpenMembers={() => setMembersChannel(activeChannel)}
+          onOpenChange={onChannelManagementOpenChange}
+          open={true}
+        />
       ) : null}
 
       {membersChannel ? (

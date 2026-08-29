@@ -1,5 +1,8 @@
+// HashMap only feeds the dev-keyring migration, which is compiled out of
+// release builds along with everything that touches it.
+#[cfg(debug_assertions)]
+use std::collections::HashMap;
 use std::{
-    collections::HashMap,
     fs::{self, File, OpenOptions},
     io::{Read as _, Seek, SeekFrom, Write},
     path::{Path, PathBuf},
@@ -139,11 +142,16 @@ trait KeyStore {
     /// Read the entire blob as a map without any side effects.
     /// `Ok(None)` when no blob exists yet; `Err` only on backend failure.
     /// Callers must not call `migrate_legacy_key` — this is a read-only view.
+    /// Dev-only: the sole consumer is the `#[cfg(debug_assertions)]`
+    /// dev-keyring migration, so release builds compile it out.
+    #[cfg(debug_assertions)]
     fn load_all_readonly(&self) -> Result<Option<HashMap<String, String>>, String>;
     /// Write `value` and read it back to confirm before the caller strips the
     /// inline copy.
     fn write_and_verify(&self, name: &str, value: &str) -> Result<(), String>;
-    /// Insert all entries from `entries` in a single blob mutation.
+    /// Insert all entries from `entries` in a single blob mutation. Dev-only,
+    /// like `load_all_readonly`.
+    #[cfg(debug_assertions)]
     fn store_all(&self, entries: &HashMap<String, String>) -> Result<(), String>;
 }
 
@@ -154,6 +162,7 @@ impl KeyStore for SecretStore {
     fn load(&self, name: &str) -> Result<Option<String>, String> {
         SecretStore::load(self, name)
     }
+    #[cfg(debug_assertions)]
     fn load_all_readonly(&self) -> Result<Option<HashMap<String, String>>, String> {
         SecretStore::load_all_readonly(self)
     }
@@ -164,6 +173,7 @@ impl KeyStore for SecretStore {
             _ => Err("keyring read-back verify failed".to_string()),
         }
     }
+    #[cfg(debug_assertions)]
     fn store_all(&self, entries: &HashMap<String, String>) -> Result<(), String> {
         SecretStore::store_all(self, entries)
     }
