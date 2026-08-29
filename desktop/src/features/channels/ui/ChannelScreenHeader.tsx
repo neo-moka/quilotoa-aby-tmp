@@ -2,12 +2,21 @@ import { LogIn, Radio, SquareTerminal } from "lucide-react";
 import type * as React from "react";
 
 import { ChatHeader } from "@/features/chat/ui/ChatHeader";
+import { getPlatformKeysById } from "@/shared/lib/keyboard-shortcuts";
 import type { EphemeralChannelDisplay } from "@/features/channels/lib/ephemeralChannel";
 import type { ActiveDmHeaderParticipant } from "@/features/channels/useActiveChannelHeader";
 import { getChannelDescription } from "@/features/channels/lib/channelDescription";
 import { getDmParticipantPreview } from "@/features/channels/lib/dmParticipantDisplay";
 import { ChannelHeaderStatusBadge } from "@/features/channels/ui/ChannelHeaderStatusBadge";
 import { ChannelMembersBar } from "@/features/channels/ui/ChannelMembersBar";
+import { useChannelLensCounts } from "@/features/channels/channelLensCountsStore";
+import { ChannelStatusStrip } from "@/features/channels/ui/ChannelStatusStrip";
+import { ChannelViewTabs } from "@/features/channels/ui/ChannelViewTabs";
+import {
+  setChannelViewTab,
+  useChannelViewTab,
+} from "@/features/channels/channelViewTabStore";
+import { useChannelViewSummary } from "@/features/channels/useChannelViewSummary";
 import {
   DEFAULT_HOVER_PROFILE_STATUS_GEOMETRY,
   ProfileAvatarWithStatus,
@@ -92,7 +101,7 @@ export function ChannelScreenHeader({
       }
       onClick={toggleTerminalPanel}
       size="icon"
-      title="ABY Term (⌘J)"
+      title={`ABY Term (${getPlatformKeysById("toggle-terminal") ?? "⌘J"})`}
       type="button"
       variant={terminalPanel.mode === "closed" ? "outline" : "secondary"}
     >
@@ -170,8 +179,22 @@ export function ChannelScreenHeader({
     return null;
   }
 
+  // Decided here, not only inside `ChannelHeaderLenses`: the element is truthy
+  // even when the component renders null, and `ChatHeader` wraps any truthy
+  // `belowContent` in a spacing div — so a DM or forum would carry a phantom
+  // margin under its title for a surface it never shows.
+  const hasLenses =
+    activeChannel !== null &&
+    activeChannel.channelType !== "dm" &&
+    activeChannel.channelType !== "forum";
+
   return (
     <ChatHeader
+      belowContent={
+        hasLenses ? (
+          <ChannelHeaderLenses activeChannel={activeChannel} />
+        ) : undefined
+      }
       belowSystemChrome
       chromeWrapperRef={chromeWrapperRef}
       actions={actions}
@@ -227,6 +250,55 @@ export function ChannelScreenHeader({
       transparentChrome={transparentChrome}
       visibility={activeChannel?.visibility}
     />
+  );
+}
+
+/**
+ * The status strip and view tabs that sit under the channel title.
+ *
+ * Its own component so the hooks it needs run unconditionally while the
+ * surface itself stays conditional — the header renders for DMs and forums
+ * too, and neither has lenses to switch between. Forums already are a
+ * thread-first view with their own layout, and a DM has no agent runs or
+ * artifacts of its own, so both keep the plain title they had.
+ */
+function ChannelHeaderLenses({
+  activeChannel,
+}: {
+  activeChannel: Channel | null;
+}) {
+  const summary = useChannelViewSummary(activeChannel);
+  const activeTab = useChannelViewTab(activeChannel?.id ?? null);
+  const counts = useChannelLensCounts(activeChannel?.id ?? null);
+
+  if (!activeChannel) return null;
+  if (
+    activeChannel.channelType === "dm" ||
+    activeChannel.channelType === "forum"
+  ) {
+    return null;
+  }
+
+  const channelId = activeChannel.id;
+
+  return (
+    <div className="flex min-w-0 flex-col gap-1.5">
+      <ChannelStatusStrip
+        goal={summary.goal}
+        needsYouCount={summary.needsYouCount}
+        onOpenWork={() => setChannelViewTab(channelId, "work")}
+        runningCount={summary.runningCount}
+      />
+      <ChannelViewTabs
+        activeTab={activeTab}
+        channelId={channelId}
+        counts={{
+          artifacts: counts?.artifacts ?? null,
+          threads: counts?.threads ?? null,
+          workNeedsYou: summary.needsYouCount,
+        }}
+      />
+    </div>
   );
 }
 

@@ -197,7 +197,12 @@ test.describe("composer overlays mask scrolled content", () => {
     expect(
       Math.abs(active.composerTop - quiet.composerTop),
     ).toBeLessThanOrEqual(0.5);
-    expect(active.composerBottom).toBeLessThan(quiet.composerBottom - 8);
+    // The rail is reserved permanently now — activity must not move the
+    // composer's bottom edge either. The old contract traded composer height
+    // for the rail, which read as the app shifting under the writer's hands.
+    expect(
+      Math.abs(active.composerBottom - quiet.composerBottom),
+    ).toBeLessThanOrEqual(0.5);
   });
 
   test("reduced motion removes dock geometry transitions", async ({ page }) => {

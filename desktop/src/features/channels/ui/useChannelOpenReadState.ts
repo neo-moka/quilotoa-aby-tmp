@@ -1,6 +1,7 @@
 import * as React from "react";
 
 import { useAppShell } from "@/app/AppShellContext";
+import { useChannelViewTab } from "@/features/channels/channelViewTabStore";
 import { isThreadReply } from "@/features/messages/lib/threading";
 import type { FeedItem } from "@/shared/api/types";
 
@@ -24,9 +25,16 @@ export function useChannelOpenReadState(
 ) {
   const { feedItemState, locallyUnreadFeedItems, markChannelRead } =
     useAppShell();
+  const tab = useChannelViewTab(activeChannelId);
 
   React.useEffect(() => {
     if (!activeChannelId || isChannelMember === false) return;
+    // Opening a channel is only "reading" it when the conversation is what
+    // opened. The other lenses show runs, threads and artifacts — none of them
+    // put a message on screen, so clearing the unread marker from one would
+    // lose the reader's place in a conversation they never saw. Switching back
+    // re-runs this effect and marks it read then, which is when they did.
+    if (tab !== "all") return;
     for (const itemId of getTopLevelInboxUnreadOverrideIds(
       locallyUnreadFeedItems,
       activeChannelId,
@@ -41,5 +49,6 @@ export function useChannelOpenReadState(
     isChannelMember,
     locallyUnreadFeedItems,
     markChannelRead,
+    tab,
   ]);
 }

@@ -1,5 +1,6 @@
 import * as React from "react";
 import { ChevronDown } from "lucide-react";
+import { motion, useReducedMotion } from "motion/react";
 
 import { cn } from "@/shared/lib/cn";
 import { useAgentSessionTranscriptVariant } from "../agentSessionTranscriptContext";
@@ -61,6 +62,49 @@ export function ActivityRow({
   }
 
   return (
+    <ExpandableActivityRow
+      className={className}
+      contentChildren={contentChildren}
+      openToneScope={openToneScope}
+      summaryChildren={summaryChildren}
+      testId={testId}
+      title={title}
+    />
+  );
+}
+
+/**
+ * The expandable face of {@link ActivityRow}, animated.
+ *
+ * Still a real `<details>` — fourteen call sites style themselves off
+ * `group-open:` variants, which only match `details[open]`. The element is
+ * controlled instead of native so closing can play its exit: the `open`
+ * attribute stays on until the collapse finishes, otherwise the UA hides the
+ * content on the first frame and there is nothing left to animate.
+ */
+function ExpandableActivityRow({
+  className,
+  contentChildren,
+  openToneScope,
+  summaryChildren,
+  testId,
+  title,
+}: {
+  className?: string;
+  contentChildren: React.ReactElement<
+    ActivityRowContentProps,
+    ActivityRowContentComponent
+  >[];
+  openToneScope: Exclude<ActivityRowToneScope, "none">;
+  summaryChildren: React.ReactNode[];
+  testId?: string;
+  title?: string;
+}) {
+  const prefersReducedMotion = useReducedMotion();
+  const [expanded, setExpanded] = React.useState(false);
+  const [detailsOpen, setDetailsOpen] = React.useState(false);
+
+  return (
     <details
       className={cn(
         openToneScope === "summary" ? "group/summary" : "group",
@@ -68,8 +112,26 @@ export function ActivityRow({
         className,
       )}
       data-testid={testId}
+      // Native toggles (tests setting `.open`, platform find-in-page
+      // expansion) fire this without going through the summary handler; sync
+      // state so the controlled element never fights an outside opener. The
+      // animated-close path never lands here: its click is prevented before
+      // the UA toggles.
+      onToggle={(event) => {
+        const isOpen = event.currentTarget.open;
+        if (isOpen && !expanded) {
+          setDetailsOpen(true);
+          setExpanded(true);
+        } else if (!isOpen && expanded) {
+          setDetailsOpen(false);
+          setExpanded(false);
+        }
+      }}
+      open={detailsOpen}
       title={title}
     >
+      {/* biome-ignore lint/a11y/useKeyWithClickEvents: summary is natively
+          keyboard-operable; the handler only redirects its default toggle. */}
       <summary
         className={cn(
           "group/row flex min-h-6 w-full max-w-full cursor-pointer list-none items-center gap-1.5 text-muted-foreground",
@@ -77,6 +139,16 @@ export function ActivityRow({
             ? "group-open/summary:text-foreground"
             : "group-open:text-foreground",
         )}
+        onClick={(event) => {
+          event.preventDefault();
+          if (expanded) {
+            // Exit runs first; `onExitComplete` drops the `open` attribute.
+            setExpanded(false);
+          } else {
+            setDetailsOpen(true);
+            setExpanded(true);
+          }
+        }}
       >
         {summaryChildren}
         <ChevronDown
@@ -88,15 +160,34 @@ export function ActivityRow({
           )}
         />
       </summary>
-      {contentChildren.map((child, index) => (
-        <div
-          className={child.props.className}
-          // biome-ignore lint/suspicious/noArrayIndexKey: content regions are static children
-          key={index}
-        >
-          {child.props.children}
-        </div>
-      ))}
+      {/* Always mounted, never conditionally rendered: a closed `<details>`
+          already hides it, and keeping it in the DOM preserves find-in-page
+          and the static markup the render tests pin. Only the height plays. */}
+      <motion.div
+        animate={{
+          height: expanded ? "auto" : 0,
+          opacity: expanded ? 1 : 0,
+        }}
+        className="overflow-hidden"
+        initial={false}
+        onAnimationComplete={() => {
+          if (!expanded) setDetailsOpen(false);
+        }}
+        transition={{
+          duration: prefersReducedMotion ? 0 : 0.18,
+          ease: "easeOut",
+        }}
+      >
+        {contentChildren.map((child, index) => (
+          <div
+            className={child.props.className}
+            // biome-ignore lint/suspicious/noArrayIndexKey: content regions are static children
+            key={index}
+          >
+            {child.props.children}
+          </div>
+        ))}
+      </motion.div>
     </details>
   );
 }

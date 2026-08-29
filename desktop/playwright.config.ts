@@ -45,6 +45,7 @@ export default defineConfig({
         "**/channel-mute.spec.ts",
         "**/channel-star.spec.ts",
         "**/channel-controls.spec.ts",
+        "**/channel-view-lenses.spec.ts",
         "**/channel-activity-popover.spec.ts",
         "**/active-turn-resilience.spec.ts",
         "**/profile-active-turn.spec.ts",

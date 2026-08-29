@@ -100,12 +100,11 @@ import {
   writeSidebarProjectsSort,
 } from "@/features/sidebar/ui/listSidebarProjects";
 
-const SECTION_LABEL_BUTTON_CLASS =
-  "group/section-label flex w-fit max-w-[calc(100%-3rem)] cursor-pointer appearance-none items-center gap-1 text-left transition-colors hover:text-sidebar-foreground focus-visible:text-sidebar-foreground";
-const SECTION_LABEL_CHEVRON_CLASS =
-  "relative size-2.5 shrink-0 text-current opacity-0 transition-[color,opacity] group-hover/sidebar-section:opacity-100 group-hover/section-label:opacity-100 group-focus-within/sidebar-section:opacity-100 group-focus-visible/section-label:opacity-100 group-data-[section-actions-open=true]/sidebar-section:opacity-100";
-const SECTION_LABEL_CHEVRON_ICON_CLASS =
-  "absolute left-1/2 top-1/2 size-2.5 -translate-x-1/2 -translate-y-1/2";
+import {
+  SECTION_LABEL_BUTTON_CLASS,
+  SECTION_LABEL_CHEVRON_CLASS,
+  SECTION_LABEL_CHEVRON_ICON_CLASS,
+} from "@/features/sidebar/ui/sidebarSectionLabel";
 
 /**
  * Collapsible list of the viewer's projects in the left sidebar. Rendered
@@ -360,7 +359,7 @@ function SidebarProjectsSectionContent() {
               })}
             </SidebarMenu>
           ) : isPending ? null : (
-            <p className="px-2 py-1 text-xs text-sidebar-foreground/50">
+            <p className="px-2 py-1 text-2xs text-sidebar-foreground/50">
               No projects yet
             </p>
           )}

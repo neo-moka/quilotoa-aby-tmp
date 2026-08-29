@@ -1,5 +1,4 @@
 import * as React from "react";
-import { toast } from "@/shared/ui/toast";
 import { Hash, LogIn } from "lucide-react";
 import { AnimatePresence } from "motion/react";
 import { useAppNavigation } from "@/app/navigation/useAppNavigation";
@@ -25,7 +24,6 @@ import {
   hasOtherDmParticipant,
 } from "@/features/channels/lib/dmHuddleMembers";
 import { buildVideoReviewPresentationByMessageId } from "@/features/messages/lib/videoReviewContext";
-import { isThreadReply } from "@/features/messages/lib/threading";
 import { useComposerHeightPadding } from "@/features/messages/ui/useComposerHeightPadding";
 import { UserProfilePanel } from "@/features/profile/ui/UserProfilePanel";
 import {
@@ -34,6 +32,7 @@ import {
   useAgentActivityPanel,
 } from "@/features/agents/agentActivityPanelStore";
 import { AgentActivityPanel } from "@/features/agents/ui/AgentActivityPanel";
+import { AgentActivityRail } from "@/features/agents/ui/AgentActivityRail";
 import { AgentSessionThreadPanel } from "@/features/channels/ui/AgentSessionThreadPanel";
 import { ChannelManagementAuxiliaryPanel } from "@/features/channels/ui/ChannelManagementAuxiliaryPanel";
 import { RightAuxiliaryPane } from "@/features/channels/ui/RightAuxiliaryPane";
@@ -44,6 +43,7 @@ import { getThreadPanelLayout } from "@/features/channels/lib/threadPanelLayout"
 import { useThreadViewMode } from "@/features/channels/lib/threadViewModePreference";
 import { useThreadViewModeSwitch } from "@/features/channels/ui/useThreadViewModeSwitch";
 import { useFocusDrawerPresence } from "@/features/channels/ui/useFocusDrawerPresence";
+import { useRoutedMessageEdit } from "@/features/channels/ui/useRoutedMessageEdit";
 import { useChannelWorkingAgentPubkeys } from "@/features/agents/agentWorkingSignal";
 import { useCardMintJobs } from "@/features/agents/cardMintStore";
 import { BotActivityComposerAction } from "@/features/channels/ui/BotActivityBar";
@@ -62,9 +62,7 @@ import { usePrepareDmSendChannel } from "@/features/channels/ui/usePrepareDmSend
 import { useChannelPaneMessages } from "@/features/channels/ui/useChannelPaneMessages";
 import { Button } from "@/shared/ui/button";
 import { useRenderScopedReactionHydration } from "@/features/messages/lib/useRenderScopedReactionHydration";
-import type { TimelineMessage } from "@/features/messages/types";
 import { isWelcomeExperienceChannel as isWelcomeExperience } from "@/features/onboarding/welcome";
-import { KIND_SYSTEM_MESSAGE } from "@/shared/constants/kinds";
 import { useIsThreadPanelOverlay } from "@/shared/hooks/use-mobile";
 import { channelChrome } from "@/shared/layout/chromeLayout";
 import { cn } from "@/shared/lib/cn";
@@ -236,26 +234,6 @@ export const ChannelPane = React.memo(function ChannelPane({
   const isEditInThread = editTarget?.isThreadReply === true;
   const mainEditTarget = editTarget && !isEditInThread ? editTarget : null;
   const threadEditTarget = editTarget && isEditInThread ? editTarget : null;
-  const findLastOwnEditable = React.useCallback(
-    (candidates: TimelineMessage[]): TimelineMessage | null => {
-      if (!onEdit || !currentPubkey) return null;
-      let best: TimelineMessage | null = null;
-      for (const message of candidates) {
-        if (
-          message.kind === KIND_SYSTEM_MESSAGE ||
-          message.pubkey !== currentPubkey ||
-          message.pending
-        ) {
-          continue;
-        }
-        if (!best || message.createdAt >= best.createdAt) {
-          best = message;
-        }
-      }
-      return best;
-    },
-    [onEdit, currentPubkey],
-  );
 
   const timeoutState = useTimeoutState();
   // A moderation DM (1:1 with the relay identity) is read-only for the member;
@@ -446,89 +424,45 @@ export const ChannelPane = React.memo(function ChannelPane({
   const isOverlay = useIsThreadPanelOverlay();
   const useSplitAuxiliaryPane = !isSinglePanelView && !isOverlay;
   const threadViewMode = useThreadViewMode();
+  const agentActivityPanel = useAgentActivityPanel();
+  // Opening a thread is an explicit navigation, so it takes the slot: the
+  // activity panel closes rather than silently outranking it. Without this
+  // the click appeared to do nothing, and the thread surfaced only when the
+  // panel was later dismissed — an answer arriving after the question left.
+  React.useEffect(() => {
+    if (openThreadHeadId) closeAgentActivityPanel();
+  }, [openThreadHeadId]);
+  // The activity panel outranks the thread in the right slot, so while it is
+  // open the focus drawer never mounts — and the presence hook below must not
+  // believe an unmounted drawer covers the channel. Believing it froze the
+  // whole main section: `channelIsCovered` set it `inert`, with no drawer on
+  // screen to dismiss, and every click and keystroke died silently.
   const useFocusThreadDrawer =
     threadViewMode === "focus" &&
     useSplitAuxiliaryPane &&
+    !agentActivityPanel.isOpen &&
     (Boolean(threadHeadMessage) || shouldShowThreadSkeleton);
   const { channelIsCovered, markExitComplete } = useFocusDrawerPresence(
     useFocusThreadDrawer,
     onCloseThread,
   );
-  const pendingMainEditRef = React.useRef<TimelineMessage | null>(null);
-  const editTargetRef = React.useRef(editTarget);
-  editTargetRef.current = editTarget;
-  const pendingMainEditContextRef = React.useRef({
-    channelId: activeChannel?.id ?? null,
-    threadId: threadHeadMessage?.id ?? null,
-  });
-  const pendingMainEditContext = {
-    channelId: activeChannel?.id ?? null,
-    threadId: threadHeadMessage?.id ?? null,
-  };
-  const previousPendingContext = pendingMainEditContextRef.current;
-  if (
-    previousPendingContext.channelId !== pendingMainEditContext.channelId ||
-    (previousPendingContext.threadId !== null &&
-      pendingMainEditContext.threadId !== null &&
-      previousPendingContext.threadId !== pendingMainEditContext.threadId)
-  ) {
-    pendingMainEditRef.current = null;
-  }
-  pendingMainEditContextRef.current = pendingMainEditContext;
-  const handleRoutedEdit = React.useCallback(
-    (message: TimelineMessage): boolean => {
-      const currentEditTarget = editTargetRef.current;
-      if (
-        currentEditTarget &&
-        currentEditTarget.id !== message.id &&
-        currentEditTarget.isThreadReply !== isThreadReply(message.tags ?? [])
-      ) {
-        pendingMainEditRef.current = null;
-        toast.info("Finish or cancel your edit first.");
-        return false;
-      }
-      if (currentEditTarget?.id === message.id) {
-        pendingMainEditRef.current = null;
-        onEdit?.(message);
-        return true;
-      }
-      if (
-        !isThreadReply(message.tags ?? []) &&
-        (isSinglePanelView || useFocusThreadDrawer)
-      ) {
-        pendingMainEditRef.current = message;
-        onCloseThread();
-        return true;
-      }
-      onEdit?.(message);
-      return Boolean(onEdit);
-    },
-    [isSinglePanelView, onCloseThread, onEdit, useFocusThreadDrawer],
-  );
-  const handleEditLastOwnMainMessage = React.useCallback((): boolean => {
-    const target = findLastOwnEditable(
-      mainTimelineEntries.map((entry) => entry.message),
-    );
-    return target ? handleRoutedEdit(target) : false;
-  }, [findLastOwnEditable, handleRoutedEdit, mainTimelineEntries]);
-  const handleEditLastOwnThreadMessage = React.useCallback((): boolean => {
-    const scope: TimelineMessage[] = [];
-    if (threadHeadMessage) scope.push(threadHeadMessage);
-    for (const entry of threadMessages) scope.push(entry.message);
-    const target = findLastOwnEditable(scope);
-    return target ? handleRoutedEdit(target) : false;
-  }, [
-    findLastOwnEditable,
+  const {
     handleRoutedEdit,
+    handleEditLastOwnMainMessage,
+    handleEditLastOwnThreadMessage,
+  } = useRoutedMessageEdit({
+    activeChannelId: activeChannel?.id ?? null,
+    channelIsCovered,
+    currentPubkey,
+    editTarget,
+    isSinglePanelView,
+    mainTimelineEntries,
+    onCloseThread,
+    onEdit,
     threadHeadMessage,
     threadMessages,
-  ]);
-  React.useEffect(() => {
-    const pendingMainEdit = pendingMainEditRef.current;
-    if (!pendingMainEdit || isSinglePanelView || channelIsCovered) return;
-    pendingMainEditRef.current = null;
-    onEdit?.(pendingMainEdit);
-  }, [channelIsCovered, isSinglePanelView, onEdit]);
+    useFocusThreadDrawer,
+  });
   const { changeThreadViewMode, layoutScrollTargetId, resolveScrollTarget } =
     useThreadViewModeSwitch({
       activeThreadHeadId: threadHeadMessage?.id ?? null,
@@ -546,7 +480,6 @@ export const ChannelPane = React.memo(function ChannelPane({
       }),
     [agentSessionAgents, openAgentSessionPubkey, profilePanelPubkey, profiles],
   );
-  const agentActivityPanel = useAgentActivityPanel();
   const hasSplitAuxiliaryPane =
     useSplitAuxiliaryPane &&
     (agentActivityPanel.isOpen ||
@@ -865,13 +798,12 @@ export const ChannelPane = React.memo(function ChannelPane({
        * host it, for the same reason.
        * ──────────────────────────────────────────────────────────────── */}
       <AnimatePresence onExitComplete={markExitComplete}>
-        {/* The right pane is one slot with strict precedence, not a container,
-            so an explicitly toggled panel has to outrank the rest or its button
-            would appear to do nothing. Activity wins while open — and only
-            hides what is underneath: the thread, management panel and profile
-            keep their state and return when it is toggled off, which is why the
-            button does not close them. Its pressed state is what makes that
-            reversible rather than mysterious. */}
+        {/* The right pane is one slot where the *most recent explicit action*
+            wins, not a fixed precedence. Toggling activity covers an open
+            thread (which keeps its state and returns on toggle-off); opening
+            a thread closes the activity panel via the effect above — both
+            directions answer the click the user just made, instead of one
+            surface silently outranking the other. */}
         {agentActivityPanel.isOpen ? (
           wrapAux(
             <AgentActivityPanel
@@ -1063,6 +995,15 @@ export const ChannelPane = React.memo(function ChannelPane({
           })()
         ) : null}
       </AnimatePresence>
+      {/* With every panel closed the right edge folds to a rail instead of
+          disappearing — who is working stays ambient, one click from the runs
+          list. Split-mode only: on narrow layouts the rail would shave width
+          off the one column that has none to spare. */}
+      {useSplitAuxiliaryPane &&
+      !hasSplitAuxiliaryPane &&
+      !isHuddleTranscript ? (
+        <AgentActivityRail profiles={profiles} />
+      ) : null}
     </div>
   );
 });

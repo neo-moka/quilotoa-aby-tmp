@@ -12,6 +12,11 @@ struct BuiltInPersona {
     name_pool: &'static [&'static str],
     model: Option<&'static str>,
     runtime: Option<&'static str>,
+    /// ABY ships without default agent cards: the built-in personas seed
+    /// inactive, so the gallery (which lists active personas only) starts
+    /// empty. The records still exist in the catalog, and the Welcome
+    /// kickoff's `ensureWelcomeTeamPersonasActive` re-activates them on
+    /// demand if the user opts into the starter team.
     default_active: bool,
 }
 
@@ -47,7 +52,7 @@ const BUILT_IN_PERSONAS: &[BuiltInPersona] = &[
         ],
         model: None,
         runtime: None,
-        default_active: true,
+        default_active: false,
     },
     BuiltInPersona {
         id: "builtin:honey",
@@ -57,7 +62,7 @@ const BUILT_IN_PERSONAS: &[BuiltInPersona] = &[
         name_pool: &["Honey"],
         model: None,
         runtime: None,
-        default_active: true,
+        default_active: false,
     },
     BuiltInPersona {
         id: POLLEN_PERSONA_ID,
@@ -67,7 +72,7 @@ const BUILT_IN_PERSONAS: &[BuiltInPersona] = &[
         name_pool: &[POLLEN_DISPLAY_NAME],
         model: None,
         runtime: None,
-        default_active: true,
+        default_active: false,
     },
 ];
 

@@ -29,6 +29,7 @@ import {
   THREAD_REPLY_LINE_WIDTH_REM,
 } from "@/features/messages/lib/threadTreeLayout";
 import {
+  KIND_APPROVAL_REQUEST,
   KIND_HUDDLE_STARTED,
   KIND_STREAM_MESSAGE_DIFF,
 } from "@/shared/constants/kinds";
@@ -48,7 +49,8 @@ import { MessageActionBar } from "./MessageActionBar";
 import { editMessage } from "@/shared/api/tauri";
 import { hasLinkPreviewSuppression } from "@/features/messages/lib/formatTimelineMessages";
 import { toast } from "@/shared/ui/toast";
-import { MessageAgentOwner } from "./MessageAgentOwner";
+import { AgentMessageProvenance } from "./AgentMessageProvenance";
+import { ChannelApprovalCard } from "./ChannelApprovalCard";
 import {
   MessageAuthorText,
   MessageHeaderRow,
@@ -400,6 +402,8 @@ export const MessageRow = React.memo(
               />
             </React.Suspense>
           );
+        case KIND_APPROVAL_REQUEST:
+          return <ChannelApprovalCard message={message} />;
         case KIND_HUDDLE_STARTED:
           return (
             <HuddleAttachment
@@ -550,10 +554,7 @@ export const MessageRow = React.memo(
       <MessageAuthorText as="h3">{message.author}</MessageAuthorText>
     );
     const agentOwnerNode = message.isAgent ? (
-      <MessageAgentOwner
-        ownerLabel={message.ownerLabel}
-        ownerPubkey={message.ownerPubkey}
-      />
+      <AgentMessageProvenance channelId={channelId} message={message} />
     ) : null;
 
     const actionBarNode = (

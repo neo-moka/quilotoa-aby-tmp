@@ -93,6 +93,27 @@ export function formatThreadSummaryLastReplyTime(
   return `on ${formatShortMonthDay(unixSeconds)}`;
 }
 
+/**
+ * The same fact as {@link formatThreadSummaryLastReplyTime}, in the width an
+ * inline summary row can spend on it: "37m ago", not "last reply 37 minutes
+ * ago". A channel where every message grows a thread repeats this string once
+ * per message, and at that frequency the spelled-out form is the loudest text
+ * on screen. The expanded phrase stays available for hover and screen readers.
+ */
+export function formatThreadSummaryLastReplyCompact(
+  unixSeconds: number,
+  nowSeconds = Date.now() / 1_000,
+): string {
+  const diff = Math.max(0, nowSeconds - unixSeconds);
+
+  if (diff < 60) return "just now";
+  if (diff < 3_600) return `${Math.floor(diff / 60)}m ago`;
+  if (diff < 86_400) return `${Math.floor(diff / 3_600)}h ago`;
+  if (diff < 604_800) return `${Math.floor(diff / 86_400)}d ago`;
+
+  return formatShortMonthDay(unixSeconds);
+}
+
 function isSameDayDate(a: Date, b: Date): boolean {
   return (
     a.getFullYear() === b.getFullYear() &&

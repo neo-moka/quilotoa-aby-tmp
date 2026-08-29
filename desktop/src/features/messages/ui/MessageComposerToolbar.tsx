@@ -3,6 +3,7 @@ import type { Editor } from "@tiptap/react";
 import { AnimatePresence, motion } from "motion/react";
 import { ALargeSmall, Paperclip, X } from "lucide-react";
 
+import { getPlatformKeysById } from "@/shared/lib/keyboard-shortcuts";
 import { Button } from "@/shared/ui/button";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/shared/ui/tooltip";
 import {
@@ -238,6 +239,22 @@ export const MessageComposerToolbar = React.memo(
 
         <div className="flex items-center gap-2">
           {extraActions}
+          {/* `↵`, not the design-mockup's `⌘↵`: plain Enter is what actually
+              sends here (the Tiptap `submitOnEnter` extension), and a keycap
+              advertising a chord the app does not require would teach the
+              wrong habit. The hover title quotes the canonical shortcut
+              registry so this hint cannot drift from the Settings list.
+              Hidden while sending is impossible — a shortcut hint for a dead
+              button is noise. */}
+          {!sendDisabled && !isSending ? (
+            <kbd
+              className="hidden h-5 min-w-5 items-center justify-center rounded border border-border/70 bg-muted/60 px-1 font-mono text-2xs text-muted-foreground sm:inline-flex"
+              data-testid="composer-send-shortcut"
+              title={`Send message · ${getPlatformKeysById("send-message") ?? "Enter"}`}
+            >
+              ↵
+            </kbd>
+          ) : null}
           <ComposerSendButton
             isSending={isSending}
             sendDisabled={sendDisabled}

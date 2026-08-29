@@ -7,18 +7,18 @@ import { after, afterEach, before, test } from "node:test";
 import { JSDOM } from "jsdom";
 
 /**
- * Why this file exists even though nothing imports `EmojiReactionButton`.
+ * Why this file outlived the verdict it was written to pin.
  *
- * The reaction pill in `features/messages/ui/MessageReactions.tsx` is the one
- * place in the chat core where a Pro component was a real candidate — it is the
- * only component in that evaluation Pro does *not* file under "AI", and the app
- * hand-rolls exactly what it offers. It was rejected on measured facts, not on
- * taste, and those facts are what this file pins.
- *
- * A verdict written in prose gets re-litigated; a verdict with a test gets
- * re-checked. If any group here starts failing, upstream has closed the gap and
- * adopting `EmojiReactionButton` is worth reconsidering — which is the whole
- * point. See `docs/heroui-migration/component-map.md` §6septies.
+ * The reaction pill in `features/messages/ui/MessageReactions.tsx` originally
+ * REJECTED `EmojiReactionButton` on the measured facts below. The component was
+ * later adopted anyway — a product call, accepting those same costs with
+ * mitigations (the hover-delegating `<span>` stays, `HERO_ACCENT_SCOPE` +
+ * `HERO_MUTED_SCOPE`, `h-7` geometry, `title` on the glyph). The facts did not
+ * change, so this file keeps pinning them with its role inverted: each group
+ * now documents a cost the adoption pays for. If a group starts failing,
+ * upstream has removed that cost and the matching mitigation in
+ * `MessageReactions.tsx` can go. See `docs/heroui-migration/component-map.md`
+ * §6septies.
  *
  * Same shape as `buttonHeroUiGap.test.mjs`, which pins the equivalent gap in
  * HeroUI's `Button` — and the same ending, which is the surprise. `title` is

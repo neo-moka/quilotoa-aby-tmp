@@ -30,6 +30,8 @@ type AppTopChromeProps = {
   onGoBack: () => void;
   onGoForward: () => void;
   hasCommunityRail?: boolean;
+  /** Active community, shown as the window's standing title. */
+  communityName?: string | null;
 };
 
 // Fixed px on purpose (button box + glyph): these controls sit beside the
@@ -43,6 +45,43 @@ const HISTORY_ICON_BUTTON_CLASS =
 
 function preventTopChromeWheel(event: WheelEvent) {
   event.preventDefault();
+}
+
+/**
+ * The community's name, standing where a macOS document title would.
+ *
+ * The title bar spent most of its width as empty drag region, and the one
+ * thing the app never said anywhere was which community the window is in —
+ * the sidebar leads with search and the switcher lives in the footer menu.
+ *
+ * Hidden while a screen projects its own chrome into `#app-top-chrome-content`
+ * (projects center a breadcrumb there); two titles in one strip read as two
+ * apps. Watched with a MutationObserver because portals mount after this row.
+ */
+function TopChromeCommunityLabel({ name }: { name: string }) {
+  const [portalBusy, setPortalBusy] = React.useState(false);
+
+  React.useEffect(() => {
+    const portal = document.getElementById("app-top-chrome-content");
+    if (!portal) return;
+    const update = () => setPortalBusy(portal.childElementCount > 0);
+    update();
+    const observer = new MutationObserver(update);
+    observer.observe(portal, { childList: true });
+    return () => observer.disconnect();
+  }, []);
+
+  if (portalBusy) return null;
+
+  return (
+    <span
+      className="ml-2 min-w-0 truncate text-sm font-semibold text-sidebar-foreground/80"
+      data-tauri-drag-region
+      data-testid="app-top-chrome-community"
+    >
+      {name}
+    </span>
+  );
 }
 
 function TopChromeSidebarTrigger() {
@@ -73,6 +112,7 @@ export function AppTopChrome({
   onGoBack,
   onGoForward,
   hasCommunityRail = false,
+  communityName = null,
 }: AppTopChromeProps) {
   const topChromeRef = React.useRef<HTMLDivElement>(null);
   const isFullscreen = useIsFullscreen();
@@ -169,6 +209,9 @@ export function AppTopChrome({
         >
           <ChevronRight />
         </Button>
+        {communityName ? (
+          <TopChromeCommunityLabel name={communityName} />
+        ) : null}
       </div>
       <div
         className={cn("flex min-w-0 flex-1 items-center", navRowAlignmentClass)}

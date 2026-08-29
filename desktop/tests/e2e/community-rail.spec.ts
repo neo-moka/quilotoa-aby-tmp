@@ -1231,7 +1231,7 @@ test.describe("community rail", () => {
     ).toBeVisible();
   });
 
-  test("keeps the gutter when the mobile sidebar closes without a rail", async ({
+  test("keeps the rail edge when the mobile sidebar closes", async ({
     page,
   }) => {
     await page.setViewportSize({ width: 740, height: 516 });
@@ -1250,14 +1250,16 @@ test.describe("community rail", () => {
     await expect(
       page.locator('[data-sidebar="sidebar"][data-mobile="true"]'),
     ).toBeHidden();
-    await expect(page.locator("[data-collapsed-content-gutter]")).toHaveCSS(
-      "width",
-      "8px",
+    // The rail is the app's outer frame now, so closing the sheet leaves its
+    // edge as the chrome — the no-rail gutter strip has nothing to patch.
+    await expect(page.getByTestId("community-rail")).toBeVisible();
+    await expect(page.locator("[data-collapsed-content-gutter]")).toHaveCount(
+      0,
     );
-    await expectContentSurfaceHorizontalGutters(page, 9);
+    await expectContentSurfaceHorizontalGutters(page);
   });
 
-  test("hides the rail with a single community", async ({ page }) => {
+  test("keeps the rail with a single community", async ({ page }) => {
     await page.addInitScript((themeStorageKey) => {
       window.localStorage.setItem(themeStorageKey, "buzz-dark");
     }, THEME_STORAGE_KEY);
@@ -1265,10 +1267,15 @@ test.describe("community rail", () => {
     await seedCommunities(page, [COMMUNITY_A], COMMUNITY_A.id);
     await page.goto("/");
 
-    // The channel sidebar still renders; the rail is omitted (a rail of one
-    // adds nothing).
+    // One community used to hide the rail; the brand mark and the agents /
+    // settings / self cluster now justify it on their own.
     await expect(page.getByTestId("app-sidebar")).toBeVisible();
-    await expect(page.getByTestId("community-rail")).toHaveCount(0);
+    await expect(page.getByTestId("community-rail")).toBeVisible();
+    await expect(page.getByTestId("community-rail-brand")).toBeVisible();
+    await expect(page.getByTestId("community-rail-settings")).toBeVisible();
+    await expect(
+      page.getByTestId(`community-rail-button-${COMMUNITY_A.id}`),
+    ).toBeVisible();
 
     await page
       .getByRole("button", { name: "Toggle Sidebar", exact: true })
@@ -1276,18 +1283,11 @@ test.describe("community rail", () => {
     await expect(
       page.locator('[data-side="left"][data-state="collapsed"]'),
     ).toBeVisible();
-    await expect(page.locator("[data-collapsed-content-gutter]")).toHaveCSS(
-      "width",
-      "8px",
+    await expect(page.getByTestId("community-rail")).toBeVisible();
+    await expect(page.locator("[data-collapsed-content-gutter]")).toHaveCount(
+      0,
     );
-    const sidebarBackground = await page
-      .locator("[data-buzz-glass-inset]")
-      .evaluate((element) => getComputedStyle(element).backgroundColor);
-    await expect(page.locator("[data-collapsed-content-gutter]")).toHaveCSS(
-      "background-color",
-      sidebarBackground,
-    );
-    await expectContentSurfaceHorizontalGutters(page, 9);
+    await expectContentSurfaceHorizontalGutters(page);
   });
 
   test("keeps the rail visible when the sidebar is collapsed", async ({
@@ -1357,8 +1357,15 @@ test.describe("community rail", () => {
     expect(appSurfaceBox).not.toBeNull();
     expect(contentBox).not.toBeNull();
     expect(buttonBox?.y ?? 0).toBeGreaterThanOrEqual(32);
+    // The brand mark leads the rail now, so it is what aligns with the
+    // content surface; the first community sits below it and the divider.
+    const brandBox = await page
+      .getByTestId("community-rail-brand")
+      .boundingBox();
+    expect(brandBox).not.toBeNull();
+    expect(brandBox?.y ?? 0).toBeGreaterThanOrEqual(32);
     expect(
-      Math.abs((buttonBox?.y ?? 0) - (contentBox?.y ?? 0) - 6),
+      Math.abs((brandBox?.y ?? 0) - (contentBox?.y ?? 0) - 6),
     ).toBeLessThan(0.5);
     expect(Math.abs((railBox?.y ?? 0) - (appSurfaceBox?.y ?? 0))).toBeLessThan(
       0.5,

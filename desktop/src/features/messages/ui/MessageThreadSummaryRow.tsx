@@ -6,7 +6,10 @@ import type {
 } from "@/features/messages/lib/threadPanel";
 import type { TimelineMessage } from "@/features/messages/types";
 import type { ThreadDepthGuideAction } from "@/features/messages/ui/MessageRow";
-import { formatThreadSummaryLastReplyTime } from "@/features/messages/lib/dateFormatters";
+import {
+  formatThreadSummaryLastReplyCompact,
+  formatThreadSummaryLastReplyTime,
+} from "@/features/messages/lib/dateFormatters";
 import {
   getThreadReplyAvatarCenterRem,
   getThreadReplyIndentRem,
@@ -259,9 +262,9 @@ export function MessageThreadSummaryRow({
                   <span
                     className="col-start-1 row-start-1 transition-opacity group-hover:opacity-0 group-focus-visible:opacity-0"
                     data-testid="message-thread-summary-last-reply"
+                    title={`Last reply ${formatThreadSummaryLastReplyTime(summary.lastReplyAt)}`}
                   >
-                    last reply{" "}
-                    {formatThreadSummaryLastReplyTime(summary.lastReplyAt)}
+                    {formatThreadSummaryLastReplyCompact(summary.lastReplyAt)}
                   </span>
                   <span
                     className="col-start-1 row-start-1 opacity-0 transition-opacity group-hover:opacity-100 group-focus-visible:opacity-100"

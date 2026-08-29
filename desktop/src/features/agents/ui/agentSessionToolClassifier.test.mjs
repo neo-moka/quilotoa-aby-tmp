@@ -189,3 +189,49 @@ test("classifyTool falls back once to a generic descriptor", () => {
   assert.equal(descriptor.preview, "notes.md");
   assert.equal(descriptor.source, "fallback");
 });
+
+test("classifyTool routes Claude Code Bash sends to the message bubble", () => {
+  const descriptor = classifyTool({
+    title: "Bash",
+    toolName: "Bash",
+    buzzToolName: null,
+    args: {
+      command: 'buzz messages send --channel some-uuid --content "hola equipo"',
+    },
+    result: "{}",
+    isError: false,
+  });
+
+  assert.equal(descriptor.renderClass, "message");
+  assert.equal(descriptor.label, "Send Message");
+  assert.equal(descriptor.preview, "hola equipo");
+  assert.equal(descriptor.groupKey, "buzz-cli:messages.send");
+});
+
+test("classifyTool renders non-buzz Bash commands as shell rows", () => {
+  const descriptor = classifyTool({
+    title: "Bash",
+    toolName: "Bash",
+    buzzToolName: null,
+    args: { command: "ls -la /tmp" },
+    result: "",
+    isError: false,
+  });
+
+  assert.equal(descriptor.renderClass, "shell");
+  assert.equal(descriptor.label, "Ran command");
+  assert.equal(descriptor.preview, "ls -la /tmp");
+});
+
+test("classifyTool routes Gemini run_shell_command buzz ops to relay-op", () => {
+  const descriptor = classifyTool({
+    title: "run_shell_command",
+    toolName: "run_shell_command",
+    buzzToolName: null,
+    args: { command: "buzz reactions add --event abc --emoji ✅" },
+    result: "{}",
+    isError: false,
+  });
+
+  assert.equal(descriptor.renderClass, "relay-op");
+});

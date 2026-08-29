@@ -495,6 +495,9 @@ export function AgentSessionThreadPanel({
             rawLayout="exclusive"
             showHeader={false}
             showRaw={showRawFeed}
+            // Same reason as the activity panel's embed: px-0 above strips
+            // the card padding, so the transcript supplies its own gutter.
+            transcriptContentClassName="px-3"
           />
         </div>
       </AuxiliaryPanelBody>

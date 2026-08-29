@@ -35,13 +35,12 @@ function AddressedAgentAvatar({
   React.useEffect(() => {
     if (pulseVersion <= previousPulseVersionRef.current) return;
     previousPulseVersionRef.current = pulseVersion;
-    if (shouldReduceMotion) return;
-    void controls.start({
-      scale: [1, 1.3, 0.96, 1.08, 1],
-      y: [0, -4, 1, -1, 0],
-      transition: { duration: 0.48, ease: "easeOut" },
-    });
-  }, [controls, pulseVersion, shouldReduceMotion]);
+    // The pulse used to scale the avatar (1 → 1.3 → 1) here. Removed on
+    // direct feedback: inline mentions re-fire it while composing, and an
+    // avatar that swells mid-keystroke reads as the UI grabbing the wrist,
+    // not as confirmation. The `data-pulse-version` signal stays — specs and
+    // any future, stiller acknowledgement key off the counter, not the scale.
+  }, [pulseVersion]);
 
   React.useEffect(() => {
     if (shakeVersion <= previousShakeVersionRef.current) return;

@@ -104,6 +104,14 @@ export const KEYBOARD_SHORTCUTS: KeyboardShortcut[] = [
     category: "Navigation",
   },
   {
+    id: "toggle-terminal",
+    label: "ABY Term",
+    description: "Open or hide the terminal panel",
+    keys: "⌘J",
+    keysWindows: "Ctrl+J",
+    category: "Navigation",
+  },
+  {
     id: "mark-current-read",
     label: "Mark as read",
     description: "Mark the current conversation as read",

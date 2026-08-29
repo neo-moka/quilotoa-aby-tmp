@@ -1,5 +1,10 @@
 import * as React from "react";
 
+import {
+  showAgentRunDetail,
+  showAgentRunsList,
+} from "@/features/agents/agentRunPanelStore";
+
 type Snapshot = {
   isOpen: boolean;
   selectedPubkey: string | null;
@@ -35,6 +40,16 @@ function publish(next: Snapshot) {
  * has no agent in mind must not clear a choice the user already made.
  */
 export function openAgentActivityPanel(pubkey?: string | null) {
+  // Which of the panel's two views opens is decided by whether the gesture
+  // named an agent. Opening from a channel where somebody is working means
+  // "show me that" — the runs list would be an extra click past an answer the
+  // caller already had. Opening with nobody in mind means "who is working?",
+  // which is the list's question.
+  if (pubkey) {
+    showAgentRunDetail();
+  } else {
+    showAgentRunsList();
+  }
   publish({
     isOpen: true,
     selectedPubkey: pubkey ?? snapshot.selectedPubkey,

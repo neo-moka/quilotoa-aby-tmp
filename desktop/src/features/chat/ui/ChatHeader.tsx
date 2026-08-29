@@ -22,6 +22,16 @@ import { writeTextToClipboard } from "@/shared/lib/clipboard";
 
 type ChatHeaderProps = {
   actions?: React.ReactNode;
+  /**
+   * Rendered under the title row, inside the same chrome block.
+   *
+   * Belongs here rather than at the top of the scrolling content because what
+   * goes in it — a channel's status strip and its view tabs — must stay put
+   * while the conversation scrolls, and must sit under the same backdrop blur
+   * as the title. Anything mounted below the chrome would scroll away or draw
+   * its own competing surface.
+   */
+  belowContent?: React.ReactNode;
   belowSystemChrome?: boolean;
   /** Ref to the outer chrome wrapper when `belowSystemChrome` is true. */
   chromeWrapperRef?: React.Ref<HTMLDivElement>;
@@ -86,6 +96,7 @@ function ChannelIcon({
 
 export function ChatHeader({
   actions,
+  belowContent,
   belowSystemChrome = false,
   chromeWrapperRef,
   title,
@@ -167,6 +178,11 @@ export function ChatHeader({
           {actions ? <div className="shrink-0">{actions}</div> : null}
         </div>
       </div>
+      {belowContent ? (
+        <div className="mt-1.5 min-w-0" data-testid="chat-header-below-content">
+          {belowContent}
+        </div>
+      ) : null}
     </header>
   );
 

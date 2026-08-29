@@ -17,8 +17,9 @@ const CYCLE_SECONDS = 1.8;
  * grey squares that read as missing glyphs. A progress cue wants a shape
  * designed for its size, not a brand asset shrunk past legibility.
  *
- * The wordmark is still right for the larger empty state ("Waiting for ACP
- * activity"), which is why this is a change here and not in `FuzzyLogo`.
+ * The larger empty state ("Waiting for ACP activity") now uses a plain
+ * spinner for the same reason — a loading cue wants a conventional shape,
+ * not a brand animation.
  */
 export function TurnLivenessIndicator({ className }: { className?: string }) {
   const animationsEnabled = useTranscriptAnimationEnabled();

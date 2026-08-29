@@ -41,6 +41,19 @@ const DEVELOPER_TOOL_BASES = new Set([
   "postcompact",
 ]);
 
+/** Terminal-tool names reported by ACP-bridged harnesses, normalized. */
+const SHELL_TOOL_BASES = new Set([
+  "bash",
+  "exec",
+  "exec_command",
+  "execute",
+  "execute_command",
+  "run_command",
+  "run_shell_command",
+  "run_terminal_cmd",
+  "terminal",
+]);
+
 const BUZZ_CLI_GROUPS = new Set([
   "messages",
   "channels",
@@ -338,6 +351,12 @@ function classifyDeveloperToolName(value: string | null | undefined) {
   const base = normalized.replace(/^buzz_dev_mcp_/, "");
 
   if (base === "shell" || normalized.endsWith("_shell")) return "shell";
+  // Harness-native terminal tools. buzz-dev-mcp calls its tool `shell`, but
+  // agents bridged over ACP report their own names — Claude Code `Bash`,
+  // Codex `exec_command`, Gemini `run_shell_command` — and without this
+  // mapping every one of their commands (including `buzz messages send`,
+  // which renders as an outgoing message bubble) falls to the generic row.
+  if (SHELL_TOOL_BASES.has(base)) return "shell";
   if (base === "read_file" || normalized.endsWith("_read_file"))
     return "read_file";
   if (base === "view_image" || normalized.endsWith("_view_image"))

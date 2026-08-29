@@ -1,6 +1,6 @@
 import * as React from "react";
 import { motion, useReducedMotion } from "motion/react";
-import { CheckCheck, Clock, Radio } from "lucide-react";
+import { CheckCheck, Radio } from "lucide-react";
 
 import {
   useActiveAgentTurns,
@@ -23,7 +23,7 @@ import {
 } from "@/shared/ui/dialog";
 import { Toggle } from "@/shared/ui/toggle";
 import { AnimatedCount } from "@/shared/ui/AnimatedCount";
-import { FuzzyLogo } from "@/shared/ui/buzz-logo/FuzzyLogo";
+import { Spinner } from "@/shared/ui/spinner";
 import type { PromptSection, TranscriptItem } from "./agentSessionTypes";
 import { TurnLivenessIndicator } from "./TurnLivenessIndicator";
 import { PromptSectionList as PromptContextSections } from "./PromptSectionAccordion";
@@ -45,7 +45,6 @@ import {
 } from "./activityRenderClasses/ActivityRow";
 import { TranscriptTimestamp } from "./activityRenderClasses/TranscriptTimestamp";
 import type { AgentTranscriptIdentityProps } from "./activityRenderClasses/types";
-import type { FileEditDiff } from "./agentSessionFileEditDiff";
 import {
   buildTranscriptDisplayBlocks,
   formatTurnSetupLabel,
@@ -55,10 +54,14 @@ import {
   type TranscriptDisplayBlock,
   type TranscriptTurnSegment,
 } from "./agentSessionTranscriptGrouping";
-import { buildCompactToolSummary } from "./agentSessionToolSummary";
+import {
+  getGroupedFileEditDiffs,
+  summarizeFileEditDiffs,
+} from "./transcriptFileEditStats";
+import { SessionBoundaryDivider } from "./SessionBoundaryDivider";
+import { selectPolishedTranscriptItems } from "./transcriptTelemetry";
 import { shouldShowTranscriptRowTimestamp } from "./agentSessionTranscriptPresentation";
 import { formatTranscriptTimestampTitle } from "./agentSessionUtils";
-import { hasFileEditLineDiff } from "./FileEditDiffView";
 import { UserMessageBubble } from "./activityRenderClasses/UserMessageBubble";
 
 const TRANSCRIPT_ACP_SOURCE_STORAGE_KEY = "buzz:show-transcript-acp-source";
@@ -152,8 +155,15 @@ export function AgentSessionTranscriptList({
     getLatestLive,
   );
 
+  // Telemetry rows are dropped before grouping, not hidden after: fewer
+  // blocks means fewer motion wrappers and observers on a list that re-renders
+  // per observer event. See `transcriptTelemetry.ts` for what counts.
   const displayBlocks = React.useMemo(
-    () => buildTranscriptDisplayBlocks(items, latestLiveSessionId),
+    () =>
+      buildTranscriptDisplayBlocks(
+        selectPolishedTranscriptItems(items),
+        latestLiveSessionId,
+      ),
     [items, latestLiveSessionId],
   );
   // Derive the same block keys the DOM renders as `data-message-id` so
@@ -208,11 +218,9 @@ export function AgentSessionTranscriptList({
       <div className={scrollContainerClassNames}>
         <div className="flex h-full min-h-40 flex-col items-center justify-center px-6 py-10 text-center">
           {isLoading ? (
-            <FuzzyLogo
-              ariaLabel="Waiting for ACP activity"
-              className="mx-auto text-muted-foreground"
-              fuzz={false}
-              loop
+            <Spinner
+              aria-label="Waiting for ACP activity"
+              className="mx-auto h-7 w-7 text-muted-foreground"
             />
           ) : (
             <>
@@ -515,7 +523,11 @@ function SameKindSummaryItem({
   const childSegments = summary.segments ?? null;
 
   return (
-    <>
+    // A burst is one step of the run, dot included — see TranscriptItemRow.
+    <div
+      className={variant !== "compactPreview" ? "relative pl-3.5" : undefined}
+    >
+      {variant !== "compactPreview" ? <TranscriptStepDot /> : null}
       <ActivityRow
         className="flex flex-col gap-0.5"
         openToneScope="summary"
@@ -580,34 +592,7 @@ function SameKindSummaryItem({
       {showTimestamp ? (
         <TranscriptRowTimestamp timestamp={summary.timestamp} />
       ) : null}
-    </>
-  );
-}
-
-function getGroupedFileEditDiffs(items: TranscriptItem[]): FileEditDiff[] {
-  return items.flatMap((item) => {
-    if (item.type !== "tool" || item.isError) {
-      return [];
-    }
-
-    const diff = buildCompactToolSummary(item).fileEditDiff;
-    return diff && hasFileEditLineDiff(diff) ? [diff] : [];
-  });
-}
-
-function summarizeFileEditDiffs(
-  diffs: FileEditDiff[],
-): ActivityRowStats | null {
-  if (diffs.length === 0) {
-    return null;
-  }
-
-  return diffs.reduce(
-    (stats, diff) => ({
-      additions: stats.additions + diff.additions,
-      deletions: stats.deletions + diff.deletions,
-    }),
-    { additions: 0, deletions: 0 },
+    </div>
   );
 }
 
@@ -860,9 +845,18 @@ function TranscriptItemRow({
     enabled: timestampsEnabled,
     variant,
   });
+  // Status and tool rows are steps of the run, so they wear the step dot —
+  // the transcript's version of the design's plan timeline. Dots rather than
+  // a connected rail: blocks are spaced by the list's gap, so a per-block
+  // rail would break at every gap and read as dashes. Messages are what the
+  // run *said*, not what it did, and keep their chat framing.
+  const isStep =
+    variant !== "compactPreview" &&
+    (item.type === "lifecycle" || item.type === "tool");
 
   return (
-    <div key={item.id}>
+    <div className={isStep ? "relative pl-3.5" : undefined} key={item.id}>
+      {isStep ? <TranscriptStepDot /> : null}
       {SHOW_TRANSCRIPT_ACP_SOURCE && item.acpSource ? (
         <TranscriptAcpSourceBadge source={item.acpSource} />
       ) : null}
@@ -882,6 +876,17 @@ function TranscriptItemRow({
         />
       ) : null}
     </div>
+  );
+}
+
+/** One step's marker, aligned to the row's first text line. */
+function TranscriptStepDot() {
+  return (
+    <span
+      aria-hidden="true"
+      className="absolute left-0 top-2 size-1.5 rounded-full bg-muted-foreground/35"
+      data-testid="transcript-step-dot"
+    />
   );
 }
 
@@ -926,50 +931,6 @@ function TurnSetupStatus({
         showTimestamp={false}
         timestamp={timestamp}
       />
-    </div>
-  );
-}
-
-/**
- * Horizontal rule rendered between session runs in the observer transcript.
- *
- * Three label states (based on live-frame observation, not harness affinity):
- *  - `"current"`     — most recent session observed via the live relay subscription.
- *  - `"most-recent"` — newest visible session with no matching live frames
- *                      (loaded from archive or session ended before observation).
- *  - `"earlier"`     — an older session preceding the most-recent one.
- */
-function SessionBoundaryDivider({
-  labelState,
-  sessionStartTimestamp,
-}: {
-  labelState: "current" | "most-recent" | "earlier";
-  sessionStartTimestamp: string;
-}) {
-  const label =
-    labelState === "current"
-      ? "Latest live-observed session"
-      : labelState === "most-recent"
-        ? "Most recent observed session"
-        : "Earlier observed session";
-  const formattedDate = new Date(sessionStartTimestamp).toLocaleString();
-  return (
-    <div
-      className="flex items-center gap-2 px-3 py-2"
-      data-testid="session-boundary-divider"
-    >
-      <div className="h-px flex-1 bg-border" />
-      <span className="flex items-center gap-1 text-xs text-muted-foreground">
-        {labelState === "current" ? (
-          <Radio aria-hidden="true" className="h-3 w-3" />
-        ) : (
-          <Clock aria-hidden="true" className="h-3 w-3" />
-        )}
-        {label}
-        {" · "}
-        {formattedDate}
-      </span>
-      <div className="h-px flex-1 bg-border" />
     </div>
   );
 }

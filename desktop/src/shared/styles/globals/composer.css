@@ -1,7 +1,15 @@
 .composer-dock {
   --composer-dock-active-rail: 2.125rem;
   --composer-dock-activity-bottom: 0.5rem;
-  --composer-dock-quiet-inset: 1.25rem;
+  /* Equal to the active rail ON PURPOSE: the rail below the composer is
+     reserved permanently, so typing/agent activity fades into space that is
+     already there and nothing about the composer moves. The previous quiet
+     inset (1.25rem) traded composer height for the rail on activation — a
+     composer that shifts mid-keystroke reads as the app fighting the writer,
+     which is worse than 14px of standing headroom. With the two values equal,
+     `--composer-dock-release` is 0 and every geometry transition below is a
+     no-op kept only so a future re-split does not have to rebuild them. */
+  --composer-dock-quiet-inset: var(--composer-dock-active-rail);
   --composer-dock-release: calc(
     var(--composer-dock-active-rail) -
     var(--composer-dock-quiet-inset)

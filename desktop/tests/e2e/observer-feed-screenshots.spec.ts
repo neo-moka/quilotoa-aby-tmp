@@ -558,7 +558,11 @@ test.describe("observer feed screenshots", () => {
       },
     ]);
 
-    await expect(feedPanel.getByText("Usage")).toBeVisible({ timeout: 5_000 });
+    // Telemetry stays out of the polished feed: the activity panel's header
+    // quotes the same usage stream live, and the raw rail keeps the row —
+    // see `transcriptTelemetry.ts`. Seeding is synchronous, so absence can be
+    // asserted directly; the screenshot documents the feed without the row.
+    await expect(feedPanel.getByText("Usage")).toHaveCount(0);
     await settleAnimations(feedPanel);
     await feedPanel.screenshot({
       path: `${SHOTS}/08-usage-update-coalesced.png`,
@@ -606,9 +610,11 @@ test.describe("observer feed screenshots", () => {
       },
     ]);
 
-    await expect(feedPanel.getByText("Commands", { exact: true })).toBeVisible({
-      timeout: 5_000,
-    });
+    // Same contract as 08: the command tally is telemetry, kept for the raw
+    // rail and dropped from the polished feed — see `transcriptTelemetry.ts`.
+    await expect(feedPanel.getByText("Commands", { exact: true })).toHaveCount(
+      0,
+    );
     await settleAnimations(feedPanel);
     await feedPanel.screenshot({
       path: `${SHOTS}/09-available-commands-update.png`,

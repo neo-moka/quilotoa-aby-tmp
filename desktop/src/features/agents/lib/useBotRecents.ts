@@ -6,8 +6,9 @@ const STORAGE_KEY = "buzz:bot-recents";
 const MAX_RECENTS = 8;
 
 // Default persona display names to seed the list when empty.
-// These are resolved to IDs by the consumer.
-export const DEFAULT_PERSONA_NAMES = ["Fizz", "Honey", "Pollen"] as const;
+// These are resolved to IDs by the consumer. ABY ships with no default
+// agents, so the quick-pick list falls back to whatever personas exist.
+export const DEFAULT_PERSONA_NAMES: readonly string[] = [];
 
 export function pickQuickBotPersonas(
   personas: readonly AgentPersona[],

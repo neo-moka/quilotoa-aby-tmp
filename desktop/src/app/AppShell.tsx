@@ -125,7 +125,8 @@ export function AppShell() {
     showHuddleInMainApp,
     viewHuddleChannel,
   } = useHuddlePresentation();
-  const hasCommunityRail = communitiesHook.communities.length > 1;
+  // One community suffices: brand + agents/settings/self make the rail the frame.
+  const hasCommunityRail = communitiesHook.communities.length > 0;
   const addCommunityDialog = useAddCommunityDialogState();
   const [isChannelManagementOpen, setIsChannelManagementOpen] =
     React.useState(false);
@@ -755,9 +756,15 @@ export function AppShell() {
                 activeCommunityId={communitiesHook.activeCommunity?.id ?? null}
                 onAddCommunity={addCommunityDialog.openDialog}
                 onReorderCommunities={communitiesHook.reorderCommunities}
+                onSelectAgents={() => void goAgents()}
                 onSwitchCommunity={handleSwitchCommunity}
                 onUpdateCommunity={communitiesHook.updateCommunity}
                 communities={communitiesHook.communities}
+                selfAvatarUrl={profileQuery.data?.avatarUrl ?? null}
+                selfDisplayName={profileQuery.data?.displayName ?? null}
+                selfPresenceStatus={presenceSession.currentStatus}
+                // biome-ignore format: the same handlers the sidebar footer card receives, kept adjacent (and compact) so the two menus cannot drift.
+                profileMenu={{ isPresencePending: presenceSession.isPending, onClearUserStatus: () => setUserStatusMutation.mutate({ text: "", emoji: "" }), onOpenAddCommunity: addCommunityDialog.openDialog, onRemoveCommunity: handleRemoveCommunity, onSendFeedback: () => setIsSendFeedbackOpen(true), onSetPresenceStatus: (status) => presenceSession.setStatus(status), onSetUserStatus: (text, emoji) => setUserStatusMutation.mutate({ text, emoji }), selfPubkey: profileQuery.data?.pubkey ?? identityQuery.data?.pubkey ?? null, selfUserStatus: deferredPubkey ? (selfStatusQuery.data?.[deferredPubkey.toLowerCase()] ?? undefined) : undefined }}
               />
             ) : null}
             <SidebarProvider
@@ -770,6 +777,7 @@ export function AppShell() {
                     <AppTopChrome
                       canGoBack={canGoBack}
                       canGoForward={canGoForward}
+                      communityName={communitiesHook.activeCommunity?.name}
                       hasCommunityRail={hasCommunityRail}
                       onGoBack={goBack}
                       onGoForward={goForward}

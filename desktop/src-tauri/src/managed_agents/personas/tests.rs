@@ -51,10 +51,8 @@ fn merge_personas_adds_missing_built_ins() {
         .filter(|record| record.is_active)
         .map(|record| record.id.as_str())
         .collect();
-    assert_eq!(
-        active_ids,
-        vec!["builtin:fizz", "builtin:honey", "builtin:bumble"]
-    );
+    // Built-ins seed inactive so ABY starts with no default agent cards.
+    assert_eq!(active_ids, Vec::<&str>::new());
 }
 
 #[test]
@@ -122,7 +120,8 @@ fn merge_personas_adds_fizz_and_retires_old_builtins_for_existing_store() {
         .find(|record| record.id == "builtin:fizz")
         .expect("fizz built-in should exist");
     assert!(fizz.is_builtin);
-    assert!(fizz.is_active);
+    // Built-ins seed inactive so ABY starts with no default agent cards.
+    assert!(!fizz.is_active);
 
     let solo = records
         .iter()

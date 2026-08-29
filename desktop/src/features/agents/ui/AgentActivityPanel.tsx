@@ -13,12 +13,16 @@ import {
   AuxiliaryPanelHeaderGroup,
   AuxiliaryPanelTitle,
 } from "@/shared/layout/AuxiliaryPanel";
+import {
+  showAgentRunDetail,
+  showAgentRunsList,
+  useAgentRunPanelView,
+} from "@/features/agents/agentRunPanelStore";
 import { resolveActivityAgentPubkey } from "./agentActivitySelection";
 import { AgentActivitySettingsMenu } from "./AgentActivitySettingsMenu";
-import {
-  AgentActivitySelector,
-  type AgentActivityCandidate,
-} from "./AgentActivitySelector";
+import type { AgentActivityCandidate } from "./AgentActivitySelector";
+import { AgentRunDetailHeader } from "./AgentRunDetailHeader";
+import { AgentRunsList } from "./AgentRunsList";
 import { ManagedAgentSessionPanel } from "./ManagedAgentSessionPanel";
 
 /**
@@ -81,11 +85,16 @@ export function AgentActivityPanel({
     show: boolean;
   }>({ pubkey: null, show: false });
 
-  const channelNameFor = React.useCallback(
-    (channelId: string) =>
-      channelsQuery.data?.find((channel) => channel.id === channelId)?.name ??
-      null,
+  const channelNameById = React.useMemo(
+    () =>
+      new Map(
+        (channelsQuery.data ?? []).map((channel) => [channel.id, channel.name]),
+      ),
     [channelsQuery.data],
+  );
+  const channelNameFor = React.useCallback(
+    (channelId: string) => channelNameById.get(channelId) ?? null,
+    [channelNameById],
   );
 
   const agents = React.useMemo<AgentActivityCandidate[]>(
@@ -107,13 +116,24 @@ export function AgentActivityPanel({
     workingPubkeys,
   });
 
+  const workingCount = agents.filter((agent) =>
+    workingPubkeys.has(agent.pubkey),
+  ).length;
+
   const selectedAgent =
     agents.find((agent) => agent.pubkey === resolvedPubkey) ?? null;
 
-  // A one-option picker is chrome that chooses nothing: a full-width selected
-  // row, an avatar and a tick, to pick the only agent there is. Below two
-  // agents the header names it instead.
-  const showPicker = agents.length > 1;
+  // The picker this replaced could only answer "which agent", never "what is
+  // anyone doing" — you had to select an agent to find out it was idle. The
+  // runs list answers both at once, so it is the panel's front door and the
+  // transcript sits one step behind it.
+  //
+  // It stays the front door even with a single agent, where the old picker
+  // hid itself: one row saying what that agent is doing and where is worth
+  // more than a one-option chooser, and `openAgentActivityPanel` already
+  // skips straight past it whenever the caller named an agent.
+  const panelView = useAgentRunPanelView();
+  const showRunsList = panelView === "runs";
 
   const showRaw = rawState.pubkey === resolvedPubkey && rawState.show;
   const activeTurns = React.useMemo(
@@ -138,14 +158,23 @@ export function AgentActivityPanel({
       header={
         <AuxiliaryPanelHeader>
           <AuxiliaryPanelHeaderGroup>
-            {/* With one agent the title names it, because the picker is hidden
-                in that case and the panel would otherwise not say whose work
-                this is. */}
+            {/* The detail view names the agent in its own header, so repeating
+                it here would say the same word twice in adjacent rows. */}
             <AuxiliaryPanelTitle>
-              {showPicker || !selectedAgent
-                ? "Agent activity"
-                : selectedAgent.name}
+              {showRunsList ? "Active runs" : "Agent activity"}
             </AuxiliaryPanelTitle>
+            {/* Working count, not roster count: the chip answers "how much is
+                happening", and an idle roster of five would overstate that as
+                a permanent 5. Hidden at zero — a `0` next to the title reads
+                as a badge that failed to load. */}
+            {workingCount > 0 ? (
+              <span
+                className="rounded-full bg-primary/15 px-1.5 py-0.5 text-2xs font-medium leading-none tabular-nums text-primary"
+                data-testid="agent-activity-panel-working-count"
+              >
+                {workingCount}
+              </span>
+            ) : null}
           </AuxiliaryPanelHeaderGroup>
           <AuxiliaryPanelHeaderActions>
             {selectedAgent ? (
@@ -186,17 +215,24 @@ export function AgentActivityPanel({
           </p>
         ) : (
           <>
-            {showPicker ? (
-              <div className="shrink-0 border-b border-border/60 px-2 py-1.5">
-                <AgentActivitySelector
-                  agents={agents}
-                  onSelect={onSelectAgent}
-                  selectedPubkey={resolvedPubkey}
-                  workingPubkeys={workingPubkeys}
-                />
-              </div>
+            {showRunsList ? (
+              <AgentRunsList
+                onSelectAgent={(pubkey) => {
+                  onSelectAgent(pubkey);
+                  showAgentRunDetail();
+                }}
+                profiles={profiles}
+              />
             ) : null}
-            {selectedAgent ? (
+            {!showRunsList && selectedAgent ? (
+              <AgentRunDetailHeader
+                agentName={selectedAgent.name}
+                agentPubkey={selectedAgent.pubkey}
+                key={`${selectedAgent.pubkey}-header`}
+                onBack={showAgentRunsList}
+              />
+            ) : null}
+            {!showRunsList && selectedAgent ? (
               // Embedded, not standalone — the same treatment
               // `AgentSessionThreadPanel` gives it, because both put it under a
               // panel that already has a header. It defaults to a standalone
@@ -220,6 +256,10 @@ export function AgentActivityPanel({
                 rawLayout="exclusive"
                 showHeader={false}
                 showRaw={showRaw}
+                // The section's own padding is stripped above (px-0) so the
+                // scrollbar can hug the panel edge; without this the rows
+                // would hug it too and read as an unstyled dump.
+                transcriptContentClassName="px-3"
               />
             ) : null}
           </>

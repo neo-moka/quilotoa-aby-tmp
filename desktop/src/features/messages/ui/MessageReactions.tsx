@@ -1,3 +1,4 @@
+import { EmojiReactionButton } from "@heroui-pro/react";
 import { SmilePlus } from "lucide-react";
 import * as React from "react";
 
@@ -8,6 +9,8 @@ import { cn } from "@/shared/lib/cn";
 import { emojiDisplayName } from "@/shared/lib/emojiName";
 import { rewriteRelayUrl } from "@/shared/lib/mediaUrl";
 import { AnimatedCount } from "@/shared/ui/AnimatedCount";
+import { HERO_ACCENT_SCOPE } from "@/shared/ui/heroAccentScope";
+import { HERO_MUTED_SCOPE } from "@/shared/ui/heroMutedScope";
 import {
   isPositiveEmojiParticle,
   useEmojiBurst,
@@ -24,13 +27,18 @@ import { useHoverPopover } from "@/shared/ui/useHoverPopover";
  */
 const REACTION_POPOVER_CLOSE_DELAY_MS = 150;
 
+/**
+ * HeroUI's chip family, worn by real `<button>`s. The `Chip` component is
+ * display-only — no press semantics, no `aria-pressed`, no ref to burst
+ * from — so the pills adopt its BEM classes and tokens instead, the same
+ * arrangement every `button button--sm` in the app already uses. Base `.chip`
+ * supplies the `--default` surface and type ramp; the overrides here are the
+ * interactive layer HeroUI leaves to the caller.
+ */
 const REACTION_PILL_BASE_CLASSES =
-  "inline-flex h-7 items-center rounded-full border text-xs font-medium leading-none transition-colors";
+  "chip chip--sm h-7 justify-center rounded-full leading-none transition-colors";
 const REACTION_CUSTOM_GLYPH_CLASSES = "h-3.5 w-3.5";
 const REACTION_NATIVE_GLYPH_CLASSES = "h-3 w-3 text-xs";
-const REACTION_COUNT_CLASSES = "text-muted-foreground";
-const REACTION_NATIVE_COUNT_CLASSES =
-  "text-muted-foreground translate-y-[0.5px]";
 const REACTION_PILL_HOVER_CLASSES =
   "hover:bg-primary/10 hover:text-foreground focus-visible:bg-primary/10 focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ring";
 const BADGE_BURST_STABLE_FRAMES = 2;
@@ -314,14 +322,13 @@ function InlineReactionPicker({
               aria-label="Add reaction"
               className={cn(
                 REACTION_PILL_BASE_CLASSES,
-                "pointer-events-none w-10 min-w-10 justify-center p-0 text-muted-foreground opacity-0",
+                "pointer-events-none w-10 min-w-10 p-0 text-muted-foreground opacity-0",
                 "group-hover/message:pointer-events-auto group-hover/message:opacity-100",
                 "group-focus-within/message:pointer-events-auto group-focus-within/message:opacity-100",
                 "group-hover/reactions:pointer-events-auto group-hover/reactions:opacity-100",
                 "group-focus-within/reactions:pointer-events-auto group-focus-within/reactions:opacity-100",
-                open
-                  ? "pointer-events-auto border-border/80 bg-background text-foreground opacity-100 shadow-xs"
-                  : "border-border/70 bg-muted/70",
+                open &&
+                  "pointer-events-auto bg-background text-foreground opacity-100 shadow-xs",
                 REACTION_PILL_HOVER_CLASSES,
               )}
               data-testid={`add-reaction-${messageId}`}
@@ -382,45 +389,53 @@ function ReactionPill({
     [reaction.emoji, registerPill],
   );
 
-  const pillClasses = cn(
-    REACTION_PILL_BASE_CLASSES,
-    "min-w-12 justify-center gap-1.5 px-2",
-    reaction.reactedByCurrentUser
-      ? "border-primary/40 bg-primary/10 text-primary"
-      : "border-border/70 bg-muted/70 text-foreground/90",
-    canToggle
-      ? reaction.reactedByCurrentUser
-        ? "hover:bg-primary/10 hover:text-primary focus-visible:bg-primary/10 focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ring"
-        : REACTION_PILL_HOVER_CLASSES
-      : "cursor-default",
+  const pillElementRef = React.useRef<HTMLButtonElement | null>(null);
+  const setPillElementRef = React.useCallback(
+    (element: HTMLButtonElement | null) => {
+      pillElementRef.current = element;
+      setPillRef(element);
+    },
+    [setPillRef],
   );
 
-  const handleClick = (event: React.MouseEvent<HTMLButtonElement>) => {
+  // `onChange`, not `onClick`: the component is a React Aria ToggleButton, so
+  // read-only and disabled states already gate this. The burst needs viewport
+  // coordinates and press events do not carry them, so it fires from the
+  // pill's own rect — same trick the badge burst above uses.
+  const handleToggle = () => {
     if (!canToggle) return;
+    const rect = pillElementRef.current?.getBoundingClientRect();
     if (
+      rect &&
       !reaction.reactedByCurrentUser &&
       isPositiveEmojiParticle(reaction.emoji)
     ) {
-      burstEmoji(reaction.emoji, event);
+      burstEmoji(reaction.emoji, {
+        clientX: rect.left + rect.width / 2,
+        clientY: rect.top + rect.height / 2,
+      });
     }
     recordQuickReactionEmoji(reaction.emoji);
     onSelect(reaction.emoji);
   };
 
-  const displayName = emojiDisplayName(reaction.emoji);
-
-  if (reaction.users.length === 0) {
-    return (
-      <button
-        aria-label={`Toggle ${reaction.emoji} reaction`}
-        aria-pressed={reaction.reactedByCurrentUser}
-        title={displayName}
-        className={pillClasses}
-        disabled={!canToggle || pending}
-        onClick={handleClick}
-        ref={setPillRef}
-        type="button"
-      >
+  // The emoji-name tooltip lives on the glyph itself (EmojiGlyph's `title`);
+  // React Aria's ToggleButton does not take one on the root.
+  // HERO_ACCENT_SCOPE on the root: the selected border/tint and count read
+  // bare `var(--accent)`, which the app spends on its hover grey. The pill
+  // owns its whole subtree (glyph + count), so root scoping is safe here.
+  const pill = (
+    <EmojiReactionButton
+      aria-label={`Toggle ${reaction.emoji} reaction`}
+      className={cn("h-7 min-w-12", HERO_ACCENT_SCOPE)}
+      isDisabled={pending}
+      isReadOnly={!canToggle}
+      isSelected={reaction.reactedByCurrentUser}
+      onChange={handleToggle}
+      ref={setPillElementRef}
+      size="sm"
+    >
+      <EmojiReactionButton.Emoji className="flex items-center">
         <EmojiGlyph
           reaction={reaction}
           className={
@@ -429,52 +444,27 @@ function ReactionPill({
               : REACTION_NATIVE_GLYPH_CLASSES
           }
         />
-        <AnimatedCount
-          className={
-            reaction.emojiUrl
-              ? REACTION_COUNT_CLASSES
-              : REACTION_NATIVE_COUNT_CLASSES
-          }
-          value={reaction.count}
-        />
-      </button>
-    );
+      </EmojiReactionButton.Emoji>
+      {/* HERO_MUTED_SCOPE on the leaf: the unselected count is the one bare
+          `var(--muted)` read in this component's dist CSS. */}
+      <EmojiReactionButton.Count className={HERO_MUTED_SCOPE}>
+        <AnimatedCount className="tabular-nums" value={reaction.count} />
+      </EmojiReactionButton.Count>
+    </EmojiReactionButton>
+  );
+
+  if (reaction.users.length === 0) {
+    return pill;
   }
 
   return (
     <Popover open={hover.open} onOpenChange={hover.setOpen}>
       <PopoverTrigger asChild>
-        {/* The span exists because the pill below can be `disabled`, and a
-            disabled button emits no pointer events — it has to delegate hover
+        {/* The span exists because the pill can be `disabled` while pending,
+            and a disabled button emits no pointer events — it delegates hover
             and focus to a wrapper for the "who reacted" popover to open. */}
         <span className="inline-flex" {...hover.triggerProps}>
-          <button
-            aria-label={`Toggle ${reaction.emoji} reaction`}
-            aria-pressed={reaction.reactedByCurrentUser}
-            title={displayName}
-            className={pillClasses}
-            disabled={!canToggle || pending}
-            onClick={handleClick}
-            ref={setPillRef}
-            type="button"
-          >
-            <EmojiGlyph
-              reaction={reaction}
-              className={
-                reaction.emojiUrl
-                  ? REACTION_CUSTOM_GLYPH_CLASSES
-                  : REACTION_NATIVE_GLYPH_CLASSES
-              }
-            />
-            <AnimatedCount
-              className={
-                reaction.emojiUrl
-                  ? REACTION_COUNT_CLASSES
-                  : REACTION_NATIVE_COUNT_CLASSES
-              }
-              value={reaction.count}
-            />
-          </button>
+          {pill}
         </span>
       </PopoverTrigger>
       <PopoverContent

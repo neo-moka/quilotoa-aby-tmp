@@ -3,6 +3,7 @@ import test from "node:test";
 
 import {
   formatShortMonthDay,
+  formatThreadSummaryLastReplyCompact,
   formatThreadSummaryLastReplyTime,
   formatTimeWithoutDayPeriod,
   startOfLocalDaySeconds,
@@ -81,4 +82,29 @@ test("startOfLocalDaySeconds separates adjacent calendar days", () => {
     startOfLocalDaySeconds(lateOn14),
     startOfLocalDaySeconds(earlyOn15),
   );
+});
+
+test("formatThreadSummaryLastReplyCompact abbreviates each unit", () => {
+  const now = localUnixSeconds(2026, 5, 15);
+
+  assert.equal(formatThreadSummaryLastReplyCompact(now - 30, now), "just now");
+  assert.equal(
+    formatThreadSummaryLastReplyCompact(now - 37 * 60, now),
+    "37m ago",
+  );
+  assert.equal(
+    formatThreadSummaryLastReplyCompact(now - 3 * 3_600, now),
+    "3h ago",
+  );
+  assert.equal(
+    formatThreadSummaryLastReplyCompact(now - 2 * 86_400, now),
+    "2d ago",
+  );
+});
+
+test("formatThreadSummaryLastReplyCompact dates older replies", () => {
+  const now = localUnixSeconds(2026, 5, 15);
+  const replyAt = localUnixSeconds(2026, 4, 19);
+
+  assert.equal(formatThreadSummaryLastReplyCompact(replyAt, now), "May 19");
 });
