@@ -12,6 +12,10 @@ env:
   CARGO_TERM_COLOR: always
   BUZZ_TEST_POSTGRES_PASSWORD: buzz_dev
   PLAYWRIGHT_BROWSERS_PATH: ${{ github.workspace }}/.cache/ms-playwright
+  # HeroUI Pro's postinstall downloads the licensed package with this token.
+  # Set the HEROUI_AUTH_TOKEN repo secret; unset it stays a stub and desktop
+  # builds fail at tsc with "Cannot find module '@heroui-pro/react'".
+  HEROUI_AUTH_TOKEN: ${{ secrets.HEROUI_AUTH_TOKEN }}
 
 jobs:
   changes:
