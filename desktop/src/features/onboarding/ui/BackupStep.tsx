@@ -7,7 +7,6 @@ import type { IdentityStorage } from "@/shared/api/types";
 import { cn } from "@/shared/lib/cn";
 import { writeTextToClipboard } from "@/shared/lib/clipboard";
 import { Button } from "@/shared/ui/button";
-import { Card } from "@/shared/ui/card";
 import { Spinner } from "@/shared/ui/spinner";
 import {
   ONBOARDING_PRIMARY_CTA_CLASS,
@@ -18,7 +17,6 @@ import {
   type OnboardingTransitionDirection,
   OnboardingSlideTransition,
 } from "./OnboardingSlideTransition";
-import { ONBOARDING_KEY_TEXT_CLASS } from "./NsecMaskedDisplay";
 
 /**
  * How long the "Creating your identity key" loader holds the stage before the
@@ -340,65 +338,67 @@ export function BackupStep({
       ) : (
         <div
           className={cn(
-            "flex w-full max-w-[1040px] flex-1 flex-col justify-center py-10",
+            "flex w-full max-w-[600px] flex-1 flex-col justify-center py-10",
             REVEAL_ANIMATION_CLASS,
           )}
         >
-          <div className="w-full">
-            <Card className="px-8 py-6" variant="textured">
-              <div className="mx-auto flex w-full min-w-0 max-w-[832px] items-center gap-4">
-                <div className="min-w-0 flex-1">
-                  <p
-                    className={cn(
-                      ONBOARDING_KEY_TEXT_CLASS,
-                      isRevealed && nsec
-                        ? "select-text"
-                        : "select-none blur-[4px]",
-                    )}
-                    data-testid="backup-key-value"
-                  >
-                    {isRevealed && nsec ? nsec : maskedKey}
-                  </p>
-                </div>
-                <Button
-                  aria-label={
-                    isRevealed ? "Hide private key" : "Reveal private key"
-                  }
-                  className="h-10 w-10 shrink-0 text-muted-foreground hover:text-foreground"
-                  data-testid="backup-key-reveal-toggle"
-                  onClick={() => void toggleReveal()}
-                  size="icon"
-                  type="button"
-                  variant="ghost"
-                >
-                  {isRevealed ? (
-                    <EyeOff className="h-6 w-6" aria-hidden="true" />
-                  ) : (
-                    <Eye className="h-6 w-6" aria-hidden="true" />
-                  )}
-                </Button>
-              </div>
-            </Card>
-
-            {copyError ? (
-              <p
-                className="mt-4 text-center text-sm text-destructive"
-                data-testid="backup-copy-error"
-              >
-                Could not retrieve your private key: {copyError}. You can
-                continue and find it later in Settings &gt; Profile &gt;
-                Identity.
-              </p>
-            ) : null}
-
-            <p className="mx-auto mt-5 flex max-w-[440px] items-start justify-center gap-1.5 text-center text-xs leading-5 text-[var(--buzz-onboarding-backup-ink)]">
-              <Info className="mt-0.5 h-3.5 w-3.5 shrink-0" />
-              <span>
-                Never share your private key. Anyone with this key can
-                impersonate you and access everything in your account.
+          {/* A contained card at reading width, not a page-wide spotlight:
+              63 mono characters at body size wrap to two tidy lines, and the
+              reveal control lives in the card's header row instead of
+              floating beside a 36px mask. */}
+          <div className="w-full rounded-2xl border border-border/70 bg-card/60 p-5 text-left shadow-xs">
+            <div className="flex items-center justify-between gap-3">
+              <span className="text-2xs font-semibold uppercase tracking-[0.16em] text-muted-foreground">
+                Private key
               </span>
+              <Button
+                aria-label={
+                  isRevealed ? "Hide private key" : "Reveal private key"
+                }
+                className="h-8 w-8 shrink-0 text-muted-foreground hover:text-foreground"
+                data-testid="backup-key-reveal-toggle"
+                onClick={() => void toggleReveal()}
+                size="icon"
+                type="button"
+                variant="ghost"
+              >
+                {isRevealed ? (
+                  <EyeOff className="h-4 w-4" aria-hidden="true" />
+                ) : (
+                  <Eye className="h-4 w-4" aria-hidden="true" />
+                )}
+              </Button>
+            </div>
+            <p
+              className={cn(
+                "mt-2 min-w-0 break-all font-mono text-base leading-7 [overflow-wrap:anywhere]",
+                isRevealed && nsec
+                  ? "select-text text-foreground"
+                  : "select-none text-muted-foreground blur-[3px]",
+              )}
+              data-testid="backup-key-value"
+            >
+              {isRevealed && nsec ? nsec : maskedKey}
             </p>
           </div>
+
+          {copyError ? (
+            <p
+              className="mt-4 text-center text-sm text-destructive"
+              data-testid="backup-copy-error"
+            >
+              Could not retrieve your private key: {copyError}. You can continue
+              and find it later in Settings &gt; Profile &gt; Identity.
+            </p>
+          ) : null}
+
+          <p className="mx-auto mt-4 flex max-w-[440px] items-start justify-center gap-1.5 text-center text-xs leading-5 text-muted-foreground">
+            <Info className="mt-0.5 h-3.5 w-3.5 shrink-0" />
+            <span>
+              Never share your private key. Anyone with this key can impersonate
+              you and access everything in your account.
+            </span>
+          </p>
         </div>
       )}
 
