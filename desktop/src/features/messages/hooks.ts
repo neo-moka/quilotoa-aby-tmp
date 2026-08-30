@@ -161,6 +161,63 @@ export function createOptimisticMessage(
 }
 
 /**
+ * Inserts a pending outgoing row into a channel's timeline *before* the send
+ * mutation runs.
+ *
+ * The composer's send path can spend seconds in preflight when agents are
+ * mentioned (starting agents, preparing DM channels, huddle sync) — during
+ * which the composer is already cleared but nothing shows in the timeline.
+ * This puts the row on screen at submit time; the send mutation adopts it via
+ * `earlyOptimisticId` so ack/rollback reconciliation stays single-owner.
+ * Returns the optimistic id the caller must ferry into the mutation — or
+ * remove with {@link removeEarlyOptimisticMessage} on any pre-send abort.
+ */
+export function insertEarlyOptimisticMessage(
+  queryClient: QueryClient,
+  channelId: string,
+  identity: Identity,
+  input: { content: string; mentionPubkeys?: string[] },
+): string {
+  const previousMessages =
+    queryClient.getQueryData<RelayEvent[]>(channelMessagesKey(channelId)) ?? [];
+  const optimisticMessage = createOptimisticMessage(
+    channelId,
+    input.content.trim(),
+    identity,
+    previousMessages,
+    input.mentionPubkeys ?? [],
+  );
+  const windowKey = channelWindowKey(channelId);
+  const previousWindow =
+    queryClient.getQueryData<ChannelWindowStore>(windowKey) ??
+    emptyChannelWindowStore();
+  queryClient.setQueryData(
+    windowKey,
+    mergeLiveChannelWindowEvent(previousWindow, optimisticMessage),
+  );
+  projectChannelWindowMessages(queryClient, channelId);
+  return optimisticMessage.id;
+}
+
+/** Removes an early optimistic row that never reached the send mutation. */
+export function removeEarlyOptimisticMessage(
+  queryClient: QueryClient,
+  channelId: string,
+  optimisticId: string,
+) {
+  const windowKey = channelWindowKey(channelId);
+  const current = queryClient.getQueryData<ChannelWindowStore>(windowKey);
+  if (!current) return;
+  queryClient.setQueryData(windowKey, {
+    ...current,
+    liveOverlay: current.liveOverlay.filter(
+      (event) => event.id !== optimisticId,
+    ),
+  });
+  projectChannelWindowMessages(queryClient, channelId);
+}
+
+/**
  * Resolves the effective target channel for a send operation.
  *
  * When `capturedChannelId` is supplied (non-null), the target is looked up from
@@ -493,6 +550,12 @@ export function useSendMessageMutation(
       sentFromThreadRootId?: string | null;
       sentFromThreadRootExcerpt?: string | null;
       transport?: "auto" | "http";
+      /**
+       * Row already on screen from `insertEarlyOptimisticMessage`. When set
+       * (and targeting the same channel), `onMutate` adopts it instead of
+       * inserting a second one, and rollback removes rather than restores it.
+       */
+      earlyOptimisticId?: string | null;
     },
     MessageQueryContext | undefined
   >({
@@ -663,6 +726,7 @@ export function useSendMessageMutation(
       mediaTags,
       sentFromThreadRootId,
       sentFromThreadRootExcerpt,
+      earlyOptimisticId,
     }) => {
       // Mirror mutationFn's target resolution so the optimistic message lands
       // in the cache for the same channel as the real send. A caller-supplied
@@ -679,6 +743,15 @@ export function useSendMessageMutation(
         !identity ||
         effectiveChannel.channelType === "forum"
       ) {
+        // An adopted-but-unroutable early row must not linger as forever
+        // pending; best-effort removal from the channel it was placed in.
+        if (earlyOptimisticId && capturedChannelId) {
+          removeEarlyOptimisticMessage(
+            queryClient,
+            capturedChannelId,
+            earlyOptimisticId,
+          );
+        }
         return undefined;
       }
 
@@ -692,15 +765,47 @@ export function useSendMessageMutation(
         queryClient.cancelQueries({ queryKey: windowKey }),
       ]);
 
-      const previousMessages =
+      const rawPreviousMessages =
         queryClient.getQueryData<RelayEvent[]>(queryKey) ?? [];
-      const previousWindow =
+      const rawPreviousWindow =
         queryClient.getQueryData<ChannelWindowStore>(windowKey);
+
+      // Adopt only when the early row actually survived until now — a window
+      // refetch racing the preflight gap can drop it, and adopting a ghost id
+      // would leave the ack with nothing to swap.
+      const earlyRowPresent =
+        Boolean(earlyOptimisticId) &&
+        (rawPreviousWindow?.liveOverlay.some(
+          (event) => event.id === earlyOptimisticId,
+        ) ??
+          false);
+
+      if (earlyOptimisticId && earlyRowPresent) {
+        // Adopt the already-rendered row. Snapshots are stripped of it so an
+        // error rollback removes the row instead of resurrecting it.
+        return {
+          optimisticId: earlyOptimisticId,
+          previousMessages: rawPreviousMessages.filter(
+            (event) => event.id !== earlyOptimisticId,
+          ),
+          previousWindow: rawPreviousWindow
+            ? {
+                ...rawPreviousWindow,
+                liveOverlay: rawPreviousWindow.liveOverlay.filter(
+                  (event) => event.id !== earlyOptimisticId,
+                ),
+              }
+            : rawPreviousWindow,
+          channelId: effectiveChannel.id,
+          queryKey,
+        };
+      }
+
       const optimisticMessage = createOptimisticMessage(
         effectiveChannel.id,
         content.trim(),
         identity,
-        previousMessages,
+        rawPreviousMessages,
         mentionPubkeys ?? [],
         parentEventId ?? null,
         mediaTags ?? [],
@@ -709,7 +814,7 @@ export function useSendMessageMutation(
       );
 
       const nextWindow = mergeLiveChannelWindowEvent(
-        previousWindow ?? emptyChannelWindowStore(),
+        rawPreviousWindow ?? emptyChannelWindowStore(),
         optimisticMessage,
       );
       queryClient.setQueryData(windowKey, nextWindow);
@@ -717,8 +822,8 @@ export function useSendMessageMutation(
 
       return {
         optimisticId: optimisticMessage.id,
-        previousMessages,
-        previousWindow,
+        previousMessages: rawPreviousMessages,
+        previousWindow: rawPreviousWindow,
         channelId: effectiveChannel.id,
         queryKey,
       };

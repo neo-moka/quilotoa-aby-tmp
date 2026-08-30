@@ -42,6 +42,12 @@ export type MarkdownRuntime = {
   /** Inline content supplied to the first prose-capable Markdown block. */
   leadingInlineContent?: React.ReactNode;
   mentionPubkeysByName?: Record<string, string>;
+  /**
+   * The viewer's identity pubkey (hex), or `null` while unresolved. Mentions
+   * that resolve to this pubkey render with the opaque highlighter treatment;
+   * mentions of anyone else stay on the subtle tinted chip.
+   */
+  selfPubkey?: string | null;
   onOpenChannel: (channelId: string) => void;
   /** Navigate to a ABY git entity (`buzz://pr|issue|repo` deep link). */
   onOpenEntityLink: (link: ParsedEntityLink) => void;

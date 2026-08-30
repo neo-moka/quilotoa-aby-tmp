@@ -264,12 +264,14 @@ function ProfileName({
   children,
   highlight = false,
   isAgent = false,
+  isSelf = false,
   pubkey,
   underlineOnHover = false,
 }: {
   children: React.ReactNode;
   highlight?: boolean;
   isAgent?: boolean;
+  isSelf?: boolean;
   pubkey: string | undefined;
   underlineOnHover?: boolean;
 }) {
@@ -279,6 +281,7 @@ function ProfileName({
       data-mention=""
       className={cn(
         isAgentMention && "agent-mention-highlight",
+        isSelf && "mention-self",
         underlineOnHover && "hover:underline",
       )}
       icon={isAgentMention ? "agent" : "human"}
@@ -475,7 +478,12 @@ function describeSystemEvent(
     <ProfileName pubkey={payload.actor}>{actorLabel}</ProfileName>
   );
   const targetName = (
-    <ProfileName highlight isAgent={isTargetAgent} pubkey={payload.target}>
+    <ProfileName
+      highlight
+      isAgent={isTargetAgent}
+      isSelf={isTargetCurrentUser}
+      pubkey={payload.target}
+    >
       {inlineTargetLabel}
     </ProfileName>
   );

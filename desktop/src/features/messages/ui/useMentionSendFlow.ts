@@ -1,5 +1,11 @@
 import * as React from "react";
+import { useQueryClient } from "@tanstack/react-query";
 import { toast } from "@/shared/ui/toast";
+import { useIdentityQuery } from "@/shared/api/hooks";
+import {
+  insertEarlyOptimisticMessage,
+  removeEarlyOptimisticMessage,
+} from "@/features/messages/hooks";
 import {
   type CreateChannelManagedAgentInput,
   useAttachManagedAgentToChannelMutation,
@@ -74,6 +80,8 @@ type UseMentionSendFlowOptions = {
         threadHeadId: string | null;
       } | null,
       forceRest?: boolean,
+      /** Pre-rendered pending row for the mutation to adopt (see hooks.ts). */
+      earlyOptimisticId?: string | null,
     ) => Promise<void>
   >;
   richText: Pick<UseRichTextEditorResult, "clearContent" | "setContent">;
@@ -110,6 +118,8 @@ export function useMentionSendFlow({
   restoreQueuedAttachments,
   setSpoileredAttachmentUrls,
 }: UseMentionSendFlowOptions) {
+  const queryClient = useQueryClient();
+  const identity = useIdentityQuery().data;
   const [pendingNonMemberSend, setPendingNonMemberSend] =
     React.useState<PendingNonMemberMentionSend | null>(null);
   const [nonMemberPromptError, setNonMemberPromptError] = React.useState<
@@ -366,7 +376,22 @@ export function useMentionSendFlow({
         draft.queuedAttachments.length > 0
           ? prepareBackgroundMediaUpload(draft.queuedAttachments)
           : null;
+      // Early optimistic row: on screen from the instant the composer clears,
+      // so agent-preflight (starting agents, DM prepare, huddle sync) no
+      // longer delays the message's appearance. Consumed by the mutation via
+      // `earlyOptimisticId`; every pre-send abort below must remove it.
+      let earlyOptimistic: { channelId: string; id: string } | null = null;
+      const removeEarlyOptimistic = () => {
+        if (!earlyOptimistic) return;
+        removeEarlyOptimisticMessage(
+          queryClient,
+          earlyOptimistic.channelId,
+          earlyOptimistic.id,
+        );
+        earlyOptimistic = null;
+      };
       const persistPreflightDraft = () => {
+        removeEarlyOptimistic();
         if (isSendCancelled() || !draft.recoveryDraftKey) return;
         drafts.persistDraft(
           draft.recoveryDraftKey,
@@ -407,6 +432,7 @@ export function useMentionSendFlow({
       };
       let composerCleared = false;
       const restoreComposerAfterFailure = () => {
+        removeEarlyOptimistic();
         if (!composerCleared) return;
         composerCleared = false;
         persistCanceledDraft();
@@ -452,6 +478,25 @@ export function useMentionSendFlow({
         }
         clearComposer();
         composerCleared = true;
+      }
+      if (
+        identity &&
+        draft.capturedChannelId &&
+        draft.capturedThreadContext === null &&
+        draft.queuedAttachments.length === 0 &&
+        draft.savedImeta.length === 0 &&
+        draft.trimmed.length > 0 &&
+        channelType !== "forum"
+      ) {
+        earlyOptimistic = {
+          channelId: draft.capturedChannelId,
+          id: insertEarlyOptimisticMessage(
+            queryClient,
+            draft.capturedChannelId,
+            identity,
+            { content: draft.trimmed, mentionPubkeys },
+          ),
+        };
       }
       let uploadStarted = false;
       try {
@@ -563,11 +608,16 @@ export function useMentionSendFlow({
             mediaTags,
             outgoingTags,
           );
-          if (!finalOutgoingTags || signal?.aborted || isSendCancelled())
+          if (!finalOutgoingTags || signal?.aborted || isSendCancelled()) {
+            removeEarlyOptimistic();
             return;
+          }
           const revalidatedMentionPubkeys =
             await mentions.revalidateMentionPubkeys(mentionPubkeys);
-          if (signal?.aborted || isSendCancelled()) return;
+          if (signal?.aborted || isSendCancelled()) {
+            removeEarlyOptimistic();
+            return;
+          }
           const finalTagsWithAgentAddress = [
             ...finalOutgoingTags,
             ...buildAgentAddressMentionTags(
@@ -575,6 +625,19 @@ export function useMentionSendFlow({
               revalidatedMentionPubkeys,
             ),
           ];
+          // A DM prepare can retarget the send; a row sitting in the original
+          // channel must not survive that — the mutation re-creates its own
+          // optimistic row in the real target.
+          if (
+            earlyOptimistic &&
+            earlyOptimistic.channelId !== (sendChannelId ?? null)
+          ) {
+            removeEarlyOptimistic();
+          }
+          // From here the mutation owns the row's lifecycle (adopt on mutate,
+          // swap on ack, strip on rollback) — pre-send cleanup must let go.
+          const adoptedOptimisticId = earlyOptimistic?.id ?? null;
+          earlyOptimistic = null;
           await send(
             finalContent,
             revalidatedMentionPubkeys,
@@ -582,6 +645,7 @@ export function useMentionSendFlow({
             sendChannelId,
             draft.capturedThreadContext,
             draft.preparedLinkPreviews != null,
+            adoptedOptimisticId,
           );
           if (signal?.aborted || isSendCancelled()) return;
           const sentMentionPubkeys = new Set(

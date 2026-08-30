@@ -168,8 +168,24 @@ export function selectNeedsYouRows(input: {
   needsAction?: readonly FeedItem[];
   mentions?: readonly FeedItem[];
   doneIds?: ReadonlySet<string>;
+  /**
+   * Drop plain mention rows (user preference). Approvals survive even when
+   * they arrived via the mentions bucket — they block someone else's work,
+   * which a display preference must not hide.
+   */
+  hideMentions?: boolean;
   limit?: number;
-}): { rows: NeedsYouRow[]; hiddenCount: number; totalCount: number } {
+}): {
+  rows: NeedsYouRow[];
+  hiddenCount: number;
+  totalCount: number;
+  /**
+   * Every surviving candidate id (not just the rendered window), split by
+   * whether "clear all" may sweep it — approvals are excluded because
+   * marking one done without acting on it hides genuinely blocked work.
+   */
+  clearableIds: string[];
+} {
   const limit = input.limit ?? SIDEBAR_NOW_ROW_LIMIT;
   const doneIds = input.doneIds;
   const seen = new Set<string>();
@@ -181,6 +197,13 @@ export function selectNeedsYouRows(input: {
   ]) {
     if (seen.has(item.id)) continue;
     if (doneIds?.has(item.id)) continue;
+    if (
+      input.hideMentions &&
+      item.category === "mention" &&
+      !isApprovalRequest(item)
+    ) {
+      continue;
+    }
     seen.add(item.id);
     candidates.push(toNeedsYouRow(item));
   }
@@ -198,6 +221,9 @@ export function selectNeedsYouRows(input: {
     rows,
     hiddenCount: candidates.length - rows.length,
     totalCount: candidates.length,
+    clearableIds: candidates
+      .filter((row) => !row.isApproval)
+      .map((row) => row.id),
   };
 }
 

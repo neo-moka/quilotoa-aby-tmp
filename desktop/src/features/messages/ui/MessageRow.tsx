@@ -1,5 +1,5 @@
 import * as React from "react";
-import { AlertTriangle } from "lucide-react";
+import { AlertTriangle, CheckCheck } from "lucide-react";
 
 import {
   depthGuideActionsEqual,
@@ -42,6 +42,10 @@ import { parseImetaTags } from "@/shared/ui/markdown/parseImeta";
 import { useMessageEmoji } from "@/features/messages/lib/useMessageEmoji";
 import { parseWaveMessageContent } from "@/features/messages/lib/waveMessage";
 import { resolveSnapshotSharedBy } from "@/features/messages/lib/snapshotSharedBy";
+import {
+  formatAgentSignalNames,
+  splitAgentSignalReactions,
+} from "@/features/messages/lib/agentSignalReactions";
 import { resolveMentionProps } from "@/shared/lib/resolveMentionNames";
 import type { VideoReviewContext } from "@/shared/ui/VideoPlayer";
 import { VideoReviewCommentMarkdown } from "@/shared/ui/VideoReviewCommentMarkdown";
@@ -212,7 +216,7 @@ export const MessageRow = React.memo(
       [message.id, onEntranceComplete, playEntrance],
     );
     const {
-      reactions,
+      reactions: rawReactions,
       canToggle: canToggleReactions,
       pending: reactionPending,
       errorMessage: reactionErrorMessage,
@@ -262,6 +266,33 @@ export const MessageRow = React.memo(
       },
       [knownAgentPubkeys, profiles],
     );
+    // Agent lifecycle signals (👀 seen / 💬 working) leave the reaction chips
+    // and render as WhatsApp-style status below the message instead.
+    // The tick only advances when a working signal is due to cross the
+    // staleness cutoff, so an orphaned 💬 (agent restarted mid-turn) demotes
+    // itself to "seen" without user interaction — and idle rows never tick.
+    const [signalClockMs, setSignalClockMs] = React.useState(() => Date.now());
+    const agentSignalSplit = React.useMemo(
+      () =>
+        splitAgentSignalReactions(
+          rawReactions,
+          isKnownAgentPubkey,
+          signalClockMs,
+        ),
+      [isKnownAgentPubkey, rawReactions, signalClockMs],
+    );
+    const reactions = agentSignalSplit.humanReactions ?? rawReactions;
+    const { seenByAgents, workingAgents, workingExpiresAtMs } =
+      agentSignalSplit;
+    React.useEffect(() => {
+      if (workingExpiresAtMs === null) return;
+      const delay = Math.max(0, workingExpiresAtMs - Date.now()) + 1_000;
+      const timer = window.setTimeout(
+        () => setSignalClockMs(Date.now()),
+        delay,
+      );
+      return () => window.clearTimeout(timer);
+    }, [workingExpiresAtMs]);
     const profilePopoverRole =
       message.role === "bot" ||
       (message.pubkey && isKnownAgentPubkey(message.pubkey))
@@ -694,6 +725,32 @@ export const MessageRow = React.memo(
             void handleReactionSelect(emoji);
           }}
         />
+        {workingAgents.length > 0 ? (
+          <p
+            className="mt-1 flex items-center gap-1.5 text-xs text-muted-foreground"
+            data-testid="agent-working-status"
+          >
+            <span
+              aria-hidden
+              className="size-1.5 shrink-0 rounded-full bg-primary motion-safe:animate-pulse"
+            />
+            <span className="min-w-0 truncate">
+              {formatAgentSignalNames(workingAgents)}
+              {workingAgents.length === 1 ? " is" : " are"} working on this…
+            </span>
+          </p>
+        ) : seenByAgents.length > 0 ? (
+          <p
+            className="mt-1 flex items-center gap-1 text-xs text-muted-foreground/80"
+            data-testid="agent-seen-status"
+            title={`Seen by ${formatAgentSignalNames(seenByAgents)}`}
+          >
+            <CheckCheck aria-hidden className="size-3.5 shrink-0" />
+            <span className="min-w-0 truncate">
+              Seen by {formatAgentSignalNames(seenByAgents)}
+            </span>
+          </p>
+        ) : null}
         {reactionErrorMessage ? (
           <p className="mt-1.5 text-xs text-destructive">
             {reactionErrorMessage}
@@ -886,7 +943,16 @@ export const MessageRow = React.memo(
             playEntrance && "motion-enter-conversation",
             "py-conversation-row",
             hoverBackground
-              ? "mx-1 px-2 hover:bg-muted/50 focus-within:bg-muted/50"
+              ? cn(
+                  // Timeline rows bleed to the scroll container's edges so the
+                  // hover tint reads as a full-width band instead of a floating
+                  // box that stops short of the panel (px-7 restores the text
+                  // to the exact x it had under `mx-1 px-2`). Thread-panel rows
+                  // keep the inset box — their container is narrower and lacks
+                  // the bleed allowance.
+                  isThreadReplyLayout ? "mx-1 px-2" : "-mx-4 rounded-none px-7",
+                  "hover:bg-muted/50 focus-within:bg-muted/50",
+                )
               : isThreadReplyLayout
                 ? "mx-1 px-2"
                 : "px-2",

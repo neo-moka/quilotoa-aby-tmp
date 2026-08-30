@@ -11,6 +11,12 @@ export type AuxiliaryPanelContextValue = {
   layout: AuxiliaryPanelLayout;
   mode: AuxiliaryPanelMode;
   onClose: () => void;
+  /**
+   * Override for the close action's test id. The right dock passes its own so
+   * specs written against `auxiliary-panel-close` keep resolving uniquely to
+   * screen-local panels while the dock is open.
+   */
+  closeTestId?: string;
   transparentChrome: boolean;
   widthPx: number;
 };

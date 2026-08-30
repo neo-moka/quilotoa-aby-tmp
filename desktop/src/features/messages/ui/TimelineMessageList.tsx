@@ -737,7 +737,11 @@ function VirtualizedTimelineRows({
       <PreserveVirtualizedItemVisibilityContext value={isPrepend}>
         <VList
           ref={listRef}
-          className="h-full min-h-0 w-full overflow-y-auto overflow-x-hidden overscroll-contain px-4 pt-[var(--channel-top-chrome-height,4.5rem)]"
+          // max(): the measured channel-header var wins in channels (a 3-row
+          // header outgrows any fixed guess and was clipping the intro), while
+          // the huddle transcript — which pins the measured var to 0 — keeps
+          // its 0.25rem top-chrome inset.
+          className="h-full min-h-0 w-full overflow-y-auto overflow-x-hidden overscroll-contain px-4 pt-[max(var(--buzz-channel-content-top-padding,4.5rem),var(--channel-top-chrome-height,0rem))]"
           data={items}
           item={VirtualizedTimelineItemShell}
           itemSize={estimateItemSize}

@@ -1,5 +1,6 @@
 import type * as React from "react";
 import * as BuzzTheme from "@/app/BuzzThemeSurfaces";
+import { RightDock } from "@/features/dock/RightDock";
 import { HuddleRoomHeader, HuddleStartingView } from "@/features/huddle";
 import { MainInsetProvider } from "@/shared/layout/MainInsetContext";
 import { chromeCssVarDefaults } from "@/shared/layout/chromeLayout";
@@ -51,9 +52,14 @@ export function AppShellChannelSurface({
           />
         ) : null}
         {isHuddleRoom && !isHuddleRoomStarting ? <HuddleRoomHeader /> : null}
-        <BuzzTheme.ContentSurface terminal={terminal} unframed={isHuddleRoom}>
-          {isHuddleRoomStarting ? <HuddleStartingView /> : children}
-        </BuzzTheme.ContentSurface>
+        {/* The dock is a sibling card on the sidebar-colored shell — the
+            same pod grammar as the content card — not a column inside it. */}
+        <div className="flex min-h-0 min-w-0 flex-1 flex-row">
+          <BuzzTheme.ContentSurface terminal={terminal} unframed={isHuddleRoom}>
+            {isHuddleRoomStarting ? <HuddleStartingView /> : children}
+          </BuzzTheme.ContentSurface>
+          {isHuddleRoom ? null : <RightDock />}
+        </div>
       </SidebarInset>
     </MainInsetProvider>
   );

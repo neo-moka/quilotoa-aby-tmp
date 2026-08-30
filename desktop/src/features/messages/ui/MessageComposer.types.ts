@@ -92,6 +92,11 @@ export type MessageComposerProps = {
     } | null,
     /** Route through the REST publisher even when best-effort enrichment settled empty. */
     forceRest?: boolean,
+    /**
+     * Pending row already rendered at submit time for the send mutation to
+     * adopt (see `insertEarlyOptimisticMessage` in `messages/hooks.ts`).
+     */
+    earlyOptimisticId?: string | null,
   ) => Promise<void>;
   placeholder?: string;
   profiles?: UserProfileLookup;

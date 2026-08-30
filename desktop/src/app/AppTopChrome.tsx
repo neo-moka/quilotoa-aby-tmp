@@ -1,6 +1,13 @@
 import * as React from "react";
-import { ChevronLeft, ChevronRight } from "lucide-react";
+import { ChevronLeft, ChevronRight, SquareTerminal } from "lucide-react";
 
+import { toggleRightDock, useRightDock } from "@/features/dock/rightDockStore";
+import { NotificationsBell } from "@/features/notifications/ui/NotificationsBell";
+import {
+  toggleTerminalPanel,
+  useTerminalPanel,
+} from "@/features/terminal/terminalPanelStore";
+import { setTopChromeSearchSlot } from "@/shared/layout/topChromeSearchSlot";
 import { isMacPlatform } from "@/shared/lib/platform";
 import { useIsFullscreen } from "@/shared/lib/useIsFullscreen";
 import { Button } from "@/shared/ui/button";
@@ -32,6 +39,12 @@ type AppTopChromeProps = {
   hasCommunityRail?: boolean;
   /** Active community, shown as the window's standing title. */
   communityName?: string | null;
+  /**
+   * Whether the terminal panel can open right now (it needs an active channel
+   * plus identity/relay context). The trigger stays visible but disabled
+   * without it, so the affordance is discoverable outside channels.
+   */
+  terminalAvailable?: boolean;
 };
 
 // Fixed px on purpose (button box + glyph): these controls sit beside the
@@ -58,7 +71,7 @@ function preventTopChromeWheel(event: WheelEvent) {
  * (projects center a breadcrumb there); two titles in one strip read as two
  * apps. Watched with a MutationObserver because portals mount after this row.
  */
-function TopChromeCommunityLabel({ name }: { name: string }) {
+function useTopChromeContentPortalBusy() {
   const [portalBusy, setPortalBusy] = React.useState(false);
 
   React.useEffect(() => {
@@ -71,6 +84,12 @@ function TopChromeCommunityLabel({ name }: { name: string }) {
     return () => observer.disconnect();
   }, []);
 
+  return portalBusy;
+}
+
+function TopChromeCommunityLabel({ name }: { name: string }) {
+  const portalBusy = useTopChromeContentPortalBusy();
+
   if (portalBusy) return null;
 
   return (
@@ -81,6 +100,82 @@ function TopChromeCommunityLabel({ name }: { name: string }) {
     >
       {name}
     </span>
+  );
+}
+
+/**
+ * Centered mount point for the global search trigger. The sidebar owns the
+ * search (channels, labels and navigation are wired there) and portals its
+ * trigger here — see `AppSidebarPinnedHeader`. Hidden while a screen projects
+ * its own chrome into `#app-top-chrome-content`, same rule as the community
+ * label; `display: none` rather than unmount so the portal target survives.
+ */
+function TopChromeSearchSlot() {
+  const portalBusy = useTopChromeContentPortalBusy();
+
+  return (
+    <div
+      // True vertical center, deliberately without the macOS +3px nudge the
+      // nav buttons carry: on a 32px pill the nudge reads as misalignment
+      // (11px above vs 5px below), while a 3px delta against the small
+      // controls is imperceptible.
+      className={cn(
+        "absolute left-1/2 top-1/2 z-10 w-[min(34rem,40vw)] -translate-x-1/2 -translate-y-1/2",
+        portalBusy && "hidden",
+      )}
+      data-testid="top-chrome-search-slot"
+      ref={setTopChromeSearchSlot}
+    />
+  );
+}
+
+/**
+ * Right-edge counterpart of the sidebar trigger. It toggles the app-level
+ * right dock (`features/dock`) — a standing column on every screen whose
+ * default view is agent activity — so it is never gated on a channel.
+ */
+function TopChromeRightPanelTrigger() {
+  const dock = useRightDock();
+
+  return (
+    <Button
+      aria-label="Toggle Right Dock"
+      aria-pressed={dock.open}
+      className={TOP_CHROME_ICON_BUTTON_CLASS}
+      data-testid="top-chrome-right-panel-trigger"
+      onClick={() => toggleRightDock()}
+      size="icon"
+      type="button"
+      variant="ghost"
+    >
+      <DrawerPanelIcon edge="right" open={dock.open} />
+      <span className="sr-only">Toggle Right Dock</span>
+    </Button>
+  );
+}
+
+function TopChromeTerminalTrigger({ available }: { available: boolean }) {
+  const panel = useTerminalPanel();
+  const isOpen = panel.mode !== "closed";
+
+  return (
+    <Button
+      aria-label="Toggle Terminal"
+      aria-pressed={isOpen}
+      className={cn(
+        TOP_CHROME_ICON_BUTTON_CLASS,
+        isOpen && "bg-sidebar-accent text-sidebar-accent-foreground",
+      )}
+      data-testid="top-chrome-terminal-trigger"
+      disabled={!available}
+      onClick={() => toggleTerminalPanel()}
+      size="icon"
+      type="button"
+      variant="ghost"
+    >
+      <SquareTerminal className="size-[16px]" />
+      <span className="sr-only">Toggle Terminal</span>
+    </Button>
   );
 }
 
@@ -100,7 +195,7 @@ function TopChromeSidebarTrigger() {
       type="button"
       variant="ghost"
     >
-      <DrawerPanelIcon side={sidebar?.open ? "left" : "right"} />
+      <DrawerPanelIcon open={sidebar?.open ?? false} />
       <span className="sr-only">Toggle Sidebar</span>
     </Button>
   );
@@ -113,6 +208,7 @@ export function AppTopChrome({
   onGoForward,
   hasCommunityRail = false,
   communityName = null,
+  terminalAvailable = false,
 }: AppTopChromeProps) {
   const topChromeRef = React.useRef<HTMLDivElement>(null);
   const isFullscreen = useIsFullscreen();
@@ -218,6 +314,12 @@ export function AppTopChrome({
         data-tauri-drag-region
         id="app-top-chrome-content"
       />
+      <TopChromeSearchSlot />
+      <div className={cn("flex items-center gap-0.5", navRowAlignmentClass)}>
+        <NotificationsBell triggerClassName={TOP_CHROME_ICON_BUTTON_CLASS} />
+        <TopChromeTerminalTrigger available={terminalAvailable} />
+        <TopChromeRightPanelTrigger />
+      </div>
     </div>
   );
 }

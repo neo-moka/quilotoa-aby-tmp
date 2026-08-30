@@ -308,6 +308,7 @@ export function useChannelPaneHandlers({
         threadHeadId: string | null;
       } | null,
       forceRest?: boolean,
+      earlyOptimisticId?: string | null,
     ) => {
       await sendMutateRef.current({
         content,
@@ -315,6 +316,7 @@ export function useChannelPaneHandlers({
         mediaTags,
         channelId: channelId ?? undefined,
         forceRest,
+        earlyOptimisticId,
       });
     },
     [],

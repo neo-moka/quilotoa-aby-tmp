@@ -332,7 +332,10 @@ export function WelcomeComposerBanner({
                 : 0,
           }}
           className={cn(
-            "relative z-[1] mx-5 mb-0 flex items-center gap-2 rounded-t-2xl border border-b-0 px-4 pb-5 pt-2.5 text-sm leading-5 transition-colors",
+            // text-xs, not text-sm: this is a coach mark, one step below the
+            // conversation it annotates — at the composer's own size it read
+            // as a message someone sent.
+            "relative z-[1] mx-5 mb-0 flex items-center gap-2 rounded-t-2xl border border-b-0 px-4 pb-5 pt-2 text-xs leading-4 transition-colors",
             state !== "prompt"
               ? "border-emerald-500/30 bg-emerald-500/15 text-foreground"
               : "border-border/60 bg-muted/55 text-muted-foreground",
@@ -374,7 +377,7 @@ export function WelcomeComposerBanner({
                 key="prompt-icon"
                 variants={welcomeComposerBannerContentVariants}
               >
-                <Bot aria-hidden className="h-4 w-4" />
+                <Bot aria-hidden className="h-3.5 w-3.5" />
               </motion.span>
             )}
           </AnimatePresence>
@@ -411,8 +414,8 @@ export function WelcomeComposerBanner({
                 key="prompt-copy"
                 variants={welcomeComposerBannerContentVariants}
               >
-                Mention <WelcomeComposerPersonaMention /> or another teammate
-                whenever you want their help.
+                Mention <WelcomeComposerPersonaMention /> and it jumps in — type
+                @ to see the whole team.
               </motion.span>
             )}
           </AnimatePresence>

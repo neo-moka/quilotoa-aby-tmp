@@ -59,6 +59,7 @@ export function ChannelManagementAuxiliaryPanel({
 
   return (
     <RightAuxiliaryPane
+      animated
       canResetWidth={canResetThreadPanelWidth}
       onResetWidth={onResetThreadPanelWidth}
       onResizeStart={onThreadPanelResizeStart}

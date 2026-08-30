@@ -781,6 +781,11 @@ export function AppShell() {
                       hasCommunityRail={hasCommunityRail}
                       onGoBack={goBack}
                       onGoForward={goForward}
+                      terminalAvailable={Boolean(
+                        effectiveTerminalContext.channelId &&
+                          effectiveTerminalContext.npub &&
+                          effectiveTerminalContext.relayUrl,
+                      )}
                     />
                   ) : null}
                   {settingsOpen ? (

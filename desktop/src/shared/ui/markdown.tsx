@@ -20,6 +20,7 @@ import {
   type ParsedMessageLink,
 } from "@/features/messages/lib/messageLink";
 import { UserProfilePopover } from "@/features/profile/ui/UserProfilePopover";
+import { useIdentityQuery } from "@/shared/api/hooks";
 import { invokeTauri } from "@/shared/api/tauri";
 import { useChannelNavigation } from "@/shared/context/ChannelNavigationContext";
 import { cn } from "@/shared/lib/cn";
@@ -1583,7 +1584,7 @@ export function createMarkdownComponents(
     }: {
       children?: React.ReactNode;
     }) {
-      const { agentMentionPubkeysByName, mentionPubkeysByName } =
+      const { agentMentionPubkeysByName, mentionPubkeysByName, selfPubkey } =
         useMarkdownRuntime();
       const mentionText = String(children ?? "");
       const mentionName = mentionText.replace(/^@/, "").trim().toLowerCase();
@@ -1591,6 +1592,10 @@ export function createMarkdownComponents(
       const isAgentMention =
         pubkey !== undefined &&
         agentMentionPubkeysByName?.[mentionName] === pubkey;
+      const isSelfMention =
+        pubkey !== undefined &&
+        typeof selfPubkey === "string" &&
+        pubkey.toLowerCase() === selfPubkey.toLowerCase();
       const mentionLabel = mentionText.replace(/^@/, "");
       // Only chips that actually open a profile get the clickable affordance.
       // A mention whose pubkey didn't resolve stays a plain chip — a pointer
@@ -1599,7 +1604,10 @@ export function createMarkdownComponents(
       const mentionNode = (
         <InlineChip
           data-mention=""
-          className={cn(isAgentMention && "agent-mention-highlight")}
+          className={cn(
+            isAgentMention && "agent-mention-highlight",
+            isSelfMention && "mention-self",
+          )}
           icon={isAgentMention ? "agent" : "human"}
           interactive={opensProfile}
         >
@@ -1763,6 +1771,9 @@ function MarkdownInner({
     [goChannel],
   );
   const relayOrigin = useRelayOrigin();
+  // Depend on the stable pubkey string, not the query object — the query
+  // result is a fresh object every render and would defeat the runtime memo.
+  const selfPubkey = useIdentityQuery().data?.pubkey ?? null;
   const resolvedLinkPreviews = useMessageLinkPreviews({
     content,
     interactive,
@@ -1781,6 +1792,7 @@ function MarkdownInner({
       imetaByUrl,
       leadingInlineContent,
       mentionPubkeysByName,
+      selfPubkey,
       onOpenChannel,
       onOpenEntityLink,
       onOpenMessageLink,
@@ -1802,6 +1814,7 @@ function MarkdownInner({
       imetaByUrl,
       leadingInlineContent,
       mentionPubkeysByName,
+      selfPubkey,
       onOpenChannel,
       onOpenEntityLink,
       onOpenMessageLink,

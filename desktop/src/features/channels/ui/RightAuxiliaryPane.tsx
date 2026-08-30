@@ -1,9 +1,17 @@
 import type * as React from "react";
+import { motion, useReducedMotion } from "motion/react";
 
 import { AUXILIARY_PANEL_MIN_WIDTH_PX } from "@/shared/layout/AuxiliaryPanel";
 import { cn } from "@/shared/lib/cn";
 
 type RightAuxiliaryPaneProps = {
+  /**
+   * Animate open/close like the left sidebar (200ms linear width reveal with
+   * a content fade). Only meaningful under an `AnimatePresence` — the exit leg
+   * needs it to hold the unmount. Consumers that keep the pane permanently
+   * mounted (projects, home) leave this off so nothing moves on screen load.
+   */
+  animated?: boolean;
   canResetWidth: boolean;
   children: React.ReactNode;
   constrainToAvailableSpace?: boolean;
@@ -14,7 +22,10 @@ type RightAuxiliaryPaneProps = {
   widthPx: number;
 };
 
+const PANE_TRANSITION = { duration: 0.2, ease: "linear" } as const;
+
 export function RightAuxiliaryPane({
+  animated = false,
   canResetWidth,
   children,
   constrainToAvailableSpace = true,
@@ -24,7 +35,14 @@ export function RightAuxiliaryPane({
   testId,
   widthPx,
 }: RightAuxiliaryPaneProps) {
-  return (
+  const prefersReducedMotion = useReducedMotion();
+  const animate = animated && !prefersReducedMotion;
+  const transition = animate ? PANE_TRANSITION : { duration: 0 };
+  const maxWidth = constrainToAvailableSpace
+    ? `calc(100% - ${AUXILIARY_PANEL_MIN_WIDTH_PX}px)`
+    : undefined;
+
+  const pane = (
     <aside
       className={cn(
         // `bg-sidebar`, not `bg-background`: this pane is chrome, and the app
@@ -39,9 +57,10 @@ export function RightAuxiliaryPane({
       )}
       data-testid={testId}
       style={{
-        maxWidth: constrainToAvailableSpace
-          ? `calc(100% - ${AUXILIARY_PANEL_MIN_WIDTH_PX}px)`
-          : undefined,
+        // In the animated path the wrapper below owns the clamp: its `100%`
+        // resolves against the pane row, while the aside's own would resolve
+        // against the content-sized wrapper and squeeze itself.
+        maxWidth: animated ? undefined : maxWidth,
         width: widthPx,
       }}
     >
@@ -60,9 +79,33 @@ export function RightAuxiliaryPane({
       >
         <span className="absolute bottom-0 left-1/2 top-0 w-px -translate-x-1/2 bg-transparent group-hover/right-pane-resize:bg-border/80 group-focus-visible/right-pane-resize:bg-border/80" />
       </button>
-      <div className="relative flex min-h-0 min-w-0 flex-1 flex-col">
+      <motion.div
+        animate={animate ? { opacity: 1, x: 0 } : undefined}
+        className="relative flex min-h-0 min-w-0 flex-1 flex-col"
+        exit={animate ? { opacity: 0, x: 24, transition } : undefined}
+        initial={animate ? { opacity: 0, x: 24 } : false}
+        transition={transition}
+      >
         {children}
-      </div>
+      </motion.div>
     </aside>
+  );
+
+  if (!animated) return pane;
+
+  // Same mechanism as `RightDock`: an overflow-hidden wrapper animating
+  // 0 ↔ auto reveals the fixed-width pane. The pane's live width (resize
+  // drags) flows through instantly because the wrapper rests at `auto`.
+  return (
+    <motion.div
+      animate={{ width: "auto" }}
+      className="flex h-full min-h-0 shrink-0 overflow-hidden"
+      exit={{ width: 0, transition }}
+      initial={{ width: 0 }}
+      style={{ maxWidth }}
+      transition={transition}
+    >
+      {pane}
+    </motion.div>
   );
 }

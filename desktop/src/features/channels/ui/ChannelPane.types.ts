@@ -116,6 +116,8 @@ export type ChannelPaneProps = {
       threadHeadId: string | null;
     } | null,
     forceRest?: boolean,
+    /** Pre-rendered pending row for the send mutation to adopt. */
+    earlyOptimisticId?: string | null,
   ) => Promise<void>;
   onSendToChannel: (
     message: TimelineMessage,
