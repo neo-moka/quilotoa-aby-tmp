@@ -21,6 +21,14 @@ edition = "2021"
 name = "buzz_lib"
 crate-type = ["staticlib", "cdylib", "rlib"]
 
+# The binary is named for the product, not the crate: on macOS the Dock and
+# the app switcher show the process name in dev (`tauri dev` runs the raw
+# binary, no .app wrapper), so `buzz-desktop` surfaced as the app's name.
+# `instance_reaper::DESKTOP_BINARY_NAMES` already lists "ABY" for this.
+[[bin]]
+name = "ABY"
+path = "src/main.rs"
+
 [features]
 default = ["system-keyring"]
 mesh-llm = ["dep:iroh", "dep:mesh-llm-sdk", "dep:mesh-llm-host-runtime", "dep:mesh-llm-client", "dep:mesh-llm-node", "dep:mesh-llm-system", "dep:mesh-llm-events"]

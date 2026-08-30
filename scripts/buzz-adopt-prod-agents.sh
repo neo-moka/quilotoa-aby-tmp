@@ -172,9 +172,10 @@ say "[1/4] Preflight"
 
 # 1a. Refuse if a running DEV build is detected; a running installed DMG is
 #     allowed (read-only detection; never kills). The main app binary is
-#     `buzz-desktop` for both the installed DMG
-#     (/Applications/ABY.app/Contents/MacOS/buzz-desktop) and dev builds
-#     (target/<profile>/buzz-desktop via `tauri dev`). Match that path component
+#     `ABY` for both the installed DMG
+#     (/Applications/ABY.app/Contents/MacOS/ABY) and dev builds
+#     (target/<profile>/ABY via `tauri dev`); older builds shipped as
+#     `buzz-desktop`, so both names are matched. Match the path component
 #     exactly so sidecars/helpers (buzz, buzz-dev-mcp, buzz-agent) don't
 #     false-positive.
 #
@@ -194,7 +195,9 @@ say "[1/4] Preflight"
 #     and resolution (path unresolvable AND process gone) is ignored — it is no
 #     longer running. A PID still alive but unresolvable (permissions, exotic
 #     state) blocks.
-ALLOWED_PROD_EXE="/Applications/ABY.app/Contents/MacOS/buzz-desktop"
+ALLOWED_PROD_EXE="/Applications/ABY.app/Contents/MacOS/ABY"
+# Pre-rename installs keep working: the old binary name is still allowed.
+ALLOWED_PROD_EXE_LEGACY="/Applications/ABY.app/Contents/MacOS/buzz-desktop"
 
 # Echo a PID's true executable path (first txt-mapped vnode), or empty if none.
 # lsof exits nonzero when the PID is gone; callers use `|| true` so a raced exit
@@ -221,18 +224,19 @@ pid_gone() {
   [[ $rc -eq 1 && -z "$out" && $had_err -eq 0 ]]
 }
 
-running_pids="$(pgrep -f '/buzz-desktop( |$)' 2>/dev/null || true)"
+running_pids="$(pgrep -f '/(ABY|buzz-desktop)( |$)' 2>/dev/null || true)"
 dmg_running=0
 dev_blocking=()   # "pid:reason" for each PID that blocks the run
 if [[ -n "$running_pids" ]]; then
-  # Canonicalize the allow-path once (resolve any symlink in the DMG bundle
+  # Canonicalize the allow-paths once (resolve any symlink in the DMG bundle
   # path) so a symlinked DMG binary still matches the resolved lsof vnode.
   allowed_real="$(realpath "$ALLOWED_PROD_EXE" 2>/dev/null || printf '%s' "$ALLOWED_PROD_EXE")"
+  allowed_legacy_real="$(realpath "$ALLOWED_PROD_EXE_LEGACY" 2>/dev/null || printf '%s' "$ALLOWED_PROD_EXE_LEGACY")"
   while IFS= read -r pid; do
     [[ -n "$pid" ]] || continue
     exe="$(pid_exe_path "$pid" || true)"
     exe_real="$(realpath "$exe" 2>/dev/null || printf '%s' "$exe")"
-    if [[ -n "$exe" && "$exe_real" == "$allowed_real" ]]; then
+    if [[ -n "$exe" && ( "$exe_real" == "$allowed_real" || "$exe_real" == "$allowed_legacy_real" ) ]]; then
       dmg_running=1
     elif pid_gone "$pid"; then
       : # process exited between pgrep and resolution — no longer running, ignore
@@ -244,7 +248,7 @@ if [[ -n "$running_pids" ]]; then
   done <<< "$running_pids"
 fi
 if [[ ${#dev_blocking[@]} -gt 0 ]]; then
-  warn "A non-installed buzz-desktop process is running (dev build or unresolvable):"
+  warn "A non-installed ABY desktop process is running (dev build or unresolvable):"
   for entry in "${dev_blocking[@]}"; do warn "  PID ${entry%%:*} → ${entry#*:}"; done
   warn "Quit any running dev build, then re-run. This script never kills processes."
   exit 1
