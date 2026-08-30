@@ -104,15 +104,15 @@ fn format_elapsed(elapsed: Duration) -> String {
     format!("{hours}h {minutes}m {seconds}s")
 }
 
-/// The ABY bee mark, pre-rendered as a menu-bar-sized alpha mask.
+/// The ABY wordmark, pre-rendered as a menu-bar-sized alpha mask.
 ///
-/// The wordmark it replaces read wide and heavy next to the system's compact
-/// menu-bar glyphs; the bee is the same silhouette the app icon carries
-/// (wings, body, eye and slot cutouts), rendered at 18pt-equivalent height
-/// with a transparent margin.
-const TRAY_BEE_MASK: &[u8] = include_bytes!("../icons/tray-aby.png");
+/// Cropped to the lettering's bounding box from `icons/aby-source.png` (its
+/// near-black background floored to zero alpha) and sized to a 16pt-equivalent
+/// height at 2x, so it sits beside the system's compact template glyphs
+/// instead of towering over them the way the earlier full-height render did.
+const TRAY_MARK_MASK: &[u8] = include_bytes!("../icons/tray-aby.png");
 
-/// Builds the standalone ABY bee mark as a transparent, macOS template image.
+/// Builds the standalone ABY wordmark as a transparent, macOS template image.
 ///
 /// The app icon sits on a filled square, which is what the Dock wants but
 /// looks out of place beside the monochrome menu-bar icons. Only the alpha
@@ -122,7 +122,7 @@ const TRAY_BEE_MASK: &[u8] = include_bytes!("../icons/tray-aby.png");
 /// `None` only if the embedded mask stops decoding, which the tray treats as
 /// "install the menu without an icon" rather than failing the whole launch.
 fn tray_mark_icon() -> Option<Image<'static>> {
-    let mask = image::load_from_memory_with_format(TRAY_BEE_MASK, image::ImageFormat::Png)
+    let mask = image::load_from_memory_with_format(TRAY_MARK_MASK, image::ImageFormat::Png)
         .ok()?
         .into_rgba8();
     let (width, height) = mask.dimensions();
