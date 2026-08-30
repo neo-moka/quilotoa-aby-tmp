@@ -3,9 +3,9 @@ import { useQueryClient } from "@tanstack/react-query";
 import { toast } from "@/shared/ui/toast";
 import { useIdentityQuery } from "@/shared/api/hooks";
 import {
-  insertEarlyOptimisticMessage,
+  maybeInsertEarlyOptimisticMessage,
   removeEarlyOptimisticMessage,
-} from "@/features/messages/hooks";
+} from "@/features/messages/lib/optimisticOutgoing";
 import {
   type CreateChannelManagedAgentInput,
   useAttachManagedAgentToChannelMutation,
@@ -23,23 +23,17 @@ import { dmThreadAgentMentionError } from "@/features/messages/lib/dmThreadAgent
 import {
   prepareBackgroundMediaUpload,
   saveQueuedAttachmentsForDraft,
-  type QueuedMediaAttachment,
 } from "@/features/messages/lib/backgroundMediaUploadStore";
-import type { UseChannelLinksResult } from "@/features/messages/lib/useChannelLinks";
-import type { UseEmojiAutocompleteResult } from "@/features/messages/lib/useEmojiAutocomplete";
 import {
   buildOutgoingMessage,
   type ImetaMedia,
 } from "@/features/messages/lib/imetaMediaMarkdown";
-import type { UseMentionsResult } from "@/features/messages/lib/useMentions";
-import type { UseRichTextEditorResult } from "@/features/messages/lib/useRichTextEditor";
-import type { UseDraftsResult } from "@/features/messages/lib/useDrafts";
 import { useActivePreparedLinkPreviews } from "./useActivePreparedLinkPreviews";
 import { invokeTauri } from "@/shared/api/tauri";
-import type { CustomEmoji } from "@/shared/lib/remarkCustomEmoji";
-import type { AcpRuntime, ChannelType, ManagedAgent } from "@/shared/api/types";
+import type { AcpRuntime, ManagedAgent } from "@/shared/api/types";
 import { normalizePubkey, truncatePubkey } from "@/shared/lib/pubkey";
 import { buildCustomEmojiTags } from "@/shared/lib/customEmojiTags";
+import type { UseMentionSendFlowOptions } from "./useMentionSendFlow.options";
 import {
   getErrorMessage,
   isManagedAgentRunning,
@@ -53,48 +47,6 @@ import {
   uniqueNormalizedPubkeys,
 } from "./useMentionSendFlow.helpers";
 import { buildAgentAddressMentionTags } from "@/features/messages/lib/agentAddressMention.mjs";
-type UseMentionSendFlowOptions = {
-  channelId: string | null;
-  channelLinks: Pick<UseChannelLinksResult, "clearChannels">;
-  channelType: ChannelType | null;
-  contentRef: React.MutableRefObject<string>;
-  customEmoji: CustomEmoji[];
-  drafts: Pick<UseDraftsResult, "loadDraft" | "markDraftSent" | "persistDraft">;
-  emojiAutocomplete: Pick<UseEmojiAutocompleteResult, "clearEmojis">;
-  mentions: UseMentionsResult;
-  onPrepareSendChannel?: (pubkeys?: string[]) => Promise<string | null>;
-  onAddressedAgentsSendStarted?: (pubkeys: readonly string[]) => void;
-  onAddressedAgentsSendFailed?: (pubkeys: readonly string[]) => void;
-  onInlineAgentMentionsSent?: (promotion: {
-    expectedRevision: number;
-    pubkeys: readonly string[];
-  }) => void;
-  onSendRef: React.MutableRefObject<
-    (
-      content: string,
-      mentionPubkeys: string[],
-      mediaTags?: string[][],
-      channelId?: string | null,
-      threadContext?: {
-        parentEventId: string | null;
-        threadHeadId: string | null;
-      } | null,
-      forceRest?: boolean,
-      /** Pre-rendered pending row for the mutation to adopt (see hooks.ts). */
-      earlyOptimisticId?: string | null,
-    ) => Promise<void>
-  >;
-  richText: Pick<UseRichTextEditorResult, "clearContent" | "setContent">;
-  setContent: (content: string) => void;
-  setIsEmojiPickerOpen: React.Dispatch<React.SetStateAction<boolean>>;
-  setPendingImeta: (pendingImeta: ImetaMedia[]) => void;
-  hasUnsavedMedia: () => boolean;
-  clearQueuedAttachments: () => void;
-  restoreQueuedAttachments: (attachments: QueuedMediaAttachment[]) => void;
-  setSpoileredAttachmentUrls?: React.Dispatch<
-    React.SetStateAction<Set<string>>
-  >;
-};
 export function useMentionSendFlow({
   channelId,
   channelLinks,
@@ -479,25 +431,19 @@ export function useMentionSendFlow({
         clearComposer();
         composerCleared = true;
       }
-      if (
-        identity &&
-        draft.capturedChannelId &&
-        draft.capturedThreadContext === null &&
-        draft.queuedAttachments.length === 0 &&
-        draft.savedImeta.length === 0 &&
-        draft.trimmed.length > 0 &&
-        channelType !== "forum"
-      ) {
-        earlyOptimistic = {
+      earlyOptimistic = maybeInsertEarlyOptimisticMessage(
+        queryClient,
+        identity,
+        {
           channelId: draft.capturedChannelId,
-          id: insertEarlyOptimisticMessage(
-            queryClient,
-            draft.capturedChannelId,
-            identity,
-            { content: draft.trimmed, mentionPubkeys },
-          ),
-        };
-      }
+          channelType,
+          content: draft.trimmed,
+          hasAttachments:
+            draft.queuedAttachments.length > 0 || draft.savedImeta.length > 0,
+          isThreadReply: draft.capturedThreadContext !== null,
+          mentionPubkeys,
+        },
+      );
       let uploadStarted = false;
       try {
         const admittedMentionPubkeys = uniqueNormalizedPubkeys(

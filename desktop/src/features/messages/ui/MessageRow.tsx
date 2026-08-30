@@ -1,5 +1,5 @@
 import * as React from "react";
-import { AlertTriangle, CheckCheck } from "lucide-react";
+import { AlertTriangle } from "lucide-react";
 
 import {
   depthGuideActionsEqual,
@@ -12,11 +12,16 @@ import {
   canSendMessageToChannel,
 } from "@/features/messages/lib/canSendToChannel";
 import type { TimelineMessage } from "@/features/messages/types";
+import type {
+  MessageRowProps,
+  ThreadDepthGuideAction,
+} from "./MessageRow.types";
+
+export type { MessageRowProps, ThreadDepthGuideAction };
 import { useKnownAgentPubkeys } from "@/features/agents/useKnownAgentPubkeys";
 import { HuddleAttachment } from "@/features/huddle/components/HuddleAttachment";
 import { MessageReactions } from "@/features/messages/ui/MessageReactions";
 import { useReactionHandler } from "@/features/messages/ui/useReactionHandler";
-import type { UserProfileLookup } from "@/features/profile/lib/identity";
 import { UserProfilePopover } from "@/features/profile/ui/UserProfilePopover";
 import { useRemindLater } from "@/features/reminders/ui/RemindMeLaterProvider";
 import {
@@ -42,12 +47,9 @@ import { parseImetaTags } from "@/shared/ui/markdown/parseImeta";
 import { useMessageEmoji } from "@/features/messages/lib/useMessageEmoji";
 import { parseWaveMessageContent } from "@/features/messages/lib/waveMessage";
 import { resolveSnapshotSharedBy } from "@/features/messages/lib/snapshotSharedBy";
-import {
-  formatAgentSignalNames,
-  splitAgentSignalReactions,
-} from "@/features/messages/lib/agentSignalReactions";
+import { splitAgentSignalReactions } from "@/features/messages/lib/agentSignalReactions";
+import { AgentSignalStatusLine } from "./AgentSignalStatusLine";
 import { resolveMentionProps } from "@/shared/lib/resolveMentionNames";
-import type { VideoReviewContext } from "@/shared/ui/VideoPlayer";
 import { VideoReviewCommentMarkdown } from "@/shared/ui/VideoReviewCommentMarkdown";
 import { MessageActionBar } from "./MessageActionBar";
 import { editMessage } from "@/shared/api/tauri";
@@ -69,13 +71,6 @@ import { MessageAgentAddressPrefix } from "./MessageAgentAddressPrefix";
 
 const DiffMessage = React.lazy(() => import("./DiffMessage"));
 const DiffMessageExpanded = React.lazy(() => import("./DiffMessageExpanded"));
-
-export type ThreadDepthGuideAction = {
-  active?: boolean;
-  depth: number;
-  label: string;
-  message: TimelineMessage;
-};
 
 export const MessageRow = React.memo(
   function MessageRow({
@@ -119,58 +114,7 @@ export const MessageRow = React.memo(
     showDepthGuides = true,
     videoReviewCommentRootId,
     videoReviewContext,
-  }: {
-    channelId?: string | null;
-    currentPubkey?: string;
-    collapseDepthGuideActions?: ReadonlyArray<ThreadDepthGuideAction>;
-    connectDescendants?: boolean;
-    depthGuideDepths?: ReadonlyArray<number>;
-    highlighted?: boolean;
-    highlightDescendantRail?: boolean;
-    highlightReplyConnector?: boolean;
-    highlightThreadLineDepths?: ReadonlyArray<number>;
-    hoverBackground?: boolean;
-    huddleMemberPubkeys?: readonly string[];
-    huddleMemberPubkeysPending?: boolean;
-    hideAgentAccessBadge?: boolean;
-    actionBarPlacement?: "floating" | "inside";
-    collapseDescendantsLabel?: string;
-    isFollowingThread?: boolean;
-    isContinuation?: boolean;
-    isUnread?: boolean;
-    layoutVariant?: "default" | "thread-reply";
-    message: TimelineMessage;
-    onCollapseDepthGuide?: (message: TimelineMessage) => void;
-    onCollapseDepthGuideHoverChange?: (
-      message: TimelineMessage,
-      hovered: boolean,
-    ) => void;
-    onCollapseDescendants?: (message: TimelineMessage) => void;
-    onCollapseDescendantsHoverChange?: (
-      message: TimelineMessage,
-      hovered: boolean,
-    ) => void;
-    onDelete?: (message: TimelineMessage) => void;
-    onEdit?: (message: TimelineMessage) => void;
-    onFollowThread?: (message: TimelineMessage) => void;
-    onMarkUnread?: (message: TimelineMessage) => void;
-    onMarkRead?: (message: TimelineMessage) => void;
-    onToggleReaction?: (
-      message: TimelineMessage,
-      emoji: string,
-      remove: boolean,
-    ) => Promise<void>;
-    onReply?: (message: TimelineMessage) => void;
-    onSendToChannel?: (message: TimelineMessage) => Promise<void>;
-    onUnfollowThread?: (message: TimelineMessage) => void;
-    onEntranceComplete?: (messageId: string) => void;
-    playEntrance?: boolean;
-    profiles?: UserProfileLookup;
-    searchQuery?: string;
-    showDepthGuides?: boolean;
-    videoReviewCommentRootId?: string;
-    videoReviewContext?: VideoReviewContext;
-  }) {
+  }: MessageRowProps) {
     // Keep the transient send state with its timestamp rather than collapsing
     // it into a grouped message row with no header.
     const isDisplayedAsContinuation = isContinuation && !message.pending;
@@ -725,32 +669,10 @@ export const MessageRow = React.memo(
             void handleReactionSelect(emoji);
           }}
         />
-        {workingAgents.length > 0 ? (
-          <p
-            className="mt-1 flex items-center gap-1.5 text-xs text-muted-foreground"
-            data-testid="agent-working-status"
-          >
-            <span
-              aria-hidden
-              className="size-1.5 shrink-0 rounded-full bg-primary motion-safe:animate-pulse"
-            />
-            <span className="min-w-0 truncate">
-              {formatAgentSignalNames(workingAgents)}
-              {workingAgents.length === 1 ? " is" : " are"} working on this…
-            </span>
-          </p>
-        ) : seenByAgents.length > 0 ? (
-          <p
-            className="mt-1 flex items-center gap-1 text-xs text-muted-foreground/80"
-            data-testid="agent-seen-status"
-            title={`Seen by ${formatAgentSignalNames(seenByAgents)}`}
-          >
-            <CheckCheck aria-hidden className="size-3.5 shrink-0" />
-            <span className="min-w-0 truncate">
-              Seen by {formatAgentSignalNames(seenByAgents)}
-            </span>
-          </p>
-        ) : null}
+        <AgentSignalStatusLine
+          seenByAgents={seenByAgents}
+          workingAgents={workingAgents}
+        />
         {reactionErrorMessage ? (
           <p className="mt-1.5 text-xs text-destructive">
             {reactionErrorMessage}

@@ -116,6 +116,7 @@ import {
   useContextWorkItems,
   useDeleteProjectHandler,
   useOpenProjectTerminalHandler,
+  useOpenRepositoryTerminalHandler,
 } from "./projectsViewWorkItems";
 
 const MANY_PROJECTS_THRESHOLD = 12;
@@ -557,15 +558,9 @@ export function ProjectsView() {
     openTerminal,
     localRepoNames,
   );
-  const handleOpenRepositoryTerminal = React.useCallback(
-    (repository: Repository) =>
-      openTerminal(repository, {
-        hasLocalCheckout: hasLocalRepositoryCheckout(
-          repository,
-          localRepoNames,
-        ),
-      }),
-    [localRepoNames, openTerminal],
+  const handleOpenRepositoryTerminal = useOpenRepositoryTerminalHandler(
+    openTerminal,
+    localRepoNames,
   );
 
   const handleDeleteProject = useDeleteProjectHandler(

@@ -54,3 +54,48 @@ export function useTerminalContext({
     };
   }, [channelId, channels, locationSearch, pubkey, relayUrl]);
 }
+
+/** Whether the resolved context is complete enough to open a terminal. */
+export function terminalContextReady(context: {
+  channelId: string | null;
+  npub: string | null;
+  relayUrl: string | null;
+}): boolean {
+  return Boolean(context.channelId && context.npub && context.relayUrl);
+}
+
+/** Applies a surface-scoped override (e.g. a lens pinning its channel). */
+export function applyTerminalContextOverride<
+  T extends {
+    channelId: string | null;
+    channelName: string | null;
+    threadId: string | null;
+  },
+>(context: T, override: { channelId: string; channelName: string } | null): T {
+  if (!override) return context;
+  return {
+    ...context,
+    channelId: override.channelId,
+    channelName: override.channelName,
+    threadId: null,
+  };
+}
+
+/** Terminal context with the surface-override state bundled in. */
+export function useEffectiveTerminalContext(
+  input: Parameters<typeof useTerminalContext>[0],
+) {
+  const [override, setTerminalContextOverride] = React.useState<{
+    channelId: string;
+    channelName: string;
+  } | null>(null);
+  const { activeChannel, terminalContext } = useTerminalContext(input);
+  return {
+    activeChannel,
+    effectiveTerminalContext: applyTerminalContextOverride(
+      terminalContext,
+      override,
+    ),
+    setTerminalContextOverride,
+  };
+}

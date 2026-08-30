@@ -40,6 +40,17 @@ import { splitOutgoingTags } from "@/features/messages/lib/imetaMediaMarkdown";
 import { messageMentionPubkeys } from "@/features/messages/lib/messageMentionPubkeys";
 import { buildSentFromThreadTag } from "@/features/messages/lib/sentFromThread";
 import {
+  createOptimisticMessage,
+  insertEarlyOptimisticMessage,
+  removeEarlyOptimisticMessage,
+} from "@/features/messages/lib/optimisticOutgoing";
+
+export {
+  createOptimisticMessage,
+  insertEarlyOptimisticMessage,
+  removeEarlyOptimisticMessage,
+};
+import {
   clearTimeoutState,
   recordTimeoutFromRejection,
 } from "@/features/moderation/lib/timeoutStore";
@@ -101,120 +112,6 @@ export function resolveCachedReplyRootId(
     }
   }
   return null;
-}
-
-export function createOptimisticMessage(
-  channelId: string,
-  content: string,
-  identity: Identity,
-  currentMessages: RelayEvent[],
-  mentionPubkeys: string[] = [],
-  parentEventId: string | null = null,
-  mediaTags: string[][] = [],
-  sentFromThreadRootId: string | null = null,
-  sentFromThreadRootExcerpt: string | null = null,
-): RelayEvent {
-  const localKey = `optimistic-${crypto.randomUUID()}`;
-  const tags: string[][] = [];
-
-  if (parentEventId) {
-    tags.push(
-      ...buildReplyTags(
-        channelId,
-        identity.pubkey,
-        parentEventId,
-        resolveReplyRootId(parentEventId, currentMessages),
-        mentionPubkeys,
-      ),
-    );
-  } else {
-    tags.push(["h", channelId]);
-    tags.push(["p", identity.pubkey]);
-    for (const pubkey of normalizeMentionPubkeys(
-      mentionPubkeys,
-      identity.pubkey,
-    )) {
-      tags.push(["p", pubkey]);
-    }
-  }
-
-  for (const tag of mediaTags) {
-    tags.push(tag);
-  }
-  if (sentFromThreadRootId) {
-    tags.push(
-      buildSentFromThreadTag(sentFromThreadRootId, sentFromThreadRootExcerpt),
-    );
-  }
-
-  return {
-    id: localKey,
-    localKey,
-    pubkey: identity.pubkey,
-    created_at: Math.floor(Date.now() / 1_000),
-    kind: KIND_STREAM_MESSAGE,
-    tags,
-    content,
-    sig: "",
-    pending: true,
-  };
-}
-
-/**
- * Inserts a pending outgoing row into a channel's timeline *before* the send
- * mutation runs.
- *
- * The composer's send path can spend seconds in preflight when agents are
- * mentioned (starting agents, preparing DM channels, huddle sync) — during
- * which the composer is already cleared but nothing shows in the timeline.
- * This puts the row on screen at submit time; the send mutation adopts it via
- * `earlyOptimisticId` so ack/rollback reconciliation stays single-owner.
- * Returns the optimistic id the caller must ferry into the mutation — or
- * remove with {@link removeEarlyOptimisticMessage} on any pre-send abort.
- */
-export function insertEarlyOptimisticMessage(
-  queryClient: QueryClient,
-  channelId: string,
-  identity: Identity,
-  input: { content: string; mentionPubkeys?: string[] },
-): string {
-  const previousMessages =
-    queryClient.getQueryData<RelayEvent[]>(channelMessagesKey(channelId)) ?? [];
-  const optimisticMessage = createOptimisticMessage(
-    channelId,
-    input.content.trim(),
-    identity,
-    previousMessages,
-    input.mentionPubkeys ?? [],
-  );
-  const windowKey = channelWindowKey(channelId);
-  const previousWindow =
-    queryClient.getQueryData<ChannelWindowStore>(windowKey) ??
-    emptyChannelWindowStore();
-  queryClient.setQueryData(
-    windowKey,
-    mergeLiveChannelWindowEvent(previousWindow, optimisticMessage),
-  );
-  projectChannelWindowMessages(queryClient, channelId);
-  return optimisticMessage.id;
-}
-
-/** Removes an early optimistic row that never reached the send mutation. */
-export function removeEarlyOptimisticMessage(
-  queryClient: QueryClient,
-  channelId: string,
-  optimisticId: string,
-) {
-  const windowKey = channelWindowKey(channelId);
-  const current = queryClient.getQueryData<ChannelWindowStore>(windowKey);
-  if (!current) return;
-  queryClient.setQueryData(windowKey, {
-    ...current,
-    liveOverlay: current.liveOverlay.filter(
-      (event) => event.id !== optimisticId,
-    ),
-  });
-  projectChannelWindowMessages(queryClient, channelId);
 }
 
 /**
