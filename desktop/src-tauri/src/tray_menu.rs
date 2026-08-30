@@ -107,7 +107,7 @@ fn format_elapsed(elapsed: Duration) -> String {
 /// The ABY wordmark, pre-rendered as a menu-bar-sized alpha mask.
 ///
 /// Cropped to the lettering's bounding box from `icons/aby-source.png` (its
-/// near-black background floored to zero alpha) and sized to a 16pt-equivalent
+/// near-black background floored to zero alpha) and sized to a 12pt-equivalent
 /// height at 2x, so it sits beside the system's compact template glyphs
 /// instead of towering over them the way the earlier full-height render did.
 const TRAY_MARK_MASK: &[u8] = include_bytes!("../icons/tray-aby.png");
