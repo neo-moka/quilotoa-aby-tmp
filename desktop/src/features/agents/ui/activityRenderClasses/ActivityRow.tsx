@@ -130,7 +130,7 @@ function ExpandableActivityRow({
       open={detailsOpen}
       title={title}
     >
-      {/* biome-ignore lint/a11y/useKeyWithClickEvents: summary is natively
+      {/* biome-ignore lint/a11y/noStaticElementInteractions: summary is natively
           keyboard-operable; the handler only redirects its default toggle. */}
       <summary
         className={cn(
