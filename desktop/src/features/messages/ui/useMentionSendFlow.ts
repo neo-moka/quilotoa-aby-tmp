@@ -659,11 +659,14 @@ export function useMentionSendFlow({
       }
     },
     [
+      channelType,
       clearComposer,
       contentRef,
       drafts,
       ensureManagedAgentMentionsReady,
       getManagedAgentsByPubkey,
+      identity,
+      queryClient,
       mentions.isAgentPubkey,
       mentions.revalidateMentionPubkeys,
       onAddressedAgentsSendStarted,
