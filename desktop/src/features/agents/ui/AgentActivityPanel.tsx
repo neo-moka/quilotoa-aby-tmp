@@ -1,7 +1,10 @@
 import * as React from "react";
 
 import { useActiveAgentTurnsByChannel } from "@/features/agents/activeAgentTurnsStore";
-import { useManagedAgentsQuery } from "@/features/agents/hooks";
+import {
+  useManagedAgentsQuery,
+  useRelayAgentsQuery,
+} from "@/features/agents/hooks";
 import { useChannelsQuery } from "@/features/channels/hooks";
 import { isManagedAgentActive } from "@/features/agents/lib/managedAgentControlActions";
 import type { UserProfileLookup } from "@/features/profile/lib/identity";
@@ -83,6 +86,7 @@ export function AgentActivityPanel({
   widthPx: number;
 }) {
   const managedAgentsQuery = useManagedAgentsQuery();
+  const relayAgentsQuery = useRelayAgentsQuery();
   const activeChannelTurns = useActiveAgentTurnsByChannel();
   const channelsQuery = useChannelsQuery();
 
@@ -107,10 +111,24 @@ export function AgentActivityPanel({
     [channelNameById],
   );
 
-  const agents = React.useMemo<AgentActivityCandidate[]>(
-    () => (managedAgentsQuery.data ?? []).filter(isManagedAgentActive),
-    [managedAgentsQuery.data],
-  );
+  // Locally managed agents keep their live process status. Relay agents that
+  // are not managed from this desktop — including ones owned by someone else —
+  // are watchable too: their harnesses may broadcast public observer frames
+  // (kind 24201), and encrypted-frame agents simply show no transcript.
+  const agents = React.useMemo<AgentActivityCandidate[]>(() => {
+    const managed = (managedAgentsQuery.data ?? []).filter(
+      isManagedAgentActive,
+    );
+    const managedPubkeys = new Set(managed.map((agent) => agent.pubkey));
+    const relayOnly = (relayAgentsQuery.data ?? [])
+      .filter((agent) => !managedPubkeys.has(agent.pubkey))
+      .map((agent) => ({
+        pubkey: agent.pubkey,
+        name: agent.name,
+        status: "deployed" as const,
+      }));
+    return [...managed, ...relayOnly];
+  }, [managedAgentsQuery.data, relayAgentsQuery.data]);
 
   // Turns are tracked per channel; the panel is channel-agnostic, so flatten to
   // the set of agents working anywhere right now.

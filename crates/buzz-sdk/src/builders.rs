@@ -5,18 +5,19 @@
 
 use buzz_core::{
     kind::{
-        KIND_AGENT_OBSERVER_FRAME, KIND_APPROVAL_DENY, KIND_APPROVAL_GRANT, KIND_DELETION,
-        KIND_DM_ADD_MEMBER, KIND_DM_OPEN, KIND_EMOJI_SET, KIND_GIT_ISSUE, KIND_GIT_PATCH,
-        KIND_GIT_PR_UPDATE, KIND_GIT_PULL_REQUEST, KIND_GIT_REPO_ANNOUNCEMENT,
-        KIND_GIT_STATUS_CLOSED, KIND_GIT_STATUS_DRAFT, KIND_GIT_STATUS_MERGED,
-        KIND_GIT_STATUS_OPEN, KIND_IA_ARCHIVE_REQUEST, KIND_IA_UNARCHIVE_REQUEST,
-        KIND_MODERATION_BAN, KIND_MODERATION_RESOLVE_REPORT, KIND_MODERATION_TIMEOUT,
-        KIND_MODERATION_UNBAN, KIND_MODERATION_UNTIMEOUT, KIND_PRESENCE_UPDATE, KIND_PROJECT,
-        KIND_USER_STATUS, KIND_WORKFLOW_DEF, KIND_WORKFLOW_TRIGGER,
+        KIND_AGENT_OBSERVER_FRAME, KIND_AGENT_OBSERVER_FRAME_PUBLIC, KIND_APPROVAL_DENY,
+        KIND_APPROVAL_GRANT, KIND_DELETION, KIND_DM_ADD_MEMBER, KIND_DM_OPEN, KIND_EMOJI_SET,
+        KIND_GIT_ISSUE, KIND_GIT_PATCH, KIND_GIT_PR_UPDATE, KIND_GIT_PULL_REQUEST,
+        KIND_GIT_REPO_ANNOUNCEMENT, KIND_GIT_STATUS_CLOSED, KIND_GIT_STATUS_DRAFT,
+        KIND_GIT_STATUS_MERGED, KIND_GIT_STATUS_OPEN, KIND_IA_ARCHIVE_REQUEST,
+        KIND_IA_UNARCHIVE_REQUEST, KIND_MODERATION_BAN, KIND_MODERATION_RESOLVE_REPORT,
+        KIND_MODERATION_TIMEOUT, KIND_MODERATION_UNBAN, KIND_MODERATION_UNTIMEOUT,
+        KIND_PRESENCE_UPDATE, KIND_PROJECT, KIND_USER_STATUS, KIND_WORKFLOW_DEF,
+        KIND_WORKFLOW_TRIGGER,
     },
     observer::{
         content_looks_like_nip44, OBSERVER_AGENT_TAG, OBSERVER_FRAME_CONTROL, OBSERVER_FRAME_TAG,
-        OBSERVER_FRAME_TELEMETRY,
+        OBSERVER_FRAME_TELEMETRY, OBSERVER_MAX_PLAINTEXT_LEN,
     },
 };
 use nostr::{EventBuilder, Kind, Tag};
@@ -277,6 +278,36 @@ pub fn build_agent_observer_frame(
     Ok(EventBuilder::new(
         Kind::Custom(KIND_AGENT_OBSERVER_FRAME as u16),
         encrypted_content,
+    )
+    .tags(tags))
+}
+
+/// Build a public cleartext agent observer telemetry frame (kind 24201).
+///
+/// The opt-in public mirror of [`build_agent_observer_frame`]: the payload is
+/// plaintext observer JSON readable by every community member, so only
+/// telemetry frames are allowed — control frames stay on the encrypted kind.
+/// The event is signed by the agent itself and carries no `p` tag.
+pub fn build_agent_observer_frame_public(
+    agent_pubkey: &str,
+    payload_json: &str,
+) -> Result<EventBuilder, SdkError> {
+    check_content(payload_json, OBSERVER_MAX_PLAINTEXT_LEN)?;
+    if !payload_json.starts_with('{') {
+        return Err(SdkError::InvalidInput(
+            "public observer frame content must be a JSON object".into(),
+        ));
+    }
+
+    let agent_pubkey = check_pubkey_hex(agent_pubkey, "agent_pubkey")?;
+    let tags = vec![
+        tag(&[OBSERVER_AGENT_TAG, &agent_pubkey])?,
+        tag(&[OBSERVER_FRAME_TAG, OBSERVER_FRAME_TELEMETRY])?,
+    ];
+
+    Ok(EventBuilder::new(
+        Kind::Custom(KIND_AGENT_OBSERVER_FRAME_PUBLIC as u16),
+        payload_json,
     )
     .tags(tags))
 }
@@ -2510,6 +2541,43 @@ mod tests {
         )
         .unwrap_err();
         assert!(matches!(err, SdkError::InvalidInput(_)));
+    }
+
+    #[test]
+    fn public_agent_observer_frame_happy_path() {
+        let agent = keys();
+        let payload = r#"{"type":"acp_read"}"#;
+        let ev =
+            sign(build_agent_observer_frame_public(&agent.public_key().to_hex(), payload).unwrap());
+
+        assert_eq!(ev.kind.as_u16(), KIND_AGENT_OBSERVER_FRAME_PUBLIC as u16);
+        assert_eq!(ev.content, payload);
+        assert!(has_tag(
+            &ev,
+            OBSERVER_AGENT_TAG,
+            &agent.public_key().to_hex()
+        ));
+        assert!(has_tag(&ev, OBSERVER_FRAME_TAG, OBSERVER_FRAME_TELEMETRY));
+        assert!(
+            !ev.tags
+                .iter()
+                .any(|t| t.as_slice().first().map(|v| v.as_str()) == Some("p")),
+            "public frames must not carry a p tag — they are not owner-routed"
+        );
+    }
+
+    #[test]
+    fn public_agent_observer_frame_rejects_non_json_content() {
+        let err =
+            build_agent_observer_frame_public(&"a".repeat(64), "not a json object").unwrap_err();
+        assert!(matches!(err, SdkError::InvalidInput(_)));
+    }
+
+    #[test]
+    fn public_agent_observer_frame_rejects_oversized_content() {
+        let oversized = format!("{{\"pad\":\"{}\"}}", "x".repeat(70_000));
+        let err = build_agent_observer_frame_public(&"a".repeat(64), &oversized).unwrap_err();
+        assert!(matches!(err, SdkError::ContentTooLarge { .. }));
     }
 
     #[test]

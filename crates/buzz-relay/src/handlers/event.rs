@@ -8,11 +8,12 @@ use tracing::{debug, error, info, warn};
 use buzz_core::event::StoredEvent;
 use buzz_core::kind::{
     event_kind_u32, is_ephemeral, is_unshared_gated_event, AUTHOR_ONLY_KINDS,
-    KIND_AGENT_OBSERVER_FRAME, KIND_GIFT_WRAP, KIND_PRESENCE_UPDATE,
+    KIND_AGENT_OBSERVER_FRAME, KIND_AGENT_OBSERVER_FRAME_PUBLIC, KIND_GIFT_WRAP,
+    KIND_PRESENCE_UPDATE,
 };
 use buzz_core::observer::{
     content_looks_like_nip44, OBSERVER_AGENT_TAG, OBSERVER_FRAME_CONTROL, OBSERVER_FRAME_TAG,
-    OBSERVER_FRAME_TELEMETRY,
+    OBSERVER_FRAME_TELEMETRY, OBSERVER_MAX_PLAINTEXT_LEN,
 };
 use buzz_core::tenant::TenantContext;
 use buzz_core::verification::verify_event;
@@ -691,6 +692,20 @@ pub async fn handle_event(event: Event, conn: Arc<ConnectionState>, state: Arc<A
         return;
     }
 
+    if kind_u32 == KIND_AGENT_OBSERVER_FRAME_PUBLIC {
+        if !scopes.is_empty() && !scopes.contains(&buzz_auth::Scope::MessagesWrite) {
+            reject("scope");
+            conn.send(RelayMessage::ok(
+                &event_id_hex,
+                false,
+                "restricted: insufficient scope for agent observer frames",
+            ));
+            return;
+        }
+        handle_public_agent_observer_event(event, conn_id, &event_id_hex, conn, state).await;
+        return;
+    }
+
     // Scope enforcement for ephemeral kinds: require MessagesWrite.
     // Persistent events skip this gate and rely on
     // ingest_event()'s per-kind scope allowlist instead, so a token with
@@ -1100,6 +1115,128 @@ async fn handle_agent_observer_event(
     conn.send(RelayMessage::ok(event_id_hex, true, ""));
 }
 
+/// Handle public cleartext agent observer telemetry frames (kind 24201).
+///
+/// The opt-in community-visible mirror of [`handle_agent_observer_event`]:
+/// frames bypass storage and fan out as global ephemeral events to every
+/// authenticated subscriber — there is no `p` gate. Authorization is
+/// self-attestation: the event must be signed by the pubkey named in its own
+/// `agent` tag, so a publisher can only broadcast activity for its own
+/// identity. Clients decide which identities they surface (the desktop only
+/// shows registered relay agents).
+async fn handle_public_agent_observer_event(
+    event: Event,
+    conn_id: uuid::Uuid,
+    event_id_hex: &str,
+    conn: Arc<ConnectionState>,
+    state: Arc<AppState>,
+) {
+    let event_clone = event.clone();
+    let verify_result = tokio::task::spawn_blocking(move || verify_event(&event_clone)).await;
+    match verify_result {
+        Ok(Ok(())) => {}
+        Ok(Err(e)) => {
+            conn.send(RelayMessage::ok(
+                event_id_hex,
+                false,
+                &format!("invalid: {e}"),
+            ));
+            return;
+        }
+        Err(_) => {
+            conn.send(RelayMessage::ok(
+                event_id_hex,
+                false,
+                "error: internal error",
+            ));
+            return;
+        }
+    }
+
+    // Same freshness window as the encrypted observer path.
+    let now = chrono::Utc::now().timestamp();
+    let event_ts = event.created_at.as_secs() as i64;
+    if (event_ts - now).unsigned_abs() > 300 {
+        conn.send(RelayMessage::ok(
+            event_id_hex,
+            false,
+            "invalid: observer frame timestamp outside ±5 minute freshness window",
+        ));
+        return;
+    }
+
+    let agent = match public_agent_observer_agent(&event) {
+        Ok(Some(agent)) => agent,
+        Ok(None) => {
+            // Control frames never go public; unknown frame values are
+            // silently dropped, matching the encrypted path.
+            conn.send(RelayMessage::ok(event_id_hex, true, ""));
+            return;
+        }
+        Err(message) => {
+            reject("invalid");
+            conn.send(RelayMessage::ok(event_id_hex, false, &message));
+            return;
+        }
+    };
+
+    // Public and encrypted frames share the per-agent telemetry limiter, so
+    // running both streams cannot double an agent's frame budget.
+    if observer_frame_rate_limited(&state, conn.tenant.community(), agent.to_bytes()) {
+        conn.send(RelayMessage::ok(
+            event_id_hex,
+            false,
+            "rate-limited: observer frame rate exceeded (100/sec per agent)",
+        ));
+        return;
+    }
+
+    state.mark_local_event(conn.tenant.community(), &event.id);
+    if let Err(e) = state
+        .pubsub
+        .publish_event(&conn.tenant, EventTopic::Global, &event)
+        .await
+    {
+        state
+            .local_event_ids
+            .invalidate(&(conn.tenant.community(), event.id.to_bytes()));
+        warn!(conn_id = %conn_id, event_id = %event_id_hex, "Public agent observer publish failed: {e}");
+    }
+
+    let stored_event = StoredEvent::new(event.clone(), None);
+    debug!(
+        event_id = %event_id_hex,
+        agent = %agent.to_hex(),
+        "Public agent observer fan-out"
+    );
+    fan_out_event_to_local_subscribers(&state, conn.tenant.community(), &stored_event).await;
+
+    conn.send(RelayMessage::ok(event_id_hex, true, ""));
+}
+
+/// Validate a public observer frame (kind 24201) and return its agent pubkey.
+///
+/// `Ok(None)` means "acknowledge and drop" (control/unknown frame values, which
+/// never belong on the public kind). `Err` carries the OK-message rejection.
+fn public_agent_observer_agent(event: &Event) -> Result<Option<PublicKey>, String> {
+    if event.content.len() > OBSERVER_MAX_PLAINTEXT_LEN || !event.content.starts_with('{') {
+        return Err(
+            "invalid: public observer content must be a JSON object within the plaintext cap"
+                .into(),
+        );
+    }
+
+    let agent = parse_single_pubkey_tag(event, OBSERVER_AGENT_TAG)?;
+    let frame = single_tag_content(event, OBSERVER_FRAME_TAG)?;
+    if frame != OBSERVER_FRAME_TELEMETRY {
+        return Ok(None);
+    }
+    if event.pubkey != agent {
+        return Err("restricted: public observer frame must be signed by its agent".into());
+    }
+    Ok(Some(agent))
+}
+
 fn agent_observer_route(event: &Event) -> Result<Option<AgentObserverRoute>, String> {
     if !content_looks_like_nip44(&event.content) {
         return Err("invalid: observer content must be NIP-44 encrypted".into());
@@ -1177,7 +1314,7 @@ mod tests {
         encrypt_observer_payload, OBSERVER_AGENT_TAG, OBSERVER_FRAME_CONTROL, OBSERVER_FRAME_TAG,
         OBSERVER_FRAME_TELEMETRY,
     };
-    use nostr::{EventBuilder, Keys, Kind, Tag};
+    use nostr::{Event, EventBuilder, Keys, Kind, Tag};
     use tokio::sync::{mpsc, Mutex, RwLock};
     use tokio_util::sync::CancellationToken;
     use uuid::Uuid;
@@ -1319,6 +1456,89 @@ mod tests {
 
         let err = super::agent_observer_route(&event).expect_err("route should reject plaintext");
         assert!(err.contains("NIP-44"));
+    }
+
+    fn signed_public_observer_event(
+        signer: &Keys,
+        agent: &Keys,
+        frame: &str,
+        content: &str,
+    ) -> Event {
+        EventBuilder::new(
+            Kind::Custom(buzz_core::kind::KIND_AGENT_OBSERVER_FRAME_PUBLIC as u16),
+            content,
+        )
+        .tags([
+            Tag::parse([OBSERVER_AGENT_TAG, &agent.public_key().to_hex()]).expect("agent tag"),
+            Tag::parse([OBSERVER_FRAME_TAG, frame]).expect("frame tag"),
+        ])
+        .sign_with_keys(signer)
+        .expect("sign event")
+    }
+
+    #[test]
+    fn public_observer_accepts_self_signed_telemetry() {
+        let agent = Keys::generate();
+        let event = signed_public_observer_event(
+            &agent,
+            &agent,
+            OBSERVER_FRAME_TELEMETRY,
+            r#"{"type":"acp_read"}"#,
+        );
+
+        let resolved = super::public_agent_observer_agent(&event)
+            .expect("public frame should validate")
+            .expect("telemetry frame should resolve an agent");
+        assert_eq!(resolved, agent.public_key());
+    }
+
+    #[test]
+    fn public_observer_rejects_foreign_signer() {
+        let agent = Keys::generate();
+        let impostor = Keys::generate();
+        let event = signed_public_observer_event(
+            &impostor,
+            &agent,
+            OBSERVER_FRAME_TELEMETRY,
+            r#"{"type":"acp_read"}"#,
+        );
+
+        let err = super::public_agent_observer_agent(&event)
+            .expect_err("frame signed by a non-agent must be rejected");
+        assert!(err.contains("signed by its agent"));
+    }
+
+    #[test]
+    fn public_observer_drops_control_frames() {
+        let agent = Keys::generate();
+        let event = signed_public_observer_event(
+            &agent,
+            &agent,
+            OBSERVER_FRAME_CONTROL,
+            r#"{"type":"cancel_turn"}"#,
+        );
+
+        let resolved =
+            super::public_agent_observer_agent(&event).expect("control frame is not an error");
+        assert!(
+            resolved.is_none(),
+            "control frames must never fan out on the public kind"
+        );
+    }
+
+    #[test]
+    fn public_observer_rejects_non_json_content() {
+        let agent = Keys::generate();
+        let event = signed_public_observer_event(
+            &agent,
+            &agent,
+            OBSERVER_FRAME_TELEMETRY,
+            "definitely not json",
+        );
+
+        let err = super::public_agent_observer_agent(&event)
+            .expect_err("non-JSON public content must be rejected");
+        assert!(err.contains("JSON object"));
     }
 
     #[tokio::test]

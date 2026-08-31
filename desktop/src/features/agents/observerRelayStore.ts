@@ -1,6 +1,10 @@
 import * as React from "react";
 
-import { subscribeToAgentObserverFrames } from "@/shared/api/observerRelay";
+import {
+  subscribeToAgentObserverFrames,
+  subscribeToPublicAgentObserverFrames,
+} from "@/shared/api/observerRelay";
+import { KIND_AGENT_OBSERVER_FRAME_PUBLIC } from "@/shared/constants/kinds";
 import type { RelayEvent, ManagedAgent } from "@/shared/api/types";
 import type { ControlResultFrame } from "@/shared/api/types";
 import { putAgentSessionConfig } from "@/shared/api/tauri";
@@ -558,6 +562,24 @@ async function handleRelayObserverEvent(
     return;
   }
 
+  // Public frames (kind 24201) carry cleartext observer JSON — anyone in the
+  // community can read them, so there is nothing to decrypt. A malformed
+  // public frame from a foreign agent is dropped quietly instead of flagging
+  // the shared connection state.
+  if (event.kind === KIND_AGENT_OBSERVER_FRAME_PUBLIC) {
+    let parsed: ObserverEvent;
+    try {
+      parsed = JSON.parse(event.content) as ObserverEvent;
+    } catch {
+      return;
+    }
+    if (activeGeneration !== generation) {
+      return;
+    }
+    processLiveObserverEvents(agentPubkey, unwrapObserverBatch(parsed));
+    return;
+  }
+
   try {
     const parsed = (await decryptObserverEvent(event)) as ObserverEvent;
     if (activeGeneration !== generation) {
@@ -589,24 +611,38 @@ export function ensureRelayObserverSubscription() {
   setConnectionState("connecting", null);
   startPromise = (async () => {
     const identity = await getIdentity();
-    const unsubscribe = await subscribeToAgentObserverFrames(
+    const enqueueEvent = (event: RelayEvent) => {
+      eventProcessingQueue = eventProcessingQueue
+        .then(() => handleRelayObserverEvent(event, activeGeneration))
+        .catch((error) => {
+          if (activeGeneration !== generation) {
+            return;
+          }
+          setConnectionState(
+            "error",
+            error instanceof Error
+              ? `Observer event handling failed: ${error.message}`
+              : "Observer event handling failed.",
+          );
+        });
+    };
+    // Two live streams share one handler: owner-scoped encrypted frames
+    // (kind 24200, `#p` = me) and community-public cleartext frames (24201).
+    const unsubscribeOwner = await subscribeToAgentObserverFrames(
       identity.pubkey,
-      (event) => {
-        eventProcessingQueue = eventProcessingQueue
-          .then(() => handleRelayObserverEvent(event, activeGeneration))
-          .catch((error) => {
-            if (activeGeneration !== generation) {
-              return;
-            }
-            setConnectionState(
-              "error",
-              error instanceof Error
-                ? `Observer event handling failed: ${error.message}`
-                : "Observer event handling failed.",
-            );
-          });
-      },
+      enqueueEvent,
     );
+    let unsubscribePublic: (() => Promise<void>) | null = null;
+    try {
+      unsubscribePublic =
+        await subscribeToPublicAgentObserverFrames(enqueueEvent);
+    } catch (error) {
+      await unsubscribeOwner();
+      throw error;
+    }
+    const unsubscribe = async () => {
+      await Promise.all([unsubscribeOwner(), unsubscribePublic?.()]);
+    };
     if (activeGeneration !== generation) {
       await unsubscribe();
       return;

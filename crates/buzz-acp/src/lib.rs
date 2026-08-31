@@ -621,8 +621,8 @@ fn spawn_relay_observer_publisher(
     publisher: RelayEventPublisher,
     keys: nostr::Keys,
     agent_pubkey_hex: String,
-    owner_pubkey_hex: String,
     owner_pubkey: PublicKey,
+    observer_public: bool,
 ) -> tokio::task::JoinHandle<()> {
     tokio::spawn(async move {
         // Subscribe BEFORE snapshotting so an event emitted between the two
@@ -637,8 +637,8 @@ fn spawn_relay_observer_publisher(
             publisher,
             keys,
             agent_pubkey_hex,
-            owner_pubkey_hex,
             owner_pubkey,
+            observer_public,
         )
         .await;
     })
@@ -650,9 +650,10 @@ async fn run_relay_observer_publisher(
     publisher: RelayEventPublisher,
     keys: nostr::Keys,
     agent_pubkey_hex: String,
-    owner_pubkey_hex: String,
     owner_pubkey: PublicKey,
+    observer_public: bool,
 ) {
+    let owner_pubkey_hex = owner_pubkey.to_hex();
     let mut queue = ObserverPublishQueue::default();
     let max_snapshot_seq = snapshot.iter().map(|event| event.seq).max().unwrap_or(0);
     for event in snapshot {
@@ -698,7 +699,7 @@ async fn run_relay_observer_publisher(
                 if let Some(frame) = queue.next_frame() {
                     publish_relay_observer_event(
                         &publisher, &keys, &agent_pubkey_hex,
-                        &owner_pubkey_hex, &owner_pubkey, frame,
+                        &owner_pubkey_hex, &owner_pubkey, observer_public, frame,
                     ).await;
                 }
                 if closed && queue.is_empty() {
@@ -1042,28 +1043,47 @@ async fn publish_relay_observer_event(
     agent_pubkey_hex: &str,
     owner_pubkey_hex: &str,
     owner_pubkey: &PublicKey,
+    observer_public: bool,
     mut event: observer::ObserverEvent,
 ) {
     // Trim oversized frames to fit the plaintext cap rather than letting
     // encrypt_observer_payload reject and drop them whole (silent telemetry loss).
     fit_observer_event_to_budget(&mut event);
-    let encrypted = match encrypt_observer_payload(keys, owner_pubkey, &event) {
-        Ok(encrypted) => encrypted,
-        Err(error) => {
-            tracing::warn!("failed to encrypt relay observer event: {error}");
-            return;
+    let builder = if observer_public {
+        // Opt-in community-wide telemetry: same payload, cleartext, kind 24201.
+        let payload = match serde_json::to_string(&event) {
+            Ok(payload) => payload,
+            Err(error) => {
+                tracing::warn!("failed to serialize public observer event: {error}");
+                return;
+            }
+        };
+        match buzz_sdk::build_agent_observer_frame_public(agent_pubkey_hex, &payload) {
+            Ok(builder) => builder,
+            Err(error) => {
+                tracing::warn!("failed to build public observer event: {error}");
+                return;
+            }
         }
-    };
-    let builder = match buzz_sdk::build_agent_observer_frame(
-        owner_pubkey_hex,
-        agent_pubkey_hex,
-        OBSERVER_FRAME_TELEMETRY,
-        &encrypted,
-    ) {
-        Ok(builder) => builder,
-        Err(error) => {
-            tracing::warn!("failed to build relay observer event: {error}");
-            return;
+    } else {
+        let encrypted = match encrypt_observer_payload(keys, owner_pubkey, &event) {
+            Ok(encrypted) => encrypted,
+            Err(error) => {
+                tracing::warn!("failed to encrypt relay observer event: {error}");
+                return;
+            }
+        };
+        match buzz_sdk::build_agent_observer_frame(
+            owner_pubkey_hex,
+            agent_pubkey_hex,
+            OBSERVER_FRAME_TELEMETRY,
+            &encrypted,
+        ) {
+            Ok(builder) => builder,
+            Err(error) => {
+                tracing::warn!("failed to build relay observer event: {error}");
+                return;
+            }
         }
     };
     let signed = match builder.sign_with_keys(keys) {
@@ -1972,6 +1992,7 @@ async fn tokio_main() -> Result<()> {
                 "agentArgs": config.agent_args,
                 "parallelism": config.agents,
                 "relayObserver": config.relay_observer,
+                "observerPublic": config.observer_public,
             }),
         );
     }
@@ -2076,7 +2097,6 @@ async fn tokio_main() -> Result<()> {
                         relay.event_publisher(),
                         config.keys.clone(),
                         pubkey_hex.clone(),
-                        owner_pubkey_hex,
                         owner_pubkey,
                     ));
                     relay
@@ -2157,16 +2177,15 @@ async fn tokio_main() -> Result<()> {
         }
     }
 
-    if let Some((observer, publisher, keys, agent_pubkey, owner_pubkey, owner)) =
-        relay_observer_publisher.take()
+    if let Some((observer, publisher, keys, agent_pubkey, owner)) = relay_observer_publisher.take()
     {
         relay_observer_publisher_task = Some(spawn_relay_observer_publisher(
             observer,
             publisher,
             keys,
             agent_pubkey,
-            owner_pubkey,
             owner,
+            config.observer_public,
         ));
     }
 
@@ -5793,8 +5812,8 @@ mod observer_snapshot_race_tests {
             publisher,
             agent_keys.clone(),
             agent_keys.public_key().to_hex(),
-            owner_keys.public_key().to_hex(),
             owner_keys.public_key(),
+            false,
         )
         .await;
 
@@ -5821,6 +5840,60 @@ mod observer_snapshot_race_tests {
             ["before", "overlap", "after"],
             "each event must be published exactly once, in order"
         );
+    }
+
+    /// With `observer_public: true` the publisher emits cleartext kind 24201
+    /// frames: readable without any key, tagged with the agent, and free of
+    /// `p` owner routing.
+    #[tokio::test(start_paused = true)]
+    async fn public_mode_publishes_cleartext_frames() {
+        let observer = observer::ObserverHandle::in_process();
+        let agent_keys = Keys::generate();
+        let owner_keys = Keys::generate();
+        let (publisher, mut published_rx) = RelayEventPublisher::test_pair();
+
+        let rx = observer.subscribe();
+        let snapshot = observer.snapshot();
+        emit_marker(&observer, "public");
+        drop(observer);
+
+        run_relay_observer_publisher(
+            snapshot,
+            rx,
+            publisher,
+            agent_keys.clone(),
+            agent_keys.public_key().to_hex(),
+            owner_keys.public_key(),
+            true,
+        )
+        .await;
+
+        let mut markers = Vec::new();
+        while let Some(event) = published_rx.recv().await {
+            assert_eq!(
+                event.kind.as_u16() as u32,
+                buzz_core::kind::KIND_AGENT_OBSERVER_FRAME_PUBLIC,
+                "public mode must publish on the public kind"
+            );
+            assert!(
+                !event
+                    .tags
+                    .iter()
+                    .any(|t| t.as_slice().first().map(|v| v.as_str()) == Some("p")),
+                "public frames must not be owner-routed"
+            );
+            let payload: serde_json::Value =
+                serde_json::from_str(&event.content).expect("cleartext frame must parse as JSON");
+            match payload["payload"]["events"].as_array() {
+                Some(inner) => markers.extend(
+                    inner
+                        .iter()
+                        .map(|e| e["payload"]["marker"].as_str().unwrap().to_string()),
+                ),
+                None => markers.push(payload["payload"]["marker"].as_str().unwrap().to_string()),
+            }
+        }
+        assert_eq!(markers, ["public"]);
     }
 }
 
@@ -6517,8 +6590,8 @@ mod observer_publish_cadence_tests {
             publisher,
             agent_keys.clone(),
             agent_keys.public_key().to_hex(),
-            owner_keys.public_key().to_hex(),
             owner_keys.public_key(),
+            false,
         ));
 
         // t=0: nothing may publish, no matter how full the snapshot was.
@@ -6596,8 +6669,8 @@ mod observer_publish_cadence_tests {
             publisher,
             agent_keys.clone(),
             agent_keys.public_key().to_hex(),
-            owner_keys.public_key().to_hex(),
             owner_keys.public_key(),
+            false,
         ));
 
         settle().await;
@@ -6662,8 +6735,8 @@ mod observer_publish_cadence_tests {
             publisher,
             agent_keys.clone(),
             agent_keys.public_key().to_hex(),
-            owner_keys.public_key().to_hex(),
             owner_keys.public_key(),
+            false,
         ));
         settle().await;
 
@@ -6837,6 +6910,7 @@ mod build_mcp_servers_tests {
             persona_env_vars: vec![],
             has_generated_codex_config: false,
             relay_observer: false,
+            observer_public: false,
             public_status: false,
             issues_watch: false,
             exit_after_inactivity_secs: 0,
@@ -7063,6 +7137,7 @@ mod error_outcome_emission_tests {
             persona_env_vars: vec![],
             has_generated_codex_config: false,
             relay_observer: false,
+            observer_public: false,
             public_status: false,
             issues_watch: false,
             exit_after_inactivity_secs: 0,

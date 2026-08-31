@@ -488,6 +488,16 @@ pub struct CliArgs {
     #[arg(long, env = "BUZZ_ACP_RELAY_OBSERVER", default_value_t = false)]
     pub relay_observer: bool,
 
+    /// Publish observer telemetry as public cleartext frames (kind 24201).
+    ///
+    /// Requires `--relay-observer`. When set, telemetry frames are published
+    /// unencrypted so every authenticated community member can watch the
+    /// agent's activity — prompts, tool calls, and outputs included. Control
+    /// frames (owner → agent) always stay on the encrypted kind. Leave this
+    /// off unless the whole community is trusted with full agent transcripts.
+    #[arg(long, env = "BUZZ_ACP_OBSERVER_PUBLIC", default_value_t = false)]
+    pub observer_public: bool,
+
     /// Publish a public NIP-38 status (kind 30315) while a turn is in flight.
     ///
     /// Complements `--relay-observer` rather than replacing it: observer frames
@@ -604,6 +614,9 @@ pub struct Config {
     pub has_generated_codex_config: bool,
     /// Whether to publish encrypted observer frames through the relay.
     pub relay_observer: bool,
+    /// Whether observer telemetry is also published as public cleartext
+    /// frames (kind 24201) readable by the whole community.
+    pub observer_public: bool,
     /// Whether to publish a public NIP-38 status while a turn is in flight.
     pub public_status: bool,
     /// Whether to watch NIP-34 issues (global subscription + issue turns).
@@ -1163,6 +1176,7 @@ impl Config {
             persona_env_vars,
             has_generated_codex_config,
             relay_observer: args.relay_observer,
+            observer_public: args.observer_public,
             public_status: args.public_status,
             issues_watch: args.issues == "watch",
             exit_after_inactivity_secs: args.exit_after_inactivity,
@@ -1538,6 +1552,7 @@ mod tests {
             persona_env_vars: vec![],
             has_generated_codex_config: false,
             relay_observer: false,
+            observer_public: false,
             public_status: false,
             issues_watch: false,
             exit_after_inactivity_secs: 0,

@@ -1,6 +1,9 @@
 import { buildObserverControlEvent } from "@/shared/api/tauriObserver";
 import type { RelayEvent } from "@/shared/api/types";
-import { KIND_AGENT_OBSERVER_FRAME } from "@/shared/constants/kinds";
+import {
+  KIND_AGENT_OBSERVER_FRAME,
+  KIND_AGENT_OBSERVER_FRAME_PUBLIC,
+} from "@/shared/constants/kinds";
 import { relayClient } from "./relayClient";
 
 // How far back (in seconds) the live subscription looks on connect/reconnect.
@@ -25,6 +28,26 @@ export function subscribeToAgentObserverFrames(
       // subscription starts after the agent has already emitted them. Older
       // history is served by the archive path (ingestArchivedObserverEvents).
       // The appendAgentEvent dedup on (seq, timestamp) prevents double-processing.
+      limit: 1000,
+      since: Math.floor(Date.now() / 1_000) - OBSERVER_LIVE_LOOKBACK_SECS,
+    },
+    onEvent,
+  );
+}
+
+/**
+ * Live subscription for public cleartext observer telemetry (kind 24201).
+ * These frames are community-visible by design — no `#p` scoping — so
+ * activity from agents the current identity does not own can still be
+ * surfaced. Published only by harnesses running with
+ * `BUZZ_ACP_OBSERVER_PUBLIC=true`.
+ */
+export function subscribeToPublicAgentObserverFrames(
+  onEvent: (event: RelayEvent) => void,
+) {
+  return relayClient.subscribeLive(
+    {
+      kinds: [KIND_AGENT_OBSERVER_FRAME_PUBLIC],
       limit: 1000,
       since: Math.floor(Date.now() / 1_000) - OBSERVER_LIVE_LOOKBACK_SECS,
     },

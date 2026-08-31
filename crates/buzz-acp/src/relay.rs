@@ -114,11 +114,19 @@ const DRAIN_BUDGET_PER_ITER: usize = 1;
 /// of events, so event-level loss is larger than the frame count.
 const GATED_OBSERVER_QUEUE_CAP: usize = 256;
 
+/// Observer telemetry kinds that get the durable park-and-drain treatment:
+/// owner-encrypted frames (24200) and their public cleartext mirror (24201).
+fn is_observer_telemetry_kind(kind: nostr::Kind) -> bool {
+    let kind = kind.as_u16() as u32;
+    kind == KIND_AGENT_OBSERVER_FRAME || kind == KIND_AGENT_OBSERVER_FRAME_PUBLIC
+}
+
 use std::time::Instant;
 
 use buzz_core::kind::{
-    KIND_AGENT_OBSERVER_FRAME, KIND_GIT_ISSUE, KIND_MEMBER_ADDED_NOTIFICATION,
-    KIND_MEMBER_REMOVED_NOTIFICATION, KIND_TEXT_NOTE, KIND_TYPING_INDICATOR,
+    KIND_AGENT_OBSERVER_FRAME, KIND_AGENT_OBSERVER_FRAME_PUBLIC, KIND_GIT_ISSUE,
+    KIND_MEMBER_ADDED_NOTIFICATION, KIND_MEMBER_REMOVED_NOTIFICATION, KIND_TEXT_NOTE,
+    KIND_TYPING_INDICATOR,
 };
 use futures_util::{SinkExt, StreamExt};
 use nostr::{Event, EventBuilder, Keys, Kind, RelayUrl, Tag};
@@ -1377,7 +1385,7 @@ fn apply_command_to_state(state: &mut BgState, cmd: RelayCommand) {
         // ephemeral publishes (typing indicators) are meaningless while
         // disconnected and are dropped.
         RelayCommand::PublishEvent { event } => {
-            if event.kind.as_u16() as u32 == KIND_AGENT_OBSERVER_FRAME {
+            if is_observer_telemetry_kind(event.kind) {
                 state.park_gated_observer_frame(event);
             }
         }
@@ -1401,9 +1409,7 @@ fn apply_command_to_state(state: &mut BgState, cmd: RelayCommand) {
 /// `Shutdown` and `Reconnect` are handled by the caller.
 fn retain_failed_command_intent(state: &mut BgState, cmd: RelayCommand) {
     match cmd {
-        RelayCommand::PublishEvent { event }
-            if event.kind.as_u16() as u32 == KIND_AGENT_OBSERVER_FRAME =>
-        {
+        RelayCommand::PublishEvent { event } if is_observer_telemetry_kind(event.kind) => {
             state.park_gated_observer_frame(event);
         }
         RelayCommand::PublishEvent { .. } => {}
@@ -1587,7 +1593,7 @@ async fn execute_connected_command(
             // and while earlier parked frames are still draining, so relative
             // order is preserved — then let the main-loop drain deliver them
             // one per pacing tick once the gate clears.
-            if event.kind.as_u16() as u32 == KIND_AGENT_OBSERVER_FRAME
+            if is_observer_telemetry_kind(event.kind)
                 && (state.check_rate_gate().is_some() || !state.gated_observer_pending.is_empty())
             {
                 debug!(
@@ -1613,7 +1619,7 @@ async fn execute_connected_command(
             // Best-effort: log a send failure but don't trigger reconnect — the
             // next ping or read will detect the dead socket. A failed observer
             // frame is parked so the post-reconnect drain redelivers it.
-            let is_observer = event.kind.as_u16() as u32 == KIND_AGENT_OBSERVER_FRAME;
+            let is_observer = is_observer_telemetry_kind(event.kind);
             if send_publish_event_frame(ws, &event).await {
                 if is_observer {
                     state.track_observer_in_flight(event);
