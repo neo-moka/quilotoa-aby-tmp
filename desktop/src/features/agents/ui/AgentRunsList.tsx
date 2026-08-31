@@ -215,7 +215,7 @@ function RunRow({
     >
       <ProfileAvatar
         avatarUrl={avatarUrl ?? null}
-        className="h-7 w-7 shrink-0"
+        className="h-7 w-7 shrink-0 text-xs"
         label={name}
       />
       <span className="min-w-0 flex-1">
