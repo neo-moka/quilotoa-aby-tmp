@@ -659,6 +659,7 @@ export function useMentionSendFlow({
       }
     },
     [
+      channelType,
       clearComposer,
       contentRef,
       drafts,
@@ -679,6 +680,8 @@ export function useMentionSendFlow({
       hasUnsavedMedia,
       mentions.restoreDraftMentionRefs,
       activePreparedLinkPreviews,
+      identity,
+      queryClient,
     ],
   );
   const sendMessageWithMentionFlow = React.useCallback(
