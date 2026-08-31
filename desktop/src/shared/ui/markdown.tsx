@@ -1405,15 +1405,7 @@ export function createMarkdownComponents(
     span: function MarkdownSpan({ children, node: _node, ...props }) {
       const { leadingInlineContent } = useMarkdownRuntime();
       if ("data-leading-inline-content" in props) {
-        // The marker can land inside any first prose block — including a
-        // heading, whose text-xl/semibold would otherwise scale the address
-        // chip with it. Addressing is metadata, not prose: pin it to the
-        // conversation base size regardless of the host block.
-        return (
-          <span className="text-message font-normal tracking-normal">
-            {leadingInlineContent}
-          </span>
-        );
+        return <>{leadingInlineContent}</>;
       }
       return <span {...props}>{children}</span>;
     },
@@ -1695,7 +1687,7 @@ export function createMarkdownComponents(
  * sixteen instances ever exist. Module-stable maps mean cached markdown
  * element trees (see ./markdown/nodeCache.ts) never embed per-mount closures.
  */
-const MARKDOWN_COMPONENT_SCHEMA_VERSION = "9";
+const MARKDOWN_COMPONENT_SCHEMA_VERSION = "8";
 const markdownComponentsByVariant = new Map<string, MarkdownComponentSet>();
 
 type MarkdownComponentSet = { components: Components; variant: string };
