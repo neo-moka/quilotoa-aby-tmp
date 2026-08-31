@@ -1,7 +1,10 @@
 import * as React from "react";
 
 import { useActiveAgentTurnsByChannel } from "@/features/agents/activeAgentTurnsStore";
-import { useManagedAgentsQuery } from "@/features/agents/hooks";
+import {
+  useManagedAgentsQuery,
+  useRelayAgentsQuery,
+} from "@/features/agents/hooks";
 import {
   buildAgentRunSummaries,
   formatRunChannelLabel,
@@ -47,6 +50,7 @@ export function AgentRunsList({
   profiles?: UserProfileLookup;
 }): React.ReactElement {
   const managedAgentsQuery = useManagedAgentsQuery();
+  const relayAgentsQuery = useRelayAgentsQuery();
   const activeChannelTurns = useActiveAgentTurnsByChannel();
   const channelsQuery = useChannelsQuery();
 
@@ -71,13 +75,21 @@ export function AgentRunsList({
     [channelInfoById],
   );
 
-  // Same roster the picker used: an agent that is neither running nor deployed
-  // cannot be mid-run, and listing it as "standing by" would overstate what is
-  // actually available to do work.
-  const agents = React.useMemo(
-    () => (managedAgentsQuery.data ?? []).filter(isManagedAgentActive),
-    [managedAgentsQuery.data],
-  );
+  // Same roster the picker uses: locally managed agents that are running or
+  // deployed, plus every agent registered on the relay — including ones owned
+  // by someone else, whose runs arrive through public observer frames.
+  const agents = React.useMemo(() => {
+    const managed = (managedAgentsQuery.data ?? []).filter(
+      isManagedAgentActive,
+    );
+    const managedPubkeys = new Set(
+      managed.map((agent) => normalizePubkey(agent.pubkey)),
+    );
+    const relayOnly = (relayAgentsQuery.data ?? []).filter(
+      (agent) => !managedPubkeys.has(normalizePubkey(agent.pubkey)),
+    );
+    return [...managed, ...relayOnly];
+  }, [managedAgentsQuery.data, relayAgentsQuery.data]);
 
   const { working, standingBy } = React.useMemo(
     () =>
@@ -103,7 +115,7 @@ export function AgentRunsList({
         // Suppressed while the roster is still loading: an empty list that
         // flashes "no agents" before the first response reads as a wrong
         // answer rather than as a pending one.
-        managedAgentsQuery.isPending ? null : (
+        managedAgentsQuery.isPending || relayAgentsQuery.isPending ? null : (
           <p
             className="px-4 py-6 text-center text-sm text-muted-foreground"
             data-testid="agent-runs-list-empty"

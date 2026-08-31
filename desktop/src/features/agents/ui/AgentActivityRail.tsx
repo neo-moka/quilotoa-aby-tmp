@@ -3,7 +3,10 @@ import * as React from "react";
 
 import { useActiveAgentTurnsByChannel } from "@/features/agents/activeAgentTurnsStore";
 import { openAgentActivityPanel } from "@/features/agents/agentActivityPanelStore";
-import { useManagedAgentsQuery } from "@/features/agents/hooks";
+import {
+  useManagedAgentsQuery,
+  useRelayAgentsQuery,
+} from "@/features/agents/hooks";
 import {
   buildAgentRunSummaries,
   formatRunChannelLabel,
@@ -38,6 +41,7 @@ export function AgentActivityRail({
   profiles?: UserProfileLookup;
 }): React.ReactElement | null {
   const managedAgentsQuery = useManagedAgentsQuery();
+  const relayAgentsQuery = useRelayAgentsQuery();
   const activeChannelTurns = useActiveAgentTurnsByChannel();
   const channelsQuery = useChannelsQuery();
 
@@ -61,10 +65,20 @@ export function AgentActivityRail({
     [channelInfoById],
   );
 
-  const agents = React.useMemo(
-    () => (managedAgentsQuery.data ?? []).filter(isManagedAgentActive),
-    [managedAgentsQuery.data],
-  );
+  // Managed active agents plus every relay-registered agent — non-owned ones
+  // report their runs through public observer frames (kind 24201).
+  const agents = React.useMemo(() => {
+    const managed = (managedAgentsQuery.data ?? []).filter(
+      isManagedAgentActive,
+    );
+    const managedPubkeys = new Set(
+      managed.map((agent) => normalizePubkey(agent.pubkey)),
+    );
+    const relayOnly = (relayAgentsQuery.data ?? []).filter(
+      (agent) => !managedPubkeys.has(normalizePubkey(agent.pubkey)),
+    );
+    return [...managed, ...relayOnly];
+  }, [managedAgentsQuery.data, relayAgentsQuery.data]);
 
   const { working, standingBy } = React.useMemo(
     () =>
