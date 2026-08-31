@@ -80,7 +80,7 @@ export function AgentActivitySelector({
           <ChatListView.Icon className={HERO_MUTED_SCOPE}>
             <ProfileAvatar
               avatarUrl={agent.avatarUrl ?? null}
-              className="h-6 w-6"
+              className="h-6 w-6 text-2xs"
               label={agent.name}
             />
           </ChatListView.Icon>

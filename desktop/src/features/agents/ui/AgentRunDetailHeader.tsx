@@ -128,7 +128,7 @@ export function AgentRunDetailHeader({
         </Button>
         <ProfileAvatar
           avatarUrl={agentAvatarUrl}
-          className="h-7 w-7 shrink-0"
+          className="h-7 w-7 shrink-0 text-xs"
           label={agentName}
         />
         <div className="min-w-0 flex-1">

@@ -122,7 +122,7 @@ export function AgentActivityRail({
           >
             <ProfileAvatar
               avatarUrl={profile?.avatarUrl ?? summary.avatarUrl ?? null}
-              className="h-8 w-8"
+              className="h-8 w-8 text-xs"
               label={name}
             />
             {isWorking ? (
