@@ -37,6 +37,13 @@ Object.defineProperty(dom.window.navigator, "mediaDevices", {
     removeEventListener: () => {},
   },
 });
+// The render tree reaches `useIsMobile`/media-query hooks, and jsdom ships no
+// matchMedia implementation.
+dom.window.matchMedia = () => ({
+  matches: false,
+  addEventListener: () => {},
+  removeEventListener: () => {},
+});
 dom.window.requestAnimationFrame = (callback) => setTimeout(callback, 0);
 globalThis.requestAnimationFrame = dom.window.requestAnimationFrame;
 
