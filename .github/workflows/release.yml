@@ -225,7 +225,7 @@ jobs:
         run: |
           BUNDLE_DIR="desktop/src-tauri/target/release/bundle"
 
-          # Find the DMG (Tauri names it Buzz_<version>_<arch>.dmg)
+          # Find the DMG (Tauri names it ABY_<version>_<arch>.dmg)
           DMG=$(find "$BUNDLE_DIR/dmg" -name '*.dmg' -type f | head -1)
           if [[ -z "$DMG" ]]; then
             echo "::error::No DMG found in $BUNDLE_DIR/dmg"
@@ -241,7 +241,7 @@ jobs:
             echo "::error::Updater archive or signature not found in $BUNDLE_DIR/macos"
             exit 1
           fi
-          RENAMED="$(dirname "$ARCHIVE")/Buzz_${VERSION}_aarch64.app.tar.gz"
+          RENAMED="$(dirname "$ARCHIVE")/ABY_${VERSION}_aarch64.app.tar.gz"
           mv "$ARCHIVE" "$RENAMED"
           mv "$SIG" "${RENAMED}.sig"
           ARCHIVE="$RENAMED"
@@ -402,7 +402,7 @@ jobs:
             echo "::error::Updater archive or signature not found in $BUNDLE_DIR/macos"
             exit 1
           fi
-          RENAMED="$(dirname "$ARCHIVE")/Buzz_${VERSION}_x64.app.tar.gz"
+          RENAMED="$(dirname "$ARCHIVE")/ABY_${VERSION}_x64.app.tar.gz"
           mv "$ARCHIVE" "$RENAMED"
           mv "$SIG" "${RENAMED}.sig"
           ARCHIVE="$RENAMED"
@@ -936,7 +936,7 @@ jobs:
             gh release create "desktop-v${VERSION}" \
               --draft \
               --target "${{ needs.setup.outputs.source_sha }}" \
-              --title "Buzz Desktop v${VERSION}" \
+              --title "ABY Desktop v${VERSION}" \
               --notes-file "$NOTES_FILE" \
               "${PRERELEASE_FLAGS[@]}"
           fi
