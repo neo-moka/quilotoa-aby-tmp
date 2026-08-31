@@ -28,7 +28,7 @@
         "dragDropEnabled": false,
         "trafficLightPosition": {
           "x": 16,
-          "y": 25
+          "y": 29
         },
         "backgroundThrottling": "disabled",
         "minWidth": 800,

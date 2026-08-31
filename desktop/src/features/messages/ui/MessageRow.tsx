@@ -12,11 +12,16 @@ import {
   canSendMessageToChannel,
 } from "@/features/messages/lib/canSendToChannel";
 import type { TimelineMessage } from "@/features/messages/types";
+import type {
+  MessageRowProps,
+  ThreadDepthGuideAction,
+} from "./MessageRow.types";
+
+export type { MessageRowProps, ThreadDepthGuideAction };
 import { useKnownAgentPubkeys } from "@/features/agents/useKnownAgentPubkeys";
 import { HuddleAttachment } from "@/features/huddle/components/HuddleAttachment";
 import { MessageReactions } from "@/features/messages/ui/MessageReactions";
 import { useReactionHandler } from "@/features/messages/ui/useReactionHandler";
-import type { UserProfileLookup } from "@/features/profile/lib/identity";
 import { UserProfilePopover } from "@/features/profile/ui/UserProfilePopover";
 import { useRemindLater } from "@/features/reminders/ui/RemindMeLaterProvider";
 import {
@@ -42,8 +47,9 @@ import { parseImetaTags } from "@/shared/ui/markdown/parseImeta";
 import { useMessageEmoji } from "@/features/messages/lib/useMessageEmoji";
 import { parseWaveMessageContent } from "@/features/messages/lib/waveMessage";
 import { resolveSnapshotSharedBy } from "@/features/messages/lib/snapshotSharedBy";
+import { splitAgentSignalReactions } from "@/features/messages/lib/agentSignalReactions";
+import { AgentSignalStatusLine } from "./AgentSignalStatusLine";
 import { resolveMentionProps } from "@/shared/lib/resolveMentionNames";
-import type { VideoReviewContext } from "@/shared/ui/VideoPlayer";
 import { VideoReviewCommentMarkdown } from "@/shared/ui/VideoReviewCommentMarkdown";
 import { MessageActionBar } from "./MessageActionBar";
 import { editMessage } from "@/shared/api/tauri";
@@ -65,13 +71,6 @@ import { MessageAgentAddressPrefix } from "./MessageAgentAddressPrefix";
 
 const DiffMessage = React.lazy(() => import("./DiffMessage"));
 const DiffMessageExpanded = React.lazy(() => import("./DiffMessageExpanded"));
-
-export type ThreadDepthGuideAction = {
-  active?: boolean;
-  depth: number;
-  label: string;
-  message: TimelineMessage;
-};
 
 export const MessageRow = React.memo(
   function MessageRow({
@@ -115,58 +114,7 @@ export const MessageRow = React.memo(
     showDepthGuides = true,
     videoReviewCommentRootId,
     videoReviewContext,
-  }: {
-    channelId?: string | null;
-    currentPubkey?: string;
-    collapseDepthGuideActions?: ReadonlyArray<ThreadDepthGuideAction>;
-    connectDescendants?: boolean;
-    depthGuideDepths?: ReadonlyArray<number>;
-    highlighted?: boolean;
-    highlightDescendantRail?: boolean;
-    highlightReplyConnector?: boolean;
-    highlightThreadLineDepths?: ReadonlyArray<number>;
-    hoverBackground?: boolean;
-    huddleMemberPubkeys?: readonly string[];
-    huddleMemberPubkeysPending?: boolean;
-    hideAgentAccessBadge?: boolean;
-    actionBarPlacement?: "floating" | "inside";
-    collapseDescendantsLabel?: string;
-    isFollowingThread?: boolean;
-    isContinuation?: boolean;
-    isUnread?: boolean;
-    layoutVariant?: "default" | "thread-reply";
-    message: TimelineMessage;
-    onCollapseDepthGuide?: (message: TimelineMessage) => void;
-    onCollapseDepthGuideHoverChange?: (
-      message: TimelineMessage,
-      hovered: boolean,
-    ) => void;
-    onCollapseDescendants?: (message: TimelineMessage) => void;
-    onCollapseDescendantsHoverChange?: (
-      message: TimelineMessage,
-      hovered: boolean,
-    ) => void;
-    onDelete?: (message: TimelineMessage) => void;
-    onEdit?: (message: TimelineMessage) => void;
-    onFollowThread?: (message: TimelineMessage) => void;
-    onMarkUnread?: (message: TimelineMessage) => void;
-    onMarkRead?: (message: TimelineMessage) => void;
-    onToggleReaction?: (
-      message: TimelineMessage,
-      emoji: string,
-      remove: boolean,
-    ) => Promise<void>;
-    onReply?: (message: TimelineMessage) => void;
-    onSendToChannel?: (message: TimelineMessage) => Promise<void>;
-    onUnfollowThread?: (message: TimelineMessage) => void;
-    onEntranceComplete?: (messageId: string) => void;
-    playEntrance?: boolean;
-    profiles?: UserProfileLookup;
-    searchQuery?: string;
-    showDepthGuides?: boolean;
-    videoReviewCommentRootId?: string;
-    videoReviewContext?: VideoReviewContext;
-  }) {
+  }: MessageRowProps) {
     // Keep the transient send state with its timestamp rather than collapsing
     // it into a grouped message row with no header.
     const isDisplayedAsContinuation = isContinuation && !message.pending;
@@ -212,7 +160,7 @@ export const MessageRow = React.memo(
       [message.id, onEntranceComplete, playEntrance],
     );
     const {
-      reactions,
+      reactions: rawReactions,
       canToggle: canToggleReactions,
       pending: reactionPending,
       errorMessage: reactionErrorMessage,
@@ -262,6 +210,33 @@ export const MessageRow = React.memo(
       },
       [knownAgentPubkeys, profiles],
     );
+    // Agent lifecycle signals (👀 seen / 💬 working) leave the reaction chips
+    // and render as WhatsApp-style status below the message instead.
+    // The tick only advances when a working signal is due to cross the
+    // staleness cutoff, so an orphaned 💬 (agent restarted mid-turn) demotes
+    // itself to "seen" without user interaction — and idle rows never tick.
+    const [signalClockMs, setSignalClockMs] = React.useState(() => Date.now());
+    const agentSignalSplit = React.useMemo(
+      () =>
+        splitAgentSignalReactions(
+          rawReactions,
+          isKnownAgentPubkey,
+          signalClockMs,
+        ),
+      [isKnownAgentPubkey, rawReactions, signalClockMs],
+    );
+    const reactions = agentSignalSplit.humanReactions ?? rawReactions;
+    const { seenByAgents, workingAgents, workingExpiresAtMs } =
+      agentSignalSplit;
+    React.useEffect(() => {
+      if (workingExpiresAtMs === null) return;
+      const delay = Math.max(0, workingExpiresAtMs - Date.now()) + 1_000;
+      const timer = window.setTimeout(
+        () => setSignalClockMs(Date.now()),
+        delay,
+      );
+      return () => window.clearTimeout(timer);
+    }, [workingExpiresAtMs]);
     const profilePopoverRole =
       message.role === "bot" ||
       (message.pubkey && isKnownAgentPubkey(message.pubkey))
@@ -694,6 +669,10 @@ export const MessageRow = React.memo(
             void handleReactionSelect(emoji);
           }}
         />
+        <AgentSignalStatusLine
+          seenByAgents={seenByAgents}
+          workingAgents={workingAgents}
+        />
         {reactionErrorMessage ? (
           <p className="mt-1.5 text-xs text-destructive">
             {reactionErrorMessage}
@@ -886,7 +865,16 @@ export const MessageRow = React.memo(
             playEntrance && "motion-enter-conversation",
             "py-conversation-row",
             hoverBackground
-              ? "mx-1 px-2 hover:bg-muted/50 focus-within:bg-muted/50"
+              ? cn(
+                  // Timeline rows bleed to the scroll container's edges so the
+                  // hover tint reads as a full-width band instead of a floating
+                  // box that stops short of the panel (px-7 restores the text
+                  // to the exact x it had under `mx-1 px-2`). Thread-panel rows
+                  // keep the inset box — their container is narrower and lacks
+                  // the bleed allowance.
+                  isThreadReplyLayout ? "mx-1 px-2" : "-mx-4 rounded-none px-7",
+                  "hover:bg-muted/50 focus-within:bg-muted/50",
+                )
               : isThreadReplyLayout
                 ? "mx-1 px-2"
                 : "px-2",

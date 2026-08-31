@@ -1,5 +1,11 @@
 import * as React from "react";
+import { useQueryClient } from "@tanstack/react-query";
 import { toast } from "@/shared/ui/toast";
+import { useIdentityQuery } from "@/shared/api/hooks";
+import {
+  maybeInsertEarlyOptimisticMessage,
+  removeEarlyOptimisticMessage,
+} from "@/features/messages/lib/optimisticOutgoing";
 import {
   type CreateChannelManagedAgentInput,
   useAttachManagedAgentToChannelMutation,
@@ -17,23 +23,17 @@ import { dmThreadAgentMentionError } from "@/features/messages/lib/dmThreadAgent
 import {
   prepareBackgroundMediaUpload,
   saveQueuedAttachmentsForDraft,
-  type QueuedMediaAttachment,
 } from "@/features/messages/lib/backgroundMediaUploadStore";
-import type { UseChannelLinksResult } from "@/features/messages/lib/useChannelLinks";
-import type { UseEmojiAutocompleteResult } from "@/features/messages/lib/useEmojiAutocomplete";
 import {
   buildOutgoingMessage,
   type ImetaMedia,
 } from "@/features/messages/lib/imetaMediaMarkdown";
-import type { UseMentionsResult } from "@/features/messages/lib/useMentions";
-import type { UseRichTextEditorResult } from "@/features/messages/lib/useRichTextEditor";
-import type { UseDraftsResult } from "@/features/messages/lib/useDrafts";
 import { useActivePreparedLinkPreviews } from "./useActivePreparedLinkPreviews";
 import { invokeTauri } from "@/shared/api/tauri";
-import type { CustomEmoji } from "@/shared/lib/remarkCustomEmoji";
-import type { AcpRuntime, ChannelType, ManagedAgent } from "@/shared/api/types";
+import type { AcpRuntime, ManagedAgent } from "@/shared/api/types";
 import { normalizePubkey, truncatePubkey } from "@/shared/lib/pubkey";
 import { buildCustomEmojiTags } from "@/shared/lib/customEmojiTags";
+import type { UseMentionSendFlowOptions } from "./useMentionSendFlow.options";
 import {
   getErrorMessage,
   isManagedAgentRunning,
@@ -47,46 +47,6 @@ import {
   uniqueNormalizedPubkeys,
 } from "./useMentionSendFlow.helpers";
 import { buildAgentAddressMentionTags } from "@/features/messages/lib/agentAddressMention.mjs";
-type UseMentionSendFlowOptions = {
-  channelId: string | null;
-  channelLinks: Pick<UseChannelLinksResult, "clearChannels">;
-  channelType: ChannelType | null;
-  contentRef: React.MutableRefObject<string>;
-  customEmoji: CustomEmoji[];
-  drafts: Pick<UseDraftsResult, "loadDraft" | "markDraftSent" | "persistDraft">;
-  emojiAutocomplete: Pick<UseEmojiAutocompleteResult, "clearEmojis">;
-  mentions: UseMentionsResult;
-  onPrepareSendChannel?: (pubkeys?: string[]) => Promise<string | null>;
-  onAddressedAgentsSendStarted?: (pubkeys: readonly string[]) => void;
-  onAddressedAgentsSendFailed?: (pubkeys: readonly string[]) => void;
-  onInlineAgentMentionsSent?: (promotion: {
-    expectedRevision: number;
-    pubkeys: readonly string[];
-  }) => void;
-  onSendRef: React.MutableRefObject<
-    (
-      content: string,
-      mentionPubkeys: string[],
-      mediaTags?: string[][],
-      channelId?: string | null,
-      threadContext?: {
-        parentEventId: string | null;
-        threadHeadId: string | null;
-      } | null,
-      forceRest?: boolean,
-    ) => Promise<void>
-  >;
-  richText: Pick<UseRichTextEditorResult, "clearContent" | "setContent">;
-  setContent: (content: string) => void;
-  setIsEmojiPickerOpen: React.Dispatch<React.SetStateAction<boolean>>;
-  setPendingImeta: (pendingImeta: ImetaMedia[]) => void;
-  hasUnsavedMedia: () => boolean;
-  clearQueuedAttachments: () => void;
-  restoreQueuedAttachments: (attachments: QueuedMediaAttachment[]) => void;
-  setSpoileredAttachmentUrls?: React.Dispatch<
-    React.SetStateAction<Set<string>>
-  >;
-};
 export function useMentionSendFlow({
   channelId,
   channelLinks,
@@ -110,6 +70,8 @@ export function useMentionSendFlow({
   restoreQueuedAttachments,
   setSpoileredAttachmentUrls,
 }: UseMentionSendFlowOptions) {
+  const queryClient = useQueryClient();
+  const identity = useIdentityQuery().data;
   const [pendingNonMemberSend, setPendingNonMemberSend] =
     React.useState<PendingNonMemberMentionSend | null>(null);
   const [nonMemberPromptError, setNonMemberPromptError] = React.useState<
@@ -366,7 +328,22 @@ export function useMentionSendFlow({
         draft.queuedAttachments.length > 0
           ? prepareBackgroundMediaUpload(draft.queuedAttachments)
           : null;
+      // Early optimistic row: on screen from the instant the composer clears,
+      // so agent-preflight (starting agents, DM prepare, huddle sync) no
+      // longer delays the message's appearance. Consumed by the mutation via
+      // `earlyOptimisticId`; every pre-send abort below must remove it.
+      let earlyOptimistic: { channelId: string; id: string } | null = null;
+      const removeEarlyOptimistic = () => {
+        if (!earlyOptimistic) return;
+        removeEarlyOptimisticMessage(
+          queryClient,
+          earlyOptimistic.channelId,
+          earlyOptimistic.id,
+        );
+        earlyOptimistic = null;
+      };
       const persistPreflightDraft = () => {
+        removeEarlyOptimistic();
         if (isSendCancelled() || !draft.recoveryDraftKey) return;
         drafts.persistDraft(
           draft.recoveryDraftKey,
@@ -407,6 +384,7 @@ export function useMentionSendFlow({
       };
       let composerCleared = false;
       const restoreComposerAfterFailure = () => {
+        removeEarlyOptimistic();
         if (!composerCleared) return;
         composerCleared = false;
         persistCanceledDraft();
@@ -453,6 +431,19 @@ export function useMentionSendFlow({
         clearComposer();
         composerCleared = true;
       }
+      earlyOptimistic = maybeInsertEarlyOptimisticMessage(
+        queryClient,
+        identity,
+        {
+          channelId: draft.capturedChannelId,
+          channelType,
+          content: draft.trimmed,
+          hasAttachments:
+            draft.queuedAttachments.length > 0 || draft.savedImeta.length > 0,
+          isThreadReply: draft.capturedThreadContext !== null,
+          mentionPubkeys,
+        },
+      );
       let uploadStarted = false;
       try {
         const admittedMentionPubkeys = uniqueNormalizedPubkeys(
@@ -563,11 +554,16 @@ export function useMentionSendFlow({
             mediaTags,
             outgoingTags,
           );
-          if (!finalOutgoingTags || signal?.aborted || isSendCancelled())
+          if (!finalOutgoingTags || signal?.aborted || isSendCancelled()) {
+            removeEarlyOptimistic();
             return;
+          }
           const revalidatedMentionPubkeys =
             await mentions.revalidateMentionPubkeys(mentionPubkeys);
-          if (signal?.aborted || isSendCancelled()) return;
+          if (signal?.aborted || isSendCancelled()) {
+            removeEarlyOptimistic();
+            return;
+          }
           const finalTagsWithAgentAddress = [
             ...finalOutgoingTags,
             ...buildAgentAddressMentionTags(
@@ -575,6 +571,19 @@ export function useMentionSendFlow({
               revalidatedMentionPubkeys,
             ),
           ];
+          // A DM prepare can retarget the send; a row sitting in the original
+          // channel must not survive that — the mutation re-creates its own
+          // optimistic row in the real target.
+          if (
+            earlyOptimistic &&
+            earlyOptimistic.channelId !== (sendChannelId ?? null)
+          ) {
+            removeEarlyOptimistic();
+          }
+          // From here the mutation owns the row's lifecycle (adopt on mutate,
+          // swap on ack, strip on rollback) — pre-send cleanup must let go.
+          const adoptedOptimisticId = earlyOptimistic?.id ?? null;
+          earlyOptimistic = null;
           await send(
             finalContent,
             revalidatedMentionPubkeys,
@@ -582,6 +591,7 @@ export function useMentionSendFlow({
             sendChannelId,
             draft.capturedThreadContext,
             draft.preparedLinkPreviews != null,
+            adoptedOptimisticId,
           );
           if (signal?.aborted || isSendCancelled()) return;
           const sentMentionPubkeys = new Set(

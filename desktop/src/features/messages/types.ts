@@ -8,6 +8,12 @@ export type TimelineReaction = {
     pubkey: string;
     displayName: string;
     avatarUrl: string | null;
+    /**
+     * Unix seconds of this vote's reaction event, when known (relay-hydrated
+     * votes carry it; the optimistic local echo does not). Consumed by the
+     * agent-signal staleness cutoff.
+     */
+    createdAt?: number;
   }>;
 };
 

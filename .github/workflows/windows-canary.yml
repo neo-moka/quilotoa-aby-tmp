@@ -13,6 +13,10 @@ on:
 permissions:
   contents: read
 
+env:
+  # HeroUI Pro's postinstall downloads the licensed package with this token.
+  HEROUI_AUTH_TOKEN: ${{ secrets.HEROUI_AUTH_TOKEN }}
+
 jobs:
   build:
     name: Build Windows canary

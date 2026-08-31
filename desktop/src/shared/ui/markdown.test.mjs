@@ -1365,6 +1365,42 @@ test("resolved human mentions replace the authored at-sign with the shared icon"
   assert.match(html, /inline-chip-icon-human/);
   assert.match(html, />alice</);
   assert.doesNotMatch(html, />@alice</);
+  assert.doesNotMatch(html, /mention-self/);
+});
+
+test("mentions resolving to the viewer pubkey carry the self treatment", () => {
+  const markdown = renderCachedMarkdown({
+    components: createMarkdownComponents(false, false),
+    content: "Ping @alice and @bob",
+    mentionNames: ["alice", "bob"],
+    variant: "self-mention-integration-test",
+  });
+  const html = renderToStaticMarkup(
+    React.createElement(
+      MarkdownRuntimeContext.Provider,
+      {
+        value: {
+          channels: [],
+          mentionPubkeysByName: {
+            alice: HUMAN_PUBKEY,
+            bob: AGENT_PUBKEY,
+          },
+          onOpenChannel: () => {},
+          onOpenEntityLink: () => {},
+          onOpenMessageLink: () => {},
+          relayOrigin: null,
+          // Case-insensitive match: identity pubkeys may arrive uppercased.
+          selfPubkey: HUMAN_PUBKEY.toUpperCase(),
+        },
+      },
+      markdown,
+    ),
+  );
+
+  // Only alice (the viewer) gets the opaque self highlight; bob stays subtle.
+  assert.equal((html.match(/mention-self/g) ?? []).length, 1);
+  const [beforeBob] = html.split(/>bob</);
+  assert.match(beforeBob, /mention-self/);
 });
 
 test("agent mentions retain the bot treatment instead of the human icon", () => {

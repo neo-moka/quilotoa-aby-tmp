@@ -116,6 +116,7 @@ import {
   useContextWorkItems,
   useDeleteProjectHandler,
   useOpenProjectTerminalHandler,
+  useOpenRepositoryTerminalHandler,
 } from "./projectsViewWorkItems";
 
 const MANY_PROJECTS_THRESHOLD = 12;
@@ -557,15 +558,9 @@ export function ProjectsView() {
     openTerminal,
     localRepoNames,
   );
-  const handleOpenRepositoryTerminal = React.useCallback(
-    (repository: Repository) =>
-      openTerminal(repository, {
-        hasLocalCheckout: hasLocalRepositoryCheckout(
-          repository,
-          localRepoNames,
-        ),
-      }),
-    [localRepoNames, openTerminal],
+  const handleOpenRepositoryTerminal = useOpenRepositoryTerminalHandler(
+    openTerminal,
+    localRepoNames,
   );
 
   const handleDeleteProject = useDeleteProjectHandler(
@@ -595,8 +590,37 @@ export function ProjectsView() {
     );
   }
 
+  const createProjectDialog = (
+    <CreateProjectDialog
+      isCreating={createProjectMutation.isPending}
+      onCreate={async (input) => {
+        const result = await createProjectMutation.mutateAsync(input);
+        if (result.compatibilityWarning) {
+          toast.warning("Created as a standalone project", {
+            description: result.compatibilityWarning,
+          });
+        } else {
+          toast.success(`Project "${result.project.name}" created.`);
+        }
+        handleRepositoryScopeChange("all");
+        handleFilterChange("projects");
+      }}
+      onOpenChange={setCreateProjectOpen}
+      open={createProjectOpen}
+    />
+  );
+
   if (projects.length === 0) {
-    return <EmptyState />;
+    // The overview's create entry points (context panel, sidebar "+") are
+    // absent or hover-hidden on a fresh community, so the empty state offers
+    // creation itself — and must bring the dialog with it, since this branch
+    // returns before the main layout that normally mounts it.
+    return (
+      <div className="flex min-h-0 min-w-0 flex-1 flex-col">
+        <EmptyState onCreateProject={() => setCreateProjectOpen(true)} />
+        {createProjectDialog}
+      </div>
+    );
   }
 
   const projectItems = (
@@ -754,23 +778,7 @@ export function ProjectsView() {
             overviewDetached ? "projects-overview-content-pod" : undefined
           }
         >
-          <CreateProjectDialog
-            isCreating={createProjectMutation.isPending}
-            onCreate={async (input) => {
-              const result = await createProjectMutation.mutateAsync(input);
-              if (result.compatibilityWarning) {
-                toast.warning("Created as a standalone project", {
-                  description: result.compatibilityWarning,
-                });
-              } else {
-                toast.success(`Project "${result.project.name}" created.`);
-              }
-              handleRepositoryScopeChange("all");
-              handleFilterChange("projects");
-            }}
-            onOpenChange={setCreateProjectOpen}
-            open={createProjectOpen}
-          />
+          {createProjectDialog}
           {createPullRequestOpen ? (
             <CreatePullRequestDialog
               onCreated={async (

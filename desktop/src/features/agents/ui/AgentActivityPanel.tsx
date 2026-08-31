@@ -42,6 +42,7 @@ import { ManagedAgentSessionPanel } from "./ManagedAgentSessionPanel";
  */
 export function AgentActivityPanel({
   canResetWidth,
+  closeTestId,
   isSinglePanelView = false,
   layout,
   onClose,
@@ -50,10 +51,13 @@ export function AgentActivityPanel({
   onSelectAgent,
   profiles,
   selectedPubkey,
+  splitPaneClamp,
   transparentChrome = false,
   widthPx,
 }: {
   canResetWidth?: boolean;
+  /** Forwarded to the panel shell — see `AuxiliaryPanelContextValue`. */
+  closeTestId?: string;
   isSinglePanelView?: boolean;
   /**
    * Split when the panel sits inside the channel's `RightAuxiliaryPane`, which
@@ -69,6 +73,12 @@ export function AgentActivityPanel({
   onSelectAgent: (pubkey: string) => void;
   profiles?: UserProfileLookup;
   selectedPubkey: string | null;
+  /**
+   * Forwarded to `AuxiliaryPanel`. The right dock passes `false`: its wrapper
+   * is sized by the panel, so the shell's `calc(100% - …)` clamp would
+   * resolve against the panel itself and squeeze the content to a sliver.
+   */
+  splitPaneClamp?: boolean;
   transparentChrome?: boolean;
   widthPx: number;
 }) {
@@ -152,8 +162,10 @@ export function AgentActivityPanel({
   return (
     <AuxiliaryPanel
       canResetWidth={canResetWidth}
+      closeTestId={closeTestId}
       isSinglePanelView={isSinglePanelView}
       layout={layout}
+      splitPaneClamp={splitPaneClamp}
       transparentChrome={transparentChrome}
       header={
         <AuxiliaryPanelHeader>

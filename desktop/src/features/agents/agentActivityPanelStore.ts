@@ -4,32 +4,32 @@ import {
   showAgentRunDetail,
   showAgentRunsList,
 } from "@/features/agents/agentRunPanelStore";
-
-type Snapshot = {
-  isOpen: boolean;
-  selectedPubkey: string | null;
-};
+import {
+  closeRightDock,
+  getRightDockSnapshot,
+  openRightDock,
+  useRightDock,
+} from "@/features/dock/rightDockStore";
 
 /**
- * Open state for the agent activity panel.
+ * Agent-activity state for the right dock.
  *
- * A store rather than route state because the panel is opened from more than
- * one screen — the agents view and the channel header today — and must survive
- * navigating between them. Search params are per-route, so a panel opened in a
- * channel would vanish on the way to another channel, which is the opposite of
- * what a "watch this agent work" surface is for. Mirrors
- * `features/terminal/terminalPanelStore.ts`, the app's existing precedent for a
- * panel toggled from several places.
+ * The panel's OPEN state now lives in the app-level dock
+ * (`features/dock/rightDockStore`): activity is the dock's default view on
+ * every screen, not a channel-local pane. This module keeps the
+ * content-level state — which agent is selected — plus the open/close/toggle
+ * API its many callers already use, now delegating visibility to the dock.
  *
  * `selectedPubkey` is community-scoped, so it is reset on community switch —
- * see `resetCommunityState`. Without that, switching communities would leave
- * the panel pointed at a pubkey from the previous one.
+ * see `resetCommunityState`. The dock's open state is window chrome (like
+ * the sidebar) and deliberately survives the switch.
  */
-let snapshot: Snapshot = { isOpen: false, selectedPubkey: null };
+let selectedPubkey: string | null = null;
 const listeners = new Set<() => void>();
 
-function publish(next: Snapshot) {
-  snapshot = next;
+function publishSelection(next: string | null) {
+  if (selectedPubkey === next) return;
+  selectedPubkey = next;
   for (const listener of listeners) listener();
 }
 
@@ -47,23 +47,20 @@ export function openAgentActivityPanel(pubkey?: string | null) {
   // which is the list's question.
   if (pubkey) {
     showAgentRunDetail();
+    publishSelection(pubkey);
   } else {
     showAgentRunsList();
   }
-  publish({
-    isOpen: true,
-    selectedPubkey: pubkey ?? snapshot.selectedPubkey,
-  });
+  openRightDock("agent-activity");
 }
 
 export function closeAgentActivityPanel() {
-  if (!snapshot.isOpen) return;
-  publish({ ...snapshot, isOpen: false });
+  closeRightDock();
 }
 
 /** Toggle from a trigger, preselecting `pubkey` when opening. */
 export function toggleAgentActivityPanel(pubkey?: string | null) {
-  if (snapshot.isOpen) {
+  if (isAgentActivityOpen()) {
     closeAgentActivityPanel();
     return;
   }
@@ -71,23 +68,42 @@ export function toggleAgentActivityPanel(pubkey?: string | null) {
 }
 
 export function selectAgentActivityAgent(pubkey: string) {
-  if (snapshot.selectedPubkey === pubkey) return;
-  publish({ ...snapshot, selectedPubkey: pubkey });
+  publishSelection(pubkey);
 }
 
-export function useAgentActivityPanel(): Snapshot {
+function useAgentActivitySelection(): string | null {
   return React.useSyncExternalStore(
     (listener) => {
       listeners.add(listener);
       return () => listeners.delete(listener);
     },
-    () => snapshot,
-    () => snapshot,
+    () => selectedPubkey,
+    () => selectedPubkey,
+  );
+}
+
+function isAgentActivityOpen(): boolean {
+  const dock = getRightDockSnapshot();
+  return dock.open && dock.viewId === "agent-activity";
+}
+
+export function useAgentActivityPanel(): {
+  isOpen: boolean;
+  selectedPubkey: string | null;
+} {
+  const dock = useRightDock();
+  const selection = useAgentActivitySelection();
+  return React.useMemo(
+    () => ({
+      isOpen: dock.open && dock.viewId === "agent-activity",
+      selectedPubkey: selection,
+    }),
+    [dock, selection],
   );
 }
 
 /** Community-scoped reset — wired into `resetCommunityState`. */
 export function resetAgentActivityPanelStore() {
-  snapshot = { isOpen: false, selectedPubkey: null };
+  selectedPubkey = null;
   for (const listener of listeners) listener();
 }

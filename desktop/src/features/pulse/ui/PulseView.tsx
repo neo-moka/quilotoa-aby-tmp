@@ -255,7 +255,7 @@ export function PulseView({ currentPubkey }: PulseViewProps) {
   const isLoading = activeQuery.isLoading;
 
   const emptyMessages: Record<PulseTab, string> = {
-    search: "Search Pulse notes by author or text.",
+    search: "Search feed notes by author or text.",
     everyone: "No public notes yet.",
     people: "No notes yet. Follow people to see their updates here.",
     liked: "No likes yet — tap the heart on a note to save it here.",
@@ -364,7 +364,7 @@ export function PulseView({ currentPubkey }: PulseViewProps) {
                       value={searchQuery}
                     />
                     <button
-                      aria-label="Search Pulse"
+                      aria-label="Search the feed"
                       className="absolute right-1.5 top-1/2 flex h-8 w-8 -translate-y-1/2 items-center justify-center rounded-full bg-foreground/10 text-foreground transition-colors hover:bg-foreground/15 dark:bg-white/85 dark:text-black dark:hover:bg-white"
                       type="button"
                     >

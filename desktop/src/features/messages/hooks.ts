@@ -40,6 +40,17 @@ import { splitOutgoingTags } from "@/features/messages/lib/imetaMediaMarkdown";
 import { messageMentionPubkeys } from "@/features/messages/lib/messageMentionPubkeys";
 import { buildSentFromThreadTag } from "@/features/messages/lib/sentFromThread";
 import {
+  createOptimisticMessage,
+  insertEarlyOptimisticMessage,
+  removeEarlyOptimisticMessage,
+} from "@/features/messages/lib/optimisticOutgoing";
+
+export {
+  createOptimisticMessage,
+  insertEarlyOptimisticMessage,
+  removeEarlyOptimisticMessage,
+};
+import {
   clearTimeoutState,
   recordTimeoutFromRejection,
 } from "@/features/moderation/lib/timeoutStore";
@@ -101,63 +112,6 @@ export function resolveCachedReplyRootId(
     }
   }
   return null;
-}
-
-export function createOptimisticMessage(
-  channelId: string,
-  content: string,
-  identity: Identity,
-  currentMessages: RelayEvent[],
-  mentionPubkeys: string[] = [],
-  parentEventId: string | null = null,
-  mediaTags: string[][] = [],
-  sentFromThreadRootId: string | null = null,
-  sentFromThreadRootExcerpt: string | null = null,
-): RelayEvent {
-  const localKey = `optimistic-${crypto.randomUUID()}`;
-  const tags: string[][] = [];
-
-  if (parentEventId) {
-    tags.push(
-      ...buildReplyTags(
-        channelId,
-        identity.pubkey,
-        parentEventId,
-        resolveReplyRootId(parentEventId, currentMessages),
-        mentionPubkeys,
-      ),
-    );
-  } else {
-    tags.push(["h", channelId]);
-    tags.push(["p", identity.pubkey]);
-    for (const pubkey of normalizeMentionPubkeys(
-      mentionPubkeys,
-      identity.pubkey,
-    )) {
-      tags.push(["p", pubkey]);
-    }
-  }
-
-  for (const tag of mediaTags) {
-    tags.push(tag);
-  }
-  if (sentFromThreadRootId) {
-    tags.push(
-      buildSentFromThreadTag(sentFromThreadRootId, sentFromThreadRootExcerpt),
-    );
-  }
-
-  return {
-    id: localKey,
-    localKey,
-    pubkey: identity.pubkey,
-    created_at: Math.floor(Date.now() / 1_000),
-    kind: KIND_STREAM_MESSAGE,
-    tags,
-    content,
-    sig: "",
-    pending: true,
-  };
 }
 
 /**
@@ -493,6 +447,12 @@ export function useSendMessageMutation(
       sentFromThreadRootId?: string | null;
       sentFromThreadRootExcerpt?: string | null;
       transport?: "auto" | "http";
+      /**
+       * Row already on screen from `insertEarlyOptimisticMessage`. When set
+       * (and targeting the same channel), `onMutate` adopts it instead of
+       * inserting a second one, and rollback removes rather than restores it.
+       */
+      earlyOptimisticId?: string | null;
     },
     MessageQueryContext | undefined
   >({
@@ -663,6 +623,7 @@ export function useSendMessageMutation(
       mediaTags,
       sentFromThreadRootId,
       sentFromThreadRootExcerpt,
+      earlyOptimisticId,
     }) => {
       // Mirror mutationFn's target resolution so the optimistic message lands
       // in the cache for the same channel as the real send. A caller-supplied
@@ -679,6 +640,15 @@ export function useSendMessageMutation(
         !identity ||
         effectiveChannel.channelType === "forum"
       ) {
+        // An adopted-but-unroutable early row must not linger as forever
+        // pending; best-effort removal from the channel it was placed in.
+        if (earlyOptimisticId && capturedChannelId) {
+          removeEarlyOptimisticMessage(
+            queryClient,
+            capturedChannelId,
+            earlyOptimisticId,
+          );
+        }
         return undefined;
       }
 
@@ -692,15 +662,47 @@ export function useSendMessageMutation(
         queryClient.cancelQueries({ queryKey: windowKey }),
       ]);
 
-      const previousMessages =
+      const rawPreviousMessages =
         queryClient.getQueryData<RelayEvent[]>(queryKey) ?? [];
-      const previousWindow =
+      const rawPreviousWindow =
         queryClient.getQueryData<ChannelWindowStore>(windowKey);
+
+      // Adopt only when the early row actually survived until now — a window
+      // refetch racing the preflight gap can drop it, and adopting a ghost id
+      // would leave the ack with nothing to swap.
+      const earlyRowPresent =
+        Boolean(earlyOptimisticId) &&
+        (rawPreviousWindow?.liveOverlay.some(
+          (event) => event.id === earlyOptimisticId,
+        ) ??
+          false);
+
+      if (earlyOptimisticId && earlyRowPresent) {
+        // Adopt the already-rendered row. Snapshots are stripped of it so an
+        // error rollback removes the row instead of resurrecting it.
+        return {
+          optimisticId: earlyOptimisticId,
+          previousMessages: rawPreviousMessages.filter(
+            (event) => event.id !== earlyOptimisticId,
+          ),
+          previousWindow: rawPreviousWindow
+            ? {
+                ...rawPreviousWindow,
+                liveOverlay: rawPreviousWindow.liveOverlay.filter(
+                  (event) => event.id !== earlyOptimisticId,
+                ),
+              }
+            : rawPreviousWindow,
+          channelId: effectiveChannel.id,
+          queryKey,
+        };
+      }
+
       const optimisticMessage = createOptimisticMessage(
         effectiveChannel.id,
         content.trim(),
         identity,
-        previousMessages,
+        rawPreviousMessages,
         mentionPubkeys ?? [],
         parentEventId ?? null,
         mediaTags ?? [],
@@ -709,7 +711,7 @@ export function useSendMessageMutation(
       );
 
       const nextWindow = mergeLiveChannelWindowEvent(
-        previousWindow ?? emptyChannelWindowStore(),
+        rawPreviousWindow ?? emptyChannelWindowStore(),
         optimisticMessage,
       );
       queryClient.setQueryData(windowKey, nextWindow);
@@ -717,8 +719,8 @@ export function useSendMessageMutation(
 
       return {
         optimisticId: optimisticMessage.id,
-        previousMessages,
-        previousWindow,
+        previousMessages: rawPreviousMessages,
+        previousWindow: rawPreviousWindow,
         channelId: effectiveChannel.id,
         queryKey,
       };

@@ -114,6 +114,7 @@ const AppShellContext = React.createContext<AppShellContextValue>({
   feedItemState: {
     doneSet: EMPTY_SET,
     markDone: () => {},
+    markManyDone: () => {},
     markUnread: () => {},
     undoDone: () => {},
     undoUnread: () => {},

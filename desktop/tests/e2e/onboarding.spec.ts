@@ -435,7 +435,7 @@ async function expectWelcomeView(page: Page) {
     "Mention",
   );
   await expect(page.getByTestId("welcome-composer-guide-banner")).toContainText(
-    "whenever you want their help.",
+    "type @ to see the whole team.",
   );
   await expectWelcomePersonaMention(page);
   await expectWelcomeComposerBannerLayout(page);

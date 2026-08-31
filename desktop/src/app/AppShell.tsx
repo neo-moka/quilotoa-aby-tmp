@@ -2,16 +2,16 @@ import * as React from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { Outlet, useLocation } from "@tanstack/react-router";
 import { deriveShellRoute, markAllReadSources } from "@/app/AppShell.helpers";
-import { useTerminalContext } from "@/app/useTerminalContext";
+import {
+  terminalContextReady,
+  useEffectiveTerminalContext,
+} from "@/app/useTerminalContext";
 import { AppShellProvider } from "@/app/AppShellContext";
 import { AppShellOverlays, TerminalBootstrap } from "@/app/AppShellOverlays";
 import { AppShellChannelSurface } from "@/app/AppShellChannelSurface";
 import { AppHuddleShell } from "@/app/AppHuddleShell";
 import { AppTopChrome } from "@/app/AppTopChrome";
-import {
-  type TerminalContextOverride,
-  TerminalContextOverrideProvider,
-} from "@/app/TerminalContextOverrideContext";
+import { TerminalContextOverrideProvider } from "@/app/TerminalContextOverrideContext";
 import { useAppNavigation } from "@/app/navigation/useAppNavigation";
 import { useBackForwardControls } from "@/app/navigation/useBackForwardControls";
 import { useCommunityNavigationTransitions } from "@/app/useCommunityNavigationTransitions";
@@ -322,23 +322,17 @@ export function AppShell() {
     selectedView,
     sidebarChannels,
   ]);
-  const [terminalContextOverride, setTerminalContextOverride] =
-    React.useState<TerminalContextOverride | null>(null);
-  const { activeChannel, terminalContext } = useTerminalContext({
+  const {
+    activeChannel,
+    effectiveTerminalContext,
+    setTerminalContextOverride,
+  } = useEffectiveTerminalContext({
     channelId: selectedChannelId,
     channels,
     locationSearch: location.search,
     pubkey: identityQuery.data?.pubkey,
     relayUrl: communitiesHook.activeCommunity?.relayUrl,
   });
-  const effectiveTerminalContext = terminalContextOverride
-    ? {
-        ...terminalContext,
-        channelId: terminalContextOverride.channelId,
-        channelName: terminalContextOverride.channelName,
-        threadId: null,
-      }
-    : terminalContext;
   const managedChannel = React.useMemo(() => {
     const targetChannelId = managedChannelId ?? selectedChannelId;
     return targetChannelId
@@ -781,6 +775,9 @@ export function AppShell() {
                       hasCommunityRail={hasCommunityRail}
                       onGoBack={goBack}
                       onGoForward={goForward}
+                      terminalAvailable={terminalContextReady(
+                        effectiveTerminalContext,
+                      )}
                     />
                   ) : null}
                   {settingsOpen ? (

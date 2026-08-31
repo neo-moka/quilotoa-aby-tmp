@@ -24,17 +24,20 @@ export function PulseTabBar({
 }: PulseTabBarProps) {
   return (
     <div className="relative z-40 shrink-0 px-4 pt-4 sm:px-6">
-      <div className="relative mx-auto flex w-full max-w-2xl items-center justify-center">
+      {/* justify-start, not center: the chips share the reading column with
+          the cards below, so they anchor to the same left edge — centered
+          chips over a wider card read as two unrelated rows. */}
+      <div className="relative mx-auto flex w-full max-w-2xl items-center justify-start">
         <div className="min-w-0 max-w-full">
           <div className="-mx-4 overflow-x-auto px-4 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
             <div
-              aria-label="Pulse sections"
+              aria-label="Feed sections"
               className="flex items-center gap-1"
               role="tablist"
             >
               <Button
                 aria-controls={getPanelId("search")}
-                aria-label="Search Pulse"
+                aria-label="Search the feed"
                 aria-selected={activeTab === "search"}
                 className="h-7 w-7 shrink-0 rounded-full border border-transparent p-0 text-muted-foreground data-[active=true]:border-border/70 data-[active=true]:bg-background/80 data-[active=true]:text-foreground data-[active=true]:shadow-xs data-[active=true]:backdrop-blur-sm"
                 data-active={activeTab === "search"}

@@ -1,4 +1,5 @@
 import {
+  ChevronDown,
   Circle,
   CircleCheck,
   CircleDashed,
@@ -32,9 +33,19 @@ import {
   projectTaskCategoryLabel,
   projectTaskUserLabels,
 } from "@/features/projects/projectTaskCategories";
+import {
+  type ProjectIssueStatusTarget,
+  useProjectIssueStatusMutation,
+} from "@/features/projects/issueStatusMutations";
 import { useIdentityQuery } from "@/shared/api/hooks";
 import type { ChannelMember } from "@/shared/api/types";
 import { BuzzLoadingState } from "@/shared/ui/BuzzLoadingState";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/shared/ui/dropdown-menu";
 import { normalizePubkey } from "@/shared/lib/pubkey";
 import { IssueAssigneeFacepile, IssueAssigneesRow } from "./IssueAssigneesRow";
 import { DiscussedInChannels } from "./DiscussionChannels";
@@ -65,6 +76,22 @@ export function issueStatusClassName(status: ProjectIssue["status"]) {
   if (status === "Closed") return "text-destructive";
   return "text-muted-foreground";
 }
+
+/**
+ * The moves offered by the status selector — the NIP-34 status events the
+ * desktop can publish (same set as `buzz issues status`). In Progress and
+ * In Review are label heuristics on the immutable issue root, so they are
+ * states a task can BE in but not targets the selector can move it to.
+ */
+const ISSUE_STATUS_TARGETS: {
+  label: string;
+  target: ProjectIssueStatusTarget;
+}[] = [
+  { label: "Reopen", target: "open" },
+  { label: "Triage", target: "draft" },
+  { label: "Done", target: "resolved" },
+  { label: "Closed", target: "closed" },
+];
 
 function issueStatusVisual(status: ProjectIssue["status"]): {
   className: string;
@@ -126,6 +153,10 @@ function issueMembers(
       issue.author,
       ...project.contributors,
       ...issue.recipients,
+      // Assignees must be mentionable: an issue-watching agent only reacts
+      // to comments that p-tag it, and the assignee is exactly who a comment
+      // on the task addresses.
+      ...issue.assignees,
     ]),
   ].map((pubkey) => {
     const profile = profiles?.[normalizePubkey(pubkey)];
@@ -312,6 +343,27 @@ export function ProjectIssueDetail({
   const isManagedAgentOwner = useIsManagedAgent(project.owner) === true;
   const canAssignOthers =
     Boolean(viewer) && (isAuthor || isOwner || isManagedAgentOwner);
+  // Status events are only honoured from the issue author or the repo owner
+  // (see `allowedActorsForRoot`), so anyone else gets the read-only chip —
+  // offering a control whose event every reader ignores would look like a
+  // silent failure.
+  const canChangeStatus = Boolean(viewer) && (isAuthor || isOwner);
+  const statusMutation = useProjectIssueStatusMutation(project);
+  const handleStatusChange = React.useCallback(
+    async (target: ProjectIssueStatusTarget) => {
+      try {
+        await statusMutation.mutateAsync({ issue, target });
+        toast.success("Task status updated.");
+      } catch (error) {
+        toast.error(
+          error instanceof Error
+            ? error.message
+            : "Failed to update task status.",
+        );
+      }
+    },
+    [issue, statusMutation.mutateAsync],
+  );
 
   return (
     <div
@@ -348,9 +400,41 @@ export function ProjectIssueDetail({
       </header>
       <ProjectDetailMetaList>
         <ProjectDetailMetaRow icon={status.icon} label="Status">
-          <span className={`font-medium ${status.className}`}>
-            {issue.status}
-          </span>
+          {canChangeStatus ? (
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <button
+                  className="inline-flex items-center gap-1 rounded-md px-1 py-0.5 -mx-1 transition-colors hover:bg-muted/70 focus-visible:outline-hidden focus-visible:ring-1 focus-visible:ring-ring disabled:opacity-60"
+                  data-testid="project-issue-status-trigger"
+                  disabled={statusMutation.isPending}
+                  type="button"
+                >
+                  <span className={`font-medium ${status.className}`}>
+                    {issue.status}
+                  </span>
+                  <ChevronDown
+                    aria-hidden
+                    className="h-3 w-3 text-muted-foreground"
+                  />
+                </button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="start">
+                {ISSUE_STATUS_TARGETS.map(({ label, target }) => (
+                  <DropdownMenuItem
+                    data-testid={`project-issue-status-option-${target}`}
+                    key={target}
+                    onSelect={() => void handleStatusChange(target)}
+                  >
+                    {label}
+                  </DropdownMenuItem>
+                ))}
+              </DropdownMenuContent>
+            </DropdownMenu>
+          ) : (
+            <span className={`font-medium ${status.className}`}>
+              {issue.status}
+            </span>
+          )}
         </ProjectDetailMetaRow>
         <ProjectDetailMetaRow icon={CircleDot} label="Category">
           {projectTaskCategoryLabel(issue.category)}

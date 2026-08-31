@@ -426,7 +426,7 @@ const SidebarTrigger = React.forwardRef<
       }}
       {...props}
     >
-      <DrawerPanelIcon side={open ? "left" : "right"} />
+      <DrawerPanelIcon open={open} />
       <span className="sr-only">Toggle Sidebar</span>
     </Button>
   );

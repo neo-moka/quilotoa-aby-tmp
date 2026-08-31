@@ -1,7 +1,14 @@
 import { cn } from "@/shared/lib/cn";
-import BuzzLogoAnimation from "@/shared/ui/buzz-logo/BuzzLogoAnimation";
+import { Spinner } from "@/shared/ui/spinner";
 
-/** Centered, low-emphasis loading state for page and panel fetches. */
+/**
+ * Centered, low-emphasis loading state for page and panel fetches.
+ *
+ * A conventional spinner, not the bee wing-flap: the same direct feedback
+ * that replaced the boot gate's animation (see `AppLoadingGate`) applies
+ * everywhere something is loading — a spinner reads as "loading" instantly,
+ * the mascot read as decoration.
+ */
 export function BuzzLoadingState({
   className,
   fill = false,
@@ -21,14 +28,7 @@ export function BuzzLoadingState({
       data-testid="buzz-loading-state"
       role="status"
     >
-      <BuzzLogoAnimation
-        ariaLabel={label}
-        className="buzz-logo--scale-pulse"
-        fullScreen={false}
-        showBackground={false}
-        style={{ width: "2rem" }}
-        textured={false}
-      />
+      <Spinner aria-label={label} className="h-6 w-6 border-2" />
     </div>
   );
 }

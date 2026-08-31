@@ -1,17 +1,9 @@
 import * as React from "react";
 
 import {
-  closeAgentActivityPanel,
-  selectAgentActivityAgent,
-  useAgentActivityPanel,
-} from "@/features/agents/agentActivityPanelStore";
-import { AgentActivityPanel } from "@/features/agents/ui/AgentActivityPanel";
-import { AgentActivityRail } from "@/features/agents/ui/AgentActivityRail";
-import {
   setChannelViewTab,
   useChannelViewTab,
 } from "@/features/channels/channelViewTabStore";
-import { RightAuxiliaryPane } from "@/features/channels/ui/RightAuxiliaryPane";
 import { ChannelArtifactsTab } from "@/features/channels/ui/ChannelArtifactsTab";
 import type { ChannelPane } from "@/features/channels/ui/ChannelScreenLazyViews";
 import { ChannelThreadsTab } from "@/features/channels/ui/ChannelThreadsTab";
@@ -19,7 +11,6 @@ import { ChannelWorkTab } from "@/features/channels/ui/ChannelWorkTab";
 import type { BotActivityAgent } from "@/features/channels/ui/BotActivityBar";
 import { useChannelPaneMessages } from "@/features/channels/ui/useChannelPaneMessages";
 import type { TimelineMessage } from "@/features/messages/types";
-import { useIsThreadPanelOverlay } from "@/shared/hooks/use-mobile";
 import { channelChrome } from "@/shared/layout/chromeLayout";
 import { cn } from "@/shared/lib/cn";
 
@@ -59,7 +50,6 @@ export const ChannelLensView = React.memo(function ChannelLensView(
     activeChannel,
     activityAgents,
     agentSessionAgents,
-    canResetThreadPanelWidth,
     currentPubkey,
     header,
     isSinglePanelView = false,
@@ -67,24 +57,12 @@ export const ChannelLensView = React.memo(function ChannelLensView(
     messages,
     onOpenAgentSession,
     onOpenThread,
-    onResetThreadPanelWidth,
-    onThreadPanelResizeStart,
     profiles,
-    threadPanelWidthPx,
     threadSummaries,
   } = props;
 
   const channelId = activeChannel?.id ?? null;
   const tab = useChannelViewTab(channelId);
-  // The lens keeps the conversation's right edge: the activity panel when it
-  // is open, the agent rail otherwise. Without this, switching to Work or
-  // Threads made every agent vanish and turned the header's activity toggle
-  // into a button that appears to do nothing.
-  const agentActivityPanel = useAgentActivityPanel();
-  const isOverlay = useIsThreadPanelOverlay();
-  // Same split-mode rule as the conversation's right slot: on narrow layouts
-  // there is no width to spare for a rail or a panel.
-  const showRightRail = !isSinglePanelView && !isOverlay;
   const { mainTimelineEntries, visibleMessages } = useChannelPaneMessages({
     activeChannel,
     isHuddleTranscript: false,
@@ -186,31 +164,8 @@ export const ChannelLensView = React.memo(function ChannelLensView(
         </div>
       </section>
 
-      {showRightRail && agentActivityPanel.isOpen ? (
-        <RightAuxiliaryPane
-          canResetWidth={canResetThreadPanelWidth}
-          onResetWidth={onResetThreadPanelWidth}
-          onResizeStart={onThreadPanelResizeStart}
-          testId="agent-activity-auxiliary-pane"
-          widthPx={threadPanelWidthPx}
-        >
-          <AgentActivityPanel
-            canResetWidth={canResetThreadPanelWidth}
-            isSinglePanelView={false}
-            layout="split"
-            onClose={closeAgentActivityPanel}
-            onResetWidth={onResetThreadPanelWidth}
-            onResizeStart={onThreadPanelResizeStart}
-            onSelectAgent={selectAgentActivityAgent}
-            profiles={profiles}
-            selectedPubkey={agentActivityPanel.selectedPubkey}
-            transparentChrome
-            widthPx={threadPanelWidthPx}
-          />
-        </RightAuxiliaryPane>
-      ) : showRightRail ? (
-        <AgentActivityRail profiles={profiles} />
-      ) : null}
+      {/* Agent activity — panel and folded rail alike — lives in the
+          app-level right dock now (`features/dock/RightDock`). */}
     </div>
   );
 });

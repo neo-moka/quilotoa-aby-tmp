@@ -1,13 +1,18 @@
+import { Hash, Users, Zap, type LucideIcon } from "lucide-react";
 import * as React from "react";
 
 /** Which slice of the sidebar the segmented control is showing. */
 export type SidebarView = "now" | "rooms" | "people";
 
-/** Tab order and copy, exported so the control and its tests share one list. */
-export const SIDEBAR_VIEWS: readonly { id: SidebarView; label: string }[] = [
-  { id: "now", label: "Now" },
-  { id: "rooms", label: "Rooms" },
-  { id: "people", label: "People" },
+/** Tab order, copy, and glyphs, exported so the control and its tests share one list. */
+export const SIDEBAR_VIEWS: readonly {
+  id: SidebarView;
+  label: string;
+  icon: LucideIcon;
+}[] = [
+  { id: "now", label: "Now", icon: Zap },
+  { id: "rooms", label: "Rooms", icon: Hash },
+  { id: "people", label: "People", icon: Users },
 ];
 
 const DEFAULT_VIEW: SidebarView = "now";

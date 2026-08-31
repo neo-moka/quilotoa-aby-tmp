@@ -763,7 +763,7 @@ const MessageTimelineBase = React.forwardRef<
               className={cn(
                 "flex w-full flex-col gap-2",
                 showChannelIntroOnly
-                  ? "pt-[var(--channel-top-chrome-height,4.5rem)]"
+                  ? "pt-[max(var(--buzz-channel-content-top-padding,4.5rem),var(--channel-top-chrome-height,0rem))]"
                   : channelChrome.contentPadding,
                 (showIntro || showGenericEmpty || showMessageList) &&
                   "min-h-full",

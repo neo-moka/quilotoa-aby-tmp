@@ -429,7 +429,7 @@ export function CommunityRail({
   return (
     <nav
       aria-label="Communities"
-      className="relative z-20 flex w-14 shrink-0 flex-col items-center gap-2.5 overflow-y-auto bg-sidebar px-2.5 pb-5 pt-[calc(var(--buzz-top-chrome-height,40px)+7px)] after:absolute after:inset-y-0 after:right-0 after:w-px after:bg-border/60"
+      className="relative z-20 flex w-14 shrink-0 flex-col items-center gap-2.5 overflow-y-auto bg-sidebar px-2.5 pb-5 pt-[calc(var(--buzz-top-chrome-height,48px)+7px)] after:absolute after:inset-y-0 after:right-0 after:w-px after:bg-border/60"
       data-testid="community-rail"
     >
       {/* Brand mark, then a hairline — the design's rail leads with the app

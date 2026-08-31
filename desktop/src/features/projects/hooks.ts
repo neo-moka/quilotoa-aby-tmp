@@ -230,7 +230,7 @@ async function fetchRepoState(project: Repository): Promise<RepoState | null> {
   return events.length > 0 ? eventToRepoState(events[0]) : null;
 }
 
-async function fetchProjectIssues(
+export async function fetchProjectIssues(
   project: Repository,
 ): Promise<ProjectIssue[]> {
   const issuePromise = relayClient.fetchEvents({
@@ -272,7 +272,7 @@ async function fetchProjectIssues(
   );
 }
 
-async function fetchProjectPullRequests(
+export async function fetchProjectPullRequests(
   project: Repository,
 ): Promise<ProjectPullRequest[]> {
   const [pullRequestEvents, updateEvents, commentEvents, statusEvents] =
@@ -827,31 +827,10 @@ export function useProjectLocalRepositoriesQuery(reposDir?: string | null) {
   });
 }
 
-export function useProjectIssuesQuery(project: Repository | null | undefined) {
-  return useQuery({
-    enabled: Boolean(project),
-    queryKey: ["project", project?.id ?? "none", "issues"],
-    queryFn: () => {
-      if (!project) throw new Error("No project selected.");
-      return fetchProjectIssues(project);
-    },
-    staleTime: 30_000,
-  });
-}
-
-export function useProjectPullRequestsQuery(
-  project: Repository | null | undefined,
-) {
-  return useQuery({
-    enabled: Boolean(project),
-    queryKey: ["project", project?.id ?? "none", "pull-requests"],
-    queryFn: () => {
-      if (!project) throw new Error("No project selected.");
-      return fetchProjectPullRequests(project);
-    },
-    staleTime: 30_000,
-  });
-}
+export {
+  useProjectIssuesQuery,
+  useProjectPullRequestsQuery,
+} from "./projectItemQueries";
 
 /** Loads cross-project issues and pull requests with partial-failure metadata. */
 export function useProjectsWorkItemsQuery(projects: Project[]) {

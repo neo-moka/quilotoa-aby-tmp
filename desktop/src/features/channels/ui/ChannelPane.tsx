@@ -26,13 +26,6 @@ import {
 import { buildVideoReviewPresentationByMessageId } from "@/features/messages/lib/videoReviewContext";
 import { useComposerHeightPadding } from "@/features/messages/ui/useComposerHeightPadding";
 import { UserProfilePanel } from "@/features/profile/ui/UserProfilePanel";
-import {
-  closeAgentActivityPanel,
-  selectAgentActivityAgent,
-  useAgentActivityPanel,
-} from "@/features/agents/agentActivityPanelStore";
-import { AgentActivityPanel } from "@/features/agents/ui/AgentActivityPanel";
-import { AgentActivityRail } from "@/features/agents/ui/AgentActivityRail";
 import { AgentSessionThreadPanel } from "@/features/channels/ui/AgentSessionThreadPanel";
 import { ChannelManagementAuxiliaryPanel } from "@/features/channels/ui/ChannelManagementAuxiliaryPanel";
 import { RightAuxiliaryPane } from "@/features/channels/ui/RightAuxiliaryPane";
@@ -279,6 +272,7 @@ export const ChannelPane = React.memo(function ChannelPane({
         threadHeadId: string | null;
       } | null,
       forceRest?: boolean,
+      earlyOptimisticId?: string | null,
     ) => {
       const shouldCompleteWelcomeBanner =
         isActiveWelcomeChannel &&
@@ -293,6 +287,7 @@ export const ChannelPane = React.memo(function ChannelPane({
         channelId,
         threadContext,
         forceRest,
+        earlyOptimisticId,
       );
 
       if (
@@ -424,23 +419,12 @@ export const ChannelPane = React.memo(function ChannelPane({
   const isOverlay = useIsThreadPanelOverlay();
   const useSplitAuxiliaryPane = !isSinglePanelView && !isOverlay;
   const threadViewMode = useThreadViewMode();
-  const agentActivityPanel = useAgentActivityPanel();
-  // Opening a thread is an explicit navigation, so it takes the slot: the
-  // activity panel closes rather than silently outranking it. Without this
-  // the click appeared to do nothing, and the thread surfaced only when the
-  // panel was later dismissed — an answer arriving after the question left.
-  React.useEffect(() => {
-    if (openThreadHeadId) closeAgentActivityPanel();
-  }, [openThreadHeadId]);
-  // The activity panel outranks the thread in the right slot, so while it is
-  // open the focus drawer never mounts — and the presence hook below must not
-  // believe an unmounted drawer covers the channel. Believing it froze the
-  // whole main section: `channelIsCovered` set it `inert`, with no drawer on
-  // screen to dismiss, and every click and keystroke died silently.
+  // Agent activity moved to the app-level right dock (`features/dock`) — it
+  // no longer competes for this channel's right slot, so threads and the
+  // dock coexist and the old close-on-thread interplay is gone.
   const useFocusThreadDrawer =
     threadViewMode === "focus" &&
     useSplitAuxiliaryPane &&
-    !agentActivityPanel.isOpen &&
     (Boolean(threadHeadMessage) || shouldShowThreadSkeleton);
   const { channelIsCovered, markExitComplete } = useFocusDrawerPresence(
     useFocusThreadDrawer,
@@ -482,8 +466,7 @@ export const ChannelPane = React.memo(function ChannelPane({
   );
   const hasSplitAuxiliaryPane =
     useSplitAuxiliaryPane &&
-    (agentActivityPanel.isOpen ||
-      channelManagementOpen ||
+    (channelManagementOpen ||
       Boolean(threadHeadMessage) ||
       shouldShowThreadSkeleton ||
       Boolean(activeChannel && selectedAgent) ||
@@ -495,6 +478,7 @@ export const ChannelPane = React.memo(function ChannelPane({
   ) =>
     useSplitAuxiliaryPane ? (
       <RightAuxiliaryPane
+        animated
         canResetWidth={canResetThreadPanelWidth}
         key={options.key ?? testId}
         onResetWidth={onResetThreadPanelWidth}
@@ -796,35 +780,13 @@ export const ChannelPane = React.memo(function ChannelPane({
        * alone keeps framing itself when embedded. `ManagedAgentSessionPanel`
        * needs `showHeader={false}` and its card dissolved in both panels that
        * host it, for the same reason.
+       *
+       * Agent activity is NOT a branch here anymore: it lives in the
+       * app-level right dock (`features/dock`), outside this surface, and
+       * coexists with whatever this slot shows.
        * ──────────────────────────────────────────────────────────────── */}
-      <AnimatePresence onExitComplete={markExitComplete}>
-        {/* The right pane is one slot where the *most recent explicit action*
-            wins, not a fixed precedence. Toggling activity covers an open
-            thread (which keeps its state and returns on toggle-off); opening
-            a thread closes the activity panel via the effect above — both
-            directions answer the click the user just made, instead of one
-            surface silently outranking the other. */}
-        {agentActivityPanel.isOpen ? (
-          wrapAux(
-            <AgentActivityPanel
-              canResetWidth={canResetThreadPanelWidth}
-              isSinglePanelView={
-                useSplitAuxiliaryPane ? false : isSinglePanelView
-              }
-              layout={useSplitAuxiliaryPane ? "split" : "standalone"}
-              transparentChrome={useSplitAuxiliaryPane}
-              onClose={closeAgentActivityPanel}
-              onResetWidth={onResetThreadPanelWidth}
-              onResizeStart={onThreadPanelResizeStart}
-              onSelectAgent={selectAgentActivityAgent}
-              profiles={profiles}
-              selectedPubkey={agentActivityPanel.selectedPubkey}
-              widthPx={threadPanelWidthPx}
-            />,
-            "agent-activity-auxiliary-pane",
-            { key: "agent-activity-panel" },
-          )
-        ) : channelManagementOpen && activeChannel ? (
+      <AnimatePresence initial={false} onExitComplete={markExitComplete}>
+        {channelManagementOpen && activeChannel ? (
           <ChannelManagementAuxiliaryPanel
             activeChannel={activeChannel}
             canResetThreadPanelWidth={canResetThreadPanelWidth}
@@ -995,15 +957,9 @@ export const ChannelPane = React.memo(function ChannelPane({
           })()
         ) : null}
       </AnimatePresence>
-      {/* With every panel closed the right edge folds to a rail instead of
-          disappearing — who is working stays ambient, one click from the runs
-          list. Split-mode only: on narrow layouts the rail would shave width
-          off the one column that has none to spare. */}
-      {useSplitAuxiliaryPane &&
-      !hasSplitAuxiliaryPane &&
-      !isHuddleTranscript ? (
-        <AgentActivityRail profiles={profiles} />
-      ) : null}
+      {/* The ambient agent rail moved into the app-level right dock
+          (`features/dock/RightDock`) — it now folds down beside every
+          screen, not just this one. */}
     </div>
   );
 });

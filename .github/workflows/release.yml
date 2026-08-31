@@ -9,6 +9,10 @@ on:
     tags:
       - 'desktop-v[0-9]*'
 
+env:
+  # HeroUI Pro's postinstall downloads the licensed package with this token.
+  HEROUI_AUTH_TOKEN: ${{ secrets.HEROUI_AUTH_TOKEN }}
+
 jobs:
   # Shared setup: verify the immutable release tag, determine the version, and
   # create the release objects all four platform jobs upload into.

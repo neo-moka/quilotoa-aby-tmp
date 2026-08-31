@@ -392,6 +392,7 @@ export function formatTimelineMessages(
       pubkey: actorPubkey,
       displayName,
       avatarUrl: profile?.avatarUrl ?? null,
+      createdAt,
     });
 
     current.set(emoji, existing);

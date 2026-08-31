@@ -36,6 +36,8 @@ type AuxiliaryPanelProps = {
   header?: React.ReactNode;
   isSinglePanelView?: boolean;
   layout?: AuxiliaryPanelLayout;
+  /** Forwarded to the header close action — see `AuxiliaryPanelContextValue`. */
+  closeTestId?: string;
   onClose: () => void;
   onResetWidth?: () => void;
   onResizeStart?: React.PointerEventHandler<HTMLButtonElement>;
@@ -59,6 +61,7 @@ export function AuxiliaryPanel({
   header,
   isSinglePanelView = false,
   layout = "standalone",
+  closeTestId,
   onClose,
   onResetWidth,
   onResizeStart,
@@ -77,6 +80,7 @@ export function AuxiliaryPanel({
 
   const contextValue = React.useMemo(
     () => ({
+      closeTestId,
       isFloatingOverlay,
       isOverlay,
       isSinglePanelView,
@@ -88,6 +92,7 @@ export function AuxiliaryPanel({
       widthPx,
     }),
     [
+      closeTestId,
       isFloatingOverlay,
       isOverlay,
       isSinglePanelView,

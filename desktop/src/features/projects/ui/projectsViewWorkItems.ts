@@ -2,7 +2,7 @@ import * as React from "react";
 import { toast } from "@/shared/ui/toast";
 
 import type { ProjectsWorkItemsResult } from "@/features/projects/projectWorkItems";
-import type { Project } from "@/features/projects/hooks";
+import type { Project, Repository } from "@/features/projects/hooks";
 import { hasLocalRepositoryCheckout } from "@/features/projects/lib/projectLocalRepos";
 import { selectProjectRepository } from "@/features/projects/projectModels";
 import type { useOpenProjectTerminal } from "@/features/projects/ui/useOpenProjectTerminal";
@@ -78,6 +78,23 @@ export function useOpenProjectTerminalHandler(
         ),
       });
     },
+    [localRepoNames, openTerminal],
+  );
+}
+
+/** Repository-row variant of `useOpenProjectTerminalHandler`. */
+export function useOpenRepositoryTerminalHandler(
+  openTerminal: ReturnType<typeof useOpenProjectTerminal>,
+  localRepoNames: Set<string>,
+) {
+  return React.useCallback(
+    (repository: Repository) =>
+      openTerminal(repository, {
+        hasLocalCheckout: hasLocalRepositoryCheckout(
+          repository,
+          localRepoNames,
+        ),
+      }),
     [localRepoNames, openTerminal],
   );
 }

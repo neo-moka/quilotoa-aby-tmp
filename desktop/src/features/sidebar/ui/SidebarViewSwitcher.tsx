@@ -46,7 +46,10 @@ export function SidebarViewSwitcher({
           // theme foreground — a solid black pill behind dark text.
           <label
             className={cn(
-              "flex flex-1 cursor-pointer items-center justify-center rounded-md px-2 py-1 text-2xs font-medium leading-none transition-colors",
+              // Same metrics as `SidebarMenuButton` (h-8, text-sm, size-4
+              // icons) so the selected pill and a selected channel row read
+              // as the same control at two spots, not two different sizes.
+              "flex h-8 flex-1 cursor-pointer items-center justify-center gap-1.5 rounded-md px-2.5 text-sm font-medium transition-colors",
               "has-[:focus-visible]:ring-2 has-[:focus-visible]:ring-sidebar-ring",
               isSelected
                 ? "bg-sidebar-active text-sidebar-active-foreground shadow-xs"
@@ -67,6 +70,7 @@ export function SidebarViewSwitcher({
               type="radio"
               value={view.id}
             />
+            <view.icon aria-hidden className="size-4 shrink-0" />
             {view.label}
           </label>
         );

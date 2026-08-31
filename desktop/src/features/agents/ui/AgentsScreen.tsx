@@ -1,13 +1,7 @@
 import * as React from "react";
 
 import { useAppNavigation } from "@/app/navigation/useAppNavigation";
-import {
-  closeAgentActivityPanel,
-  openAgentActivityPanel,
-  selectAgentActivityAgent,
-  useAgentActivityPanel,
-} from "@/features/agents/agentActivityPanelStore";
-import { AgentActivityPanel } from "@/features/agents/ui/AgentActivityPanel";
+import { openAgentActivityPanel } from "@/features/agents/agentActivityPanelStore";
 import { usePersonasQuery } from "@/features/agents/hooks";
 import { useOpenDmMutation } from "@/features/channels/hooks";
 import {
@@ -73,10 +67,9 @@ export function AgentsScreen() {
   const openDmMutation = useOpenDmMutation();
   const { goChannel } = useAppNavigation();
 
-  // The activity panel and the profile panel are both the right pane, so
-  // opening either closes the other rather than stacking two panels.
-  const activityPanel = useAgentActivityPanel();
-
+  // Agent activity lives in the app-level right dock now (`features/dock`),
+  // so it no longer competes with the profile panel for this screen's right
+  // pane — the two coexist.
   const handleOpenActivityPanel = React.useCallback(() => {
     applyPatch({
       profile: null,
@@ -89,7 +82,6 @@ export function AgentsScreen() {
 
   const handleOpenProfilePanel = React.useCallback(
     (pubkey: string, options?: ProfilePanelOpenOptions) => {
-      closeAgentActivityPanel();
       applyPatch({
         profile: pubkey,
         profilePersona: null,
@@ -148,17 +140,6 @@ export function AgentsScreen() {
           <React.Suspense fallback={<ViewLoadingFallback kind="agents" />}>
             <AgentsView onOpenActivityPanel={handleOpenActivityPanel} />
           </React.Suspense>
-          {activityPanel.isOpen ? (
-            <AgentActivityPanel
-              canResetWidth={threadPanelWidth.canReset}
-              onClose={closeAgentActivityPanel}
-              onResetWidth={threadPanelWidth.onResetWidth}
-              onResizeStart={threadPanelWidth.onResizeStart}
-              onSelectAgent={selectAgentActivityAgent}
-              selectedPubkey={activityPanel.selectedPubkey}
-              widthPx={threadPanelWidth.widthPx}
-            />
-          ) : null}
           {profilePanelTarget ? (
             <UserProfilePanel
               canResetWidth={threadPanelWidth.canReset}

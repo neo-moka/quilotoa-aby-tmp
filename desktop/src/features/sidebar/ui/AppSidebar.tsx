@@ -49,7 +49,6 @@ import type {
   CreateChannelKind,
 } from "@/features/sidebar/ui/AppSidebar.types";
 import { useSidebarView } from "@/features/sidebar/lib/sidebarViewStore";
-import { SidebarNowSection } from "@/features/sidebar/ui/SidebarNowSection";
 import { SidebarRelayConnectionCard } from "@/features/sidebar/ui/SidebarRelayConnectionCard";
 import { SidebarStatusFooter } from "@/features/sidebar/ui/SidebarStatusFooter";
 import {
@@ -510,13 +509,9 @@ export function AppSidebar({
                 selectedView={selectedView}
               />
 
-              <SidebarNowSection
-                currentPubkey={currentPubkey}
-                onSelectChannel={onSelectChannel}
-                onSelectHome={onSelectHome}
-                selectedChannelId={selectedChannelId}
-              />
-
+              {/* Needs-you moved to the title bar's notification bell
+                  (`features/notifications/NotificationsBell`) — same data and
+                  dismissal rules, reachable from every screen. */}
               {isLoading ? (
                 <SidebarLoadingContent shape={sidebarLoadingShape} />
               ) : null}

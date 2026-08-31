@@ -1,6 +1,8 @@
 import { Activity, Bot, Folders, Inbox, Zap } from "lucide-react";
+import { createPortal } from "react-dom";
 
 import { TopbarSearch } from "@/features/search/ui/TopbarSearch";
+import { useTopChromeSearchSlot } from "@/shared/layout/topChromeSearchSlot";
 import { SidebarProjectsSection } from "@/features/sidebar/ui/SidebarProjectsSection";
 import { SidebarViewSwitcher } from "@/features/sidebar/ui/SidebarViewSwitcher";
 import { FeatureGate } from "@/shared/features";
@@ -65,27 +67,36 @@ export function AppSidebarPinnedHeader({
   scopeSearchFocusRequest,
   suggestionChannels,
 }: AppSidebarPinnedHeaderProps) {
+  // The search stays wired here (channels, labels, navigation) but renders
+  // its trigger centered in the title bar whenever that slot is on screen.
+  // Falling back to the sidebar keeps search reachable in windows without
+  // top chrome (settings, huddle rooms).
+  const searchSlot = useTopChromeSearchSlot();
+  const search = (
+    <TopbarSearch
+      channelLabels={channelLabels}
+      channels={searchChannels}
+      currentChannelId={currentChannelId}
+      currentPubkey={currentPubkey}
+      focusRequest={searchFocusRequest}
+      onOpenChannel={onSelectChannel}
+      onOpenResult={onOpenSearchResult}
+      onOpenUser={(user) => onOpenDm({ pubkeys: [user.pubkey] })}
+      onBrowseChannels={onBrowseChannels}
+      onCreateAgent={onCreateAgent}
+      onCreateChannel={onCreateChannel}
+      scopeFocusRequest={scopeSearchFocusRequest}
+      suggestionChannels={suggestionChannels}
+    />
+  );
+
   return (
     <div
       className="mx-[3px] shrink-0 px-2 pb-2 pt-3"
       data-testid="sidebar-pinned-header"
     >
-      <TopbarSearch
-        channelLabels={channelLabels}
-        channels={searchChannels}
-        currentChannelId={currentChannelId}
-        currentPubkey={currentPubkey}
-        focusRequest={searchFocusRequest}
-        onOpenChannel={onSelectChannel}
-        onOpenResult={onOpenSearchResult}
-        onOpenUser={(user) => onOpenDm({ pubkeys: [user.pubkey] })}
-        onBrowseChannels={onBrowseChannels}
-        onCreateAgent={onCreateAgent}
-        onCreateChannel={onCreateChannel}
-        scopeFocusRequest={scopeSearchFocusRequest}
-        suggestionChannels={suggestionChannels}
-      />
-      <SidebarViewSwitcher className="mt-2" />
+      {searchSlot ? createPortal(search, searchSlot) : search}
+      <SidebarViewSwitcher className={searchSlot ? undefined : "mt-2"} />
     </div>
   );
 }
@@ -134,11 +145,11 @@ export function AppSidebarPrimaryMenu({
                 data-testid="open-pulse-view"
                 isActive={selectedView === "pulse"}
                 onClick={onSelectPulse}
-                tooltip="Pulse"
+                tooltip="Feed"
                 type="button"
               >
                 <Activity className="h-4 w-4" />
-                <SidebarMenuLabel>Pulse</SidebarMenuLabel>
+                <SidebarMenuLabel>Feed</SidebarMenuLabel>
               </SidebarMenuButton>
             </SidebarMenuItem>
           </FeatureGate>
