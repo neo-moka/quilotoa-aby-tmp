@@ -1,60 +1,28 @@
-import { motion, useReducedMotion } from "motion/react";
-
 import { cn } from "@/shared/lib/cn";
-import { useTranscriptAnimationEnabled } from "./transcriptAnimationPreference";
-
-const MARKS = ["first", "second", "third"] as const;
-const STAGGER_SECONDS = 0.25;
-const CYCLE_SECONDS = 1.8;
+import { Spinner } from "@/shared/ui/spinner";
 
 /**
  * "This agent is working" at the foot of the transcript.
  *
- * Three dots rather than three copies of the wordmark. It used to render the
- * logo three times at 20px and a quarter opacity, which is not a legible
- * signal at any fidelity — and `AbyMark` draws its letters as SVG `<text>`
- * rather than traced outlines, so at that size the three marks collapsed into
- * grey squares that read as missing glyphs. A progress cue wants a shape
- * designed for its size, not a brand asset shrunk past legibility.
- *
- * The larger empty state ("Waiting for ACP activity") now uses a plain
- * spinner for the same reason — a loading cue wants a conventional shape,
- * not a brand animation.
+ * A centered arc spinner — the same shape the empty state ("Waiting for ACP
+ * activity") uses, so the two loading cues read as one system. It replaced a
+ * row of three staggered dots, which sat flush-left at 6px and was easy to
+ * miss entirely at the foot of a busy transcript. A liveness cue needs enough
+ * presence to be noticed at a glance; centering it in the transcript column
+ * and matching the empty-state spinner's size gives it that.
  */
 export function TurnLivenessIndicator({ className }: { className?: string }) {
-  const animationsEnabled = useTranscriptAnimationEnabled();
-  const shouldReduceMotion = useReducedMotion();
-  const showStaggeredRow = animationsEnabled && !shouldReduceMotion;
-
   return (
     <div
       aria-label="Agent turn in progress"
       className={cn(
-        "flex items-center gap-1.5 text-muted-foreground",
-        !showStaggeredRow && "opacity-60",
+        "flex w-full items-center justify-center py-2 text-muted-foreground",
         className,
       )}
       data-testid="turn-liveness-indicator"
       role="status"
     >
-      {MARKS.map((mark, index) =>
-        showStaggeredRow ? (
-          <motion.span
-            animate={{ opacity: [0.25, 1, 1, 0.25], y: [1, -1, -1, 1] }}
-            className="h-1.5 w-1.5 rounded-full bg-current"
-            key={mark}
-            transition={{
-              delay: index * STAGGER_SECONDS,
-              duration: CYCLE_SECONDS,
-              ease: "easeInOut",
-              repeat: Number.POSITIVE_INFINITY,
-              times: [0, 0.3, 0.7, 1],
-            }}
-          />
-        ) : (
-          <span className="h-1.5 w-1.5 rounded-full bg-current" key={mark} />
-        ),
-      )}
+      <Spinner aria-hidden className="h-7 w-7" />
     </div>
   );
 }
