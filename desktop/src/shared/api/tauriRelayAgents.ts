@@ -5,6 +5,7 @@ type RawRelayAgent = {
   pubkey: string;
   owner_pubkey?: string | null;
   name: string;
+  avatar_url?: string | null;
   agent_type: string;
   channels: string[];
   channel_ids: string[];
@@ -26,6 +27,7 @@ export async function revalidateRelayAgents(
     pubkey: agent.pubkey,
     ownerPubkey: agent.owner_pubkey ?? null,
     name: agent.name,
+    avatarUrl: agent.avatar_url ?? null,
     agentType: agent.agent_type,
     channels: agent.channels,
     channelIds: agent.channel_ids ?? [],
