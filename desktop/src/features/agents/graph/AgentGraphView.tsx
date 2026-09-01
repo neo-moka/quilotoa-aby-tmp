@@ -1,5 +1,13 @@
 import * as React from "react";
-import { ArrowLeft, GitFork, Radio, Scan, ZoomIn, ZoomOut } from "lucide-react";
+import {
+  ArrowLeft,
+  GitFork,
+  Orbit,
+  Radio,
+  Scan,
+  ZoomIn,
+  ZoomOut,
+} from "lucide-react";
 
 import { openAgentActivityPanel } from "@/features/agents/agentActivityPanelStore";
 import { useChannelsQuery } from "@/features/channels/hooks";
@@ -8,12 +16,23 @@ import { Button } from "@/shared/ui/button";
 import { Spinner } from "@/shared/ui/spinner";
 
 import { type AgentGraphEdge, edgesForNode } from "./agentGraphModel";
+import { AgentGraph3DCanvas } from "./AgentGraph3DCanvas";
 import { AgentGraphCanvas } from "./AgentGraphCanvas";
 import { useAgentGraphData } from "./useAgentGraphData";
 
 const MIN_ZOOM = 0.4;
 const MAX_ZOOM = 2.5;
 const ZOOM_STEP = 1.25;
+/** The 3D orbit mode is a per-user flag; it survives restarts. */
+const ORBIT_MODE_STORAGE_KEY = "buzz.agentGraph.orbit";
+
+function readOrbitFlag(): boolean {
+  try {
+    return window.localStorage.getItem(ORBIT_MODE_STORAGE_KEY) === "1";
+  } catch {
+    return false;
+  }
+}
 
 function formatAgo(atSeconds: number, nowSeconds: number): string {
   const delta = Math.max(0, nowSeconds - atSeconds);
@@ -54,6 +73,18 @@ export function AgentGraphView({
 
   const [zoom, setZoom] = React.useState(1);
   const [pan, setPan] = React.useState({ x: 0, y: 0 });
+  const [isOrbit, setIsOrbit] = React.useState(readOrbitFlag);
+  const toggleOrbit = React.useCallback(() => {
+    setIsOrbit((current) => {
+      const next = !current;
+      try {
+        window.localStorage.setItem(ORBIT_MODE_STORAGE_KEY, next ? "1" : "0");
+      } catch {
+        // Preference persistence is best-effort.
+      }
+      return next;
+    });
+  }, []);
   const stageWrapperRef = React.useRef<HTMLDivElement | null>(null);
   const dragRef = React.useRef<{
     pointerId: number;
@@ -230,19 +261,41 @@ export function AgentGraphView({
                   transformOrigin: "center center",
                 }}
               >
-                <AgentGraphCanvas
-                  edges={model.edges}
-                  nodes={model.nodes}
-                  nowSeconds={nowSeconds}
-                  onSelectNode={selectNode}
-                  selectedPubkey={selectedPubkey}
-                  workingPubkeys={workingPubkeys}
-                />
+                {isOrbit ? (
+                  <AgentGraph3DCanvas
+                    edges={model.edges}
+                    nodes={model.nodes}
+                    nowSeconds={nowSeconds}
+                    onSelectNode={selectNode}
+                    selectedPubkey={selectedPubkey}
+                    workingPubkeys={workingPubkeys}
+                  />
+                ) : (
+                  <AgentGraphCanvas
+                    edges={model.edges}
+                    nodes={model.nodes}
+                    nowSeconds={nowSeconds}
+                    onSelectNode={selectNode}
+                    selectedPubkey={selectedPubkey}
+                    workingPubkeys={workingPubkeys}
+                  />
+                )}
               </div>
             </div>
           )}
 
           <div className="absolute bottom-3 right-3 flex flex-col gap-1 rounded-lg border border-border/70 bg-background/90 p-1 shadow-sm backdrop-blur">
+            <Button
+              aria-label={isOrbit ? "Switch to 2D view" : "Switch to 3D orbit"}
+              aria-pressed={isOrbit}
+              onClick={toggleOrbit}
+              size="icon"
+              title={isOrbit ? "2D view" : "3D orbit — drag to spin"}
+              type="button"
+              variant={isOrbit ? "secondary" : "ghost"}
+            >
+              <Orbit />
+            </Button>
             <Button
               aria-label="Zoom in"
               onClick={() => applyZoom(ZOOM_STEP)}
