@@ -185,7 +185,12 @@ function classifyDeveloperHarnessTool(
   if (!kind) return null;
 
   if (kind === "shell") {
-    const command = getToolString(input.args, ["command"]);
+    // ACP-bridged harnesses often carry the command only in the tool title
+    // ("terminal: buzz messages send …"), not in args — without this the
+    // buzz CLI parser never fires and the row shows the raw prefixed title.
+    const command =
+      getToolString(input.args, ["command"]) ??
+      commandFromShellTitle(input.title);
     const buzzCli = command ? parseBuzzCliCommand(command) : null;
     if (buzzCli) {
       return buzzCli;
@@ -370,6 +375,19 @@ function classifyDeveloperToolName(value: string | null | undefined) {
     return "dev_mcp";
   }
   return null;
+}
+
+/**
+ * Recover the command line from a shell tool's title. Harnesses title these
+ * calls `<tool>: <command>` (Claude Code `terminal: …`, Codex
+ * `exec_command: …`); only prefixes naming a known shell tool are stripped so
+ * a command that legitimately starts with `word:` is left alone.
+ */
+export function commandFromShellTitle(title: string): string | null {
+  const match = title.match(/^([A-Za-z][\w-]*):\s+(.+)$/);
+  if (!match) return null;
+  const base = normalizeToolNameText(match[1]);
+  return SHELL_TOOL_BASES.has(base) ? match[2] : null;
 }
 
 export function parseBuzzCliCommand(

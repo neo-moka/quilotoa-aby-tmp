@@ -235,3 +235,46 @@ test("classifyTool routes Gemini run_shell_command buzz ops to relay-op", () => 
 
   assert.equal(descriptor.renderClass, "relay-op");
 });
+
+test("a title-only terminal buzz command classifies as a relay op, not a raw shell row", () => {
+  const descriptor = classifyTool({
+    title:
+      "terminal: buzz messages send --channel general --content 'hola equipo'",
+    toolName: "terminal",
+    buzzToolName: null,
+    args: {},
+    result: '{"accepted":true}',
+    isError: false,
+  });
+
+  assert.equal(descriptor.renderClass, "message");
+  assert.equal(descriptor.label, "Send Message");
+  assert.equal(descriptor.action.verb, "Sent");
+});
+
+test("a title-only terminal non-buzz command drops the terminal prefix", () => {
+  const descriptor = classifyTool({
+    title: "terminal: ls -la /tmp",
+    toolName: "terminal",
+    buzzToolName: null,
+    args: {},
+    result: "",
+    isError: false,
+  });
+
+  assert.equal(descriptor.renderClass, "shell");
+  assert.deepEqual(descriptor.action, { verb: "Ran", object: "ls -la /tmp" });
+});
+
+test("a prefix naming no shell tool is left alone", () => {
+  const descriptor = classifyTool({
+    title: "note: buzz messages send --channel general",
+    toolName: "unknown_tool",
+    buzzToolName: null,
+    args: {},
+    result: "",
+    isError: false,
+  });
+
+  assert.notEqual(descriptor.renderClass, "message");
+});
