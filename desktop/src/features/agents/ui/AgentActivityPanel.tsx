@@ -5,6 +5,11 @@ import { GitFork } from "lucide-react";
 import { useActiveAgentTurnsByChannel } from "@/features/agents/activeAgentTurnsStore";
 import { openAgentGraphPanel } from "@/features/agents/graph/agentGraphPanelStore";
 import { Button } from "@/shared/ui/button";
+
+const LazyEmbeddedAgentGraph = React.lazy(async () => {
+  const module = await import("@/features/agents/graph/AgentGraphView");
+  return { default: module.AgentGraphView };
+});
 import {
   useManagedAgentsQuery,
   useRelayAgentsQuery,
@@ -260,13 +265,24 @@ export function AgentActivityPanel({
         ) : (
           <>
             {showRunsList ? (
-              <AgentRunsList
-                onSelectAgent={(pubkey) => {
-                  onSelectAgent(pubkey);
-                  showAgentRunDetail();
-                }}
-                profiles={profiles}
-              />
+              <>
+                {/* The graph is the runs view's front door: who is talking to
+                    whom, live, with the roster below. Clicking a node flips
+                    this same panel to that agent's transcript. Lazy so the
+                    dock shell doesn't carry the graph bundle until shown. */}
+                <div className="h-72 shrink-0 overflow-hidden border-b border-border/60">
+                  <React.Suspense fallback={null}>
+                    <LazyEmbeddedAgentGraph variant="embedded" />
+                  </React.Suspense>
+                </div>
+                <AgentRunsList
+                  onSelectAgent={(pubkey) => {
+                    onSelectAgent(pubkey);
+                    showAgentRunDetail();
+                  }}
+                  profiles={profiles}
+                />
+              </>
             ) : null}
             {!showRunsList && selectedAgent ? (
               <AgentRunDetailHeader

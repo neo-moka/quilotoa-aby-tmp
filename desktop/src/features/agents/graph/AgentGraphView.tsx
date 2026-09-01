@@ -20,7 +20,9 @@ import { AgentGraph3DCanvas } from "./AgentGraph3DCanvas";
 import { AgentGraphCanvas } from "./AgentGraphCanvas";
 import { useAgentGraphData } from "./useAgentGraphData";
 
-const MIN_ZOOM = 0.4;
+const MIN_ZOOM = 0.3;
+/** Stage size plus breathing room, used to fit the embedded variant. */
+const STAGE_FIT_BASE = 700;
 const MAX_ZOOM = 2.5;
 const ZOOM_STEP = 1.25;
 /** The 3D orbit mode is a per-user flag; it survives restarts. Default ON. */
@@ -60,7 +62,11 @@ export function AgentGraphView({
   headerTrailing,
   onHeaderPointerDown,
 }: {
-  variant?: "page" | "panel";
+  /**
+   * `embedded` drops the header and auto-fits the stage to its container —
+   * the shape the Active runs dock view mounts above the roster.
+   */
+  variant?: "page" | "panel" | "embedded";
   headerTrailing?: React.ReactNode;
   onHeaderPointerDown?: (event: React.PointerEvent<HTMLElement>) => void;
 }) {
@@ -104,6 +110,17 @@ export function AgentGraphView({
     setZoom(1);
     setPan({ x: 0, y: 0 });
   }, []);
+
+  // Embedded in the dock, the 640px stage must shrink to whatever column it
+  // got: fit once per mount, leaving the toolbar free to re-zoom.
+  React.useLayoutEffect(() => {
+    if (variant !== "embedded") return;
+    const wrapper = stageWrapperRef.current;
+    if (!wrapper) return;
+    const fit =
+      Math.min(wrapper.clientWidth, wrapper.clientHeight) / STAGE_FIT_BASE;
+    setZoom(Math.max(MIN_ZOOM, Math.min(1, fit)));
+  }, [variant]);
 
   // Wheel zoom needs a non-passive listener: React's synthetic onWheel cannot
   // preventDefault, and without it the page scrolls instead of zooming.
@@ -239,43 +256,49 @@ export function AgentGraphView({
 
   return (
     <div className="flex h-full min-h-0 flex-col bg-background">
-      <header
-        className={cn(
-          "flex shrink-0 items-center gap-3 border-b border-border px-4 py-2.5",
-          onHeaderPointerDown && "cursor-grab select-none",
-        )}
-        onPointerDown={onHeaderPointerDown}
-      >
-        {variant === "page" ? (
-          <Button
-            aria-label="Back"
-            onClick={() => window.history.back()}
-            size="icon"
-            type="button"
-            variant="ghost"
-          >
-            <ArrowLeft />
-          </Button>
-        ) : null}
-        <GitFork
-          aria-hidden
-          className="h-4 w-4 shrink-0 text-muted-foreground"
-        />
-        <div className="min-w-0 flex-1">
-          <h1 className="truncate text-sm font-semibold">Agent graph</h1>
-          <p className="truncate text-xs text-muted-foreground">
-            Solid edges carry thread replies (dependencies), dashed edges are
-            mentions.
-          </p>
-        </div>
-        {workingPubkeys.size > 0 ? (
-          <span className="flex shrink-0 items-center gap-1.5 text-xs text-muted-foreground">
-            <Spinner aria-hidden className="border-2 text-primary" size={14} />
-            {workingPubkeys.size} working
-          </span>
-        ) : null}
-        {headerTrailing}
-      </header>
+      {variant === "embedded" ? null : (
+        <header
+          className={cn(
+            "flex shrink-0 items-center gap-3 border-b border-border px-4 py-2.5",
+            onHeaderPointerDown && "cursor-grab select-none",
+          )}
+          onPointerDown={onHeaderPointerDown}
+        >
+          {variant === "page" ? (
+            <Button
+              aria-label="Back"
+              onClick={() => window.history.back()}
+              size="icon"
+              type="button"
+              variant="ghost"
+            >
+              <ArrowLeft />
+            </Button>
+          ) : null}
+          <GitFork
+            aria-hidden
+            className="h-4 w-4 shrink-0 text-muted-foreground"
+          />
+          <div className="min-w-0 flex-1">
+            <h1 className="truncate text-sm font-semibold">Agent graph</h1>
+            <p className="truncate text-xs text-muted-foreground">
+              Solid edges carry thread replies (dependencies), dashed edges are
+              mentions.
+            </p>
+          </div>
+          {workingPubkeys.size > 0 ? (
+            <span className="flex shrink-0 items-center gap-1.5 text-xs text-muted-foreground">
+              <Spinner
+                aria-hidden
+                className="border-2 text-primary"
+                size={14}
+              />
+              {workingPubkeys.size} working
+            </span>
+          ) : null}
+          {headerTrailing}
+        </header>
+      )}
 
       <div className="flex min-h-0 flex-1 [container-type:inline-size]">
         <div
