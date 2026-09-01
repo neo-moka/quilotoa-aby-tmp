@@ -1,5 +1,6 @@
 import type * as React from "react";
 import * as BuzzTheme from "@/app/BuzzThemeSurfaces";
+import { AgentGraphFloatingPanelHost } from "@/features/agents/graph/AgentGraphFloatingPanelHost";
 import { RightDock } from "@/features/dock/RightDock";
 import { HuddleRoomHeader, HuddleStartingView } from "@/features/huddle";
 import { MainInsetProvider } from "@/shared/layout/MainInsetContext";
@@ -60,6 +61,7 @@ export function AppShellChannelSurface({
           </BuzzTheme.ContentSurface>
           {isHuddleRoom ? null : <RightDock />}
         </div>
+        <AgentGraphFloatingPanelHost />
       </SidebarInset>
     </MainInsetProvider>
   );
