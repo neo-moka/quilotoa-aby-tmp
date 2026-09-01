@@ -256,6 +256,7 @@ export function AgentActivityPanel({
             ) : null}
             {!showRunsList && selectedAgent ? (
               <AgentRunDetailHeader
+                agentAvatarUrl={selectedAgent.avatarUrl ?? null}
                 agentName={selectedAgent.name}
                 agentPubkey={selectedAgent.pubkey}
                 key={`${selectedAgent.pubkey}-header`}
