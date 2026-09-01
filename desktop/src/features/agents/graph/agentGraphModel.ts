@@ -17,6 +17,12 @@ export type AgentGraphRosterEntry = {
   pubkey: string;
   name: string;
   avatarUrl?: string | null;
+  /**
+   * Optional participants (human community members) render only when they
+   * actually take part in the flow — a node with zero traffic would be
+   * roster noise, not communication.
+   */
+  optional?: boolean;
 };
 
 export type AgentGraphNode = {
@@ -24,6 +30,7 @@ export type AgentGraphNode = {
   name: string;
   avatarUrl: string | null;
   isViewer: boolean;
+  isHuman: boolean;
   sent: number;
   received: number;
 };
@@ -89,6 +96,7 @@ export function buildAgentGraphModel({
   events: GraphEventLike[];
 }): AgentGraphModel {
   const nodesByPubkey = new Map<string, AgentGraphNode>();
+  const optionalPubkeys = new Set<string>();
   const addNode = (entry: AgentGraphRosterEntry, isViewer: boolean) => {
     const pubkey = normalizePubkey(entry.pubkey);
     if (!nodesByPubkey.has(pubkey)) {
@@ -97,9 +105,11 @@ export function buildAgentGraphModel({
         name: entry.name,
         avatarUrl: entry.avatarUrl ?? null,
         isViewer,
+        isHuman: isViewer || entry.optional === true,
         sent: 0,
         received: 0,
       });
+      if (!isViewer && entry.optional) optionalPubkeys.add(pubkey);
     }
   };
   for (const entry of roster) {
@@ -173,6 +183,13 @@ export function buildAgentGraphModel({
   for (const edge of edgesByKey.values()) {
     edge.recent.sort((left, right) => right.at - left.at);
     edge.recent = edge.recent.slice(0, RECENT_CAP);
+  }
+
+  for (const pubkey of optionalPubkeys) {
+    const node = nodesByPubkey.get(pubkey);
+    if (node && node.sent === 0 && node.received === 0) {
+      nodesByPubkey.delete(pubkey);
+    }
   }
 
   const nodes = [...nodesByPubkey.values()].sort((left, right) =>
