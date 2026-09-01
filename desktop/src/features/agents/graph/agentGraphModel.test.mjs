@@ -150,3 +150,23 @@ test("long content is collapsed into a bounded snippet", () => {
   assert.ok(snippet.length <= 140);
   assert.ok(snippet.endsWith("…"));
 });
+
+test("optional humans render only when they take part in the flow", () => {
+  const active = "e".repeat(64);
+  const idle = "f".repeat(64);
+  const model = buildAgentGraphModel({
+    roster: [
+      ...roster,
+      { pubkey: active, name: "Pedro", optional: true },
+      { pubkey: idle, name: "Silente", optional: true },
+    ],
+    viewer,
+    events: [msg("1", active, [["p", A]], 100)],
+  });
+  const pedro = model.nodes.find((node) => node.name === "Pedro");
+  assert.ok(pedro);
+  assert.equal(pedro.isHuman, true);
+  assert.ok(!model.nodes.some((node) => node.name === "Silente"));
+  const aby = model.nodes.find((node) => node.name === "Aby");
+  assert.equal(aby.isHuman, false);
+});

@@ -7,6 +7,8 @@ import {
   useRelayAgentsQuery,
 } from "@/features/agents/hooks";
 import { isManagedAgentActive } from "@/features/agents/lib/managedAgentControlActions";
+import { useRelayMembersQuery } from "@/features/community-members/hooks";
+import { useUsersBatchQuery } from "@/features/profile/hooks";
 import { relayClient } from "@/shared/api/relayClient";
 import { useIdentityQuery } from "@/shared/api/hooks";
 import {
@@ -65,21 +67,60 @@ export function useAgentGraphData(): AgentGraphData {
     }));
   }, [managedAgentsQuery.data, relayAgentsQuery.data]);
 
+  // Humans in the flow: every relay member who is not an agent joins the
+  // roster as an optional node — the model renders them only when they
+  // actually exchange messages with someone on the graph.
+  const relayMembersQuery = useRelayMembersQuery();
+  const humanPubkeys = React.useMemo(() => {
+    const agentPubkeys = new Set(
+      roster.map((entry) => normalizePubkey(entry.pubkey)),
+    );
+    const viewerPubkey = identityQuery.data?.pubkey
+      ? normalizePubkey(identityQuery.data.pubkey)
+      : null;
+    return (relayMembersQuery.data ?? [])
+      .map((member) => normalizePubkey(member.pubkey))
+      .filter((pubkey) => !agentPubkeys.has(pubkey) && pubkey !== viewerPubkey);
+  }, [identityQuery.data?.pubkey, relayMembersQuery.data, roster]);
+
+  const profilesQuery = useUsersBatchQuery(
+    identityQuery.data?.pubkey
+      ? [...humanPubkeys, identityQuery.data.pubkey]
+      : humanPubkeys,
+  );
+  const profiles = profilesQuery.data?.profiles;
+
+  const humans = React.useMemo<AgentGraphRosterEntry[]>(
+    () =>
+      humanPubkeys.map((pubkey) => {
+        const profile = profiles?.[pubkey];
+        return {
+          pubkey,
+          name: profile?.displayName || `${pubkey.slice(0, 8)}…`,
+          avatarUrl: profile?.avatarUrl ?? null,
+          optional: true,
+        };
+      }),
+    [humanPubkeys, profiles],
+  );
+
   const viewer = React.useMemo<AgentGraphRosterEntry | null>(() => {
     const identity = identityQuery.data;
     if (!identity?.pubkey) return null;
     return {
       pubkey: identity.pubkey,
       name: identity.displayName || "You",
-      avatarUrl: null,
+      avatarUrl:
+        profiles?.[normalizePubkey(identity.pubkey)]?.avatarUrl ?? null,
     };
-  }, [identityQuery.data]);
+  }, [identityQuery.data, profiles]);
 
   const authorPubkeys = React.useMemo(() => {
     const pubkeys = roster.map((entry) => normalizePubkey(entry.pubkey));
     if (viewer) pubkeys.push(normalizePubkey(viewer.pubkey));
+    for (const pubkey of humanPubkeys) pubkeys.push(pubkey);
     return [...new Set(pubkeys)].slice(0, MAX_AUTHORS);
-  }, [roster, viewer]);
+  }, [humanPubkeys, roster, viewer]);
 
   const eventsQuery = useQuery({
     queryKey: ["agent-graph-messages", authorPubkeys],
@@ -96,11 +137,11 @@ export function useAgentGraphData(): AgentGraphData {
   const model = React.useMemo(
     () =>
       buildAgentGraphModel({
-        roster,
+        roster: [...roster, ...humans],
         viewer,
         events: eventsQuery.data ?? [],
       }),
-    [eventsQuery.data, roster, viewer],
+    [eventsQuery.data, humans, roster, viewer],
   );
 
   const workingPubkeys = React.useMemo(() => {
