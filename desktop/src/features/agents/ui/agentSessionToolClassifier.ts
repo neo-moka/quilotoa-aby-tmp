@@ -352,6 +352,15 @@ function resolveDeveloperToolKind(
 function classifyDeveloperToolName(value: string | null | undefined) {
   if (!value) return null;
 
+  // "terminal: buzz messages send …" — many ACP harnesses report no
+  // standalone tool name and fold the command into the title, so the
+  // derived toolName is the normalized full title and matches nothing. A
+  // prefix naming a shell tool identifies the kind on its own.
+  const prefixed = value.match(/^([A-Za-z][\w-]*):\s/);
+  if (prefixed && SHELL_TOOL_BASES.has(normalizeToolNameText(prefixed[1]))) {
+    return "shell";
+  }
+
   const normalized = normalizeToolNameText(value);
   const base = normalized.replace(/^buzz_dev_mcp_/, "");
 

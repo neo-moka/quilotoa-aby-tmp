@@ -278,3 +278,20 @@ test("a prefix naming no shell tool is left alone", () => {
 
   assert.notEqual(descriptor.renderClass, "message");
 });
+
+test("a harness reporting no tool name still classifies a titled terminal buzz command", () => {
+  // Real ACP shape: extractToolIdentity derives toolName by normalizing the
+  // whole title, which matches no shell base — only the title prefix says
+  // this was a terminal.
+  const descriptor = classifyTool({
+    title: "terminal: buzz messages send --channel general --content 'hola'",
+    toolName: "terminal_buzz_messages_send_channel_general_content_hola",
+    buzzToolName: null,
+    args: {},
+    result: "",
+    isError: false,
+  });
+
+  assert.equal(descriptor.renderClass, "message");
+  assert.equal(descriptor.action.verb, "Sent");
+});
