@@ -300,10 +300,17 @@ export function AgentGraphView({
         </header>
       )}
 
-      <div className="flex min-h-0 flex-1 [container-type:inline-size]">
+      <div
+        className={cn(
+          "flex min-h-0 flex-1 [container-type:inline-size]",
+          variant === "embedded" && "flex-col",
+        )}
+      >
         <div
           className={cn(
-            "relative min-w-0 flex-1 overflow-hidden",
+            variant === "embedded"
+              ? "relative h-72 w-full shrink-0 overflow-hidden border-b border-border/60"
+              : "relative min-w-0 flex-1 overflow-hidden",
             dragRef.current ? "cursor-grabbing" : "cursor-grab",
           )}
           data-testid="agent-graph-stage"
@@ -403,10 +410,16 @@ export function AgentGraphView({
           </div>
         </div>
 
-        {/* The traffic list rides along whenever the view itself is wide
-            enough — half-docked, maximized, or the full page — and bows out
-            in a small floating window, all by container width. */}
-        <aside className="hidden w-80 shrink-0 flex-col overflow-y-auto border-l border-border p-4 [@container(min-width:44rem)]:flex">
+        {/* Embedded (the dock's front door): the traffic list stacks under
+            the stage — the graph says who is talking, the list says about
+            what. Wide layouts keep it as a side rail by container width. */}
+        <aside
+          className={cn(
+            variant === "embedded"
+              ? "flex min-h-0 flex-1 flex-col overflow-y-auto p-3"
+              : "hidden w-80 shrink-0 flex-col overflow-y-auto border-l border-border p-4 [@container(min-width:44rem)]:flex",
+          )}
+        >
           <h2 className="pb-2 text-2xs font-semibold uppercase tracking-wide text-muted-foreground">
             {selectedPubkey
               ? `Traffic — ${nameByPubkey.get(selectedPubkey) ?? "agent"}`

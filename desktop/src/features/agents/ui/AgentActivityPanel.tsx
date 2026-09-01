@@ -6,10 +6,6 @@ import { useActiveAgentTurnsByChannel } from "@/features/agents/activeAgentTurns
 import { openAgentGraphPanel } from "@/features/agents/graph/agentGraphPanelStore";
 import { Button } from "@/shared/ui/button";
 
-const LazyEmbeddedAgentGraph = React.lazy(async () => {
-  const module = await import("@/features/agents/graph/AgentGraphView");
-  return { default: module.AgentGraphView };
-});
 import {
   useManagedAgentsQuery,
   useRelayAgentsQuery,
@@ -26,7 +22,6 @@ import {
   AuxiliaryPanelTitle,
 } from "@/shared/layout/AuxiliaryPanel";
 import {
-  showAgentRunDetail,
   showAgentRunsList,
   useAgentRunPanelView,
 } from "@/features/agents/agentRunPanelStore";
@@ -34,8 +29,12 @@ import { resolveActivityAgentPubkey } from "./agentActivitySelection";
 import { AgentActivitySettingsMenu } from "./AgentActivitySettingsMenu";
 import type { AgentActivityCandidate } from "./AgentActivitySelector";
 import { AgentRunDetailHeader } from "./AgentRunDetailHeader";
-import { AgentRunsList } from "./AgentRunsList";
 import { ManagedAgentSessionPanel } from "./ManagedAgentSessionPanel";
+
+const LazyEmbeddedAgentGraph = React.lazy(async () => {
+  const module = await import("@/features/agents/graph/AgentGraphView");
+  return { default: module.AgentGraphView };
+});
 
 /**
  * Right-side panel for watching one agent work, independent of whatever
@@ -60,7 +59,6 @@ export function AgentActivityPanel({
   onClose,
   onResetWidth,
   onResizeStart,
-  onSelectAgent,
   profiles,
   selectedPubkey,
   splitPaneClamp,
@@ -82,7 +80,8 @@ export function AgentActivityPanel({
   onClose: () => void;
   onResetWidth?: () => void;
   onResizeStart?: (event: React.PointerEvent<HTMLButtonElement>) => void;
-  onSelectAgent: (pubkey: string) => void;
+  /** Unused since the graph took over selection; kept so callers need no change. */
+  onSelectAgent?: (pubkey: string) => void;
   profiles?: UserProfileLookup;
   selectedPubkey: string | null;
   /**
@@ -199,9 +198,7 @@ export function AgentActivityPanel({
           <AuxiliaryPanelHeaderGroup>
             {/* The detail view names the agent in its own header, so repeating
                 it here would say the same word twice in adjacent rows. */}
-            <AuxiliaryPanelTitle>
-              {showRunsList ? "Active runs" : "Agent activity"}
-            </AuxiliaryPanelTitle>
+            <AuxiliaryPanelTitle>Agent activity</AuxiliaryPanelTitle>
             {/* Working count, not roster count: the chip answers "how much is
                 happening", and an idle roster of five would overstate that as
                 a permanent 5. Hidden at zero — a `0` next to the title reads
@@ -265,24 +262,17 @@ export function AgentActivityPanel({
         ) : (
           <>
             {showRunsList ? (
-              <>
-                {/* The graph is the runs view's front door: who is talking to
-                    whom, live, with the roster below. Clicking a node flips
-                    this same panel to that agent's transcript. Lazy so the
-                    dock shell doesn't carry the graph bundle until shown. */}
-                <div className="h-72 shrink-0 overflow-hidden border-b border-border/60">
-                  <React.Suspense fallback={null}>
-                    <LazyEmbeddedAgentGraph variant="embedded" />
-                  </React.Suspense>
-                </div>
-                <AgentRunsList
-                  onSelectAgent={(pubkey) => {
-                    onSelectAgent(pubkey);
-                    showAgentRunDetail();
-                  }}
-                  profiles={profiles}
-                />
-              </>
+              // The graph is this view's whole front door: who is talking to
+              // whom (working agents wear the spinner ring), with recent
+              // traffic stacked below — the graph already carries the roster,
+              // so a standing-by list would repeat it. Clicking a node flips
+              // this same panel to that agent's transcript. Lazy so the dock
+              // shell doesn't carry the graph bundle until shown.
+              <div className="flex min-h-0 flex-1 flex-col">
+                <React.Suspense fallback={null}>
+                  <LazyEmbeddedAgentGraph variant="embedded" />
+                </React.Suspense>
+              </div>
             ) : null}
             {!showRunsList && selectedAgent ? (
               <AgentRunDetailHeader
