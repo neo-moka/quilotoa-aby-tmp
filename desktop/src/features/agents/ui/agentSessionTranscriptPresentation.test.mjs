@@ -267,15 +267,17 @@ test("shouldShowTranscriptRowTimestamp: off by default (enabled=false)", () => {
   );
 });
 
-test("shouldShowTranscriptRowTimestamp: enabled shows for tools, thoughts, assistant messages", () => {
+test("shouldShowTranscriptRowTimestamp: enabled shows for tools and thoughts, never messages", () => {
   const options = { enabled: true, variant: "default" };
   assert.equal(shouldShowTranscriptRowTimestamp(makeTool(), options), true);
+  // Assistant bubbles carry their own footer clock, same as user bubbles —
+  // a row timestamp under them printed the same minute twice.
   assert.equal(
     shouldShowTranscriptRowTimestamp(
       makeMessage({ role: "assistant" }),
       options,
     ),
-    true,
+    false,
   );
   assert.equal(
     shouldShowTranscriptRowTimestamp(

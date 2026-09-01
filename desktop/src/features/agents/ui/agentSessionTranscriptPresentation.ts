@@ -3,9 +3,10 @@ import { buildCompactToolSummary } from "./agentSessionToolSummary";
 
 /**
  * Whether a polished activity row should render the opt-in timestamp footer.
- * User message bubbles already render their own timestamp footer, so they are
- * excluded to avoid doubling up. Compact previews stay dense regardless of
- * the preference.
+ * Message bubbles — user and assistant alike — already render their own
+ * timestamp footer, so all of them are excluded to avoid the stuttering
+ * double time ("6:43 ✓✓" then "6:43" again) under every bubble. Compact
+ * previews stay dense regardless of the preference.
  */
 export function shouldShowTranscriptRowTimestamp(
   item: TranscriptItem,
@@ -14,7 +15,7 @@ export function shouldShowTranscriptRowTimestamp(
   if (!options.enabled || options.variant === "compactPreview") {
     return false;
   }
-  if (item.type === "message" && item.role !== "assistant") {
+  if (item.type === "message") {
     return false;
   }
   return true;
