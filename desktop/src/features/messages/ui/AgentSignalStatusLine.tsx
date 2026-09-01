@@ -4,10 +4,11 @@ import {
   type AgentSignalUser,
   formatAgentSignalNames,
 } from "@/features/messages/lib/agentSignalReactions";
+import { Spinner } from "@/shared/ui/spinner";
 
 /**
  * WhatsApp-style footer for the agent lifecycle signals split out of the
- * reaction chips: a pulsing "working on this…" line while a 💬 is live,
+ * reaction chips: a spinning "working on this…" line while a 💬 is live,
  * otherwise a quiet "Seen by …" tick line for held 👀 votes.
  */
 export function AgentSignalStatusLine({
@@ -23,10 +24,7 @@ export function AgentSignalStatusLine({
         className="mt-1 flex items-center gap-1.5 text-xs text-muted-foreground"
         data-testid="agent-working-status"
       >
-        <span
-          aria-hidden
-          className="size-1.5 shrink-0 rounded-full bg-primary motion-safe:animate-pulse"
-        />
+        <Spinner aria-hidden className="size-3 border-2 text-primary" />
         <span className="min-w-0 truncate">
           {formatAgentSignalNames(workingAgents)}
           {workingAgents.length === 1 ? " is" : " are"} working on this…
