@@ -1,4 +1,3 @@
-import { useNavigate } from "@tanstack/react-router";
 import { LogIn, Radio, SquareTerminal } from "lucide-react";
 import type * as React from "react";
 
@@ -29,6 +28,7 @@ import type { Channel, PresenceStatus } from "@/shared/api/types";
 import { UserAvatar } from "@/shared/ui/UserAvatar";
 import { useActiveAgentTurnsByChannel } from "@/features/agents/activeAgentTurnsStore";
 import { useAgentActivityPanel } from "@/features/agents/agentActivityPanelStore";
+import { toggleAgentGraphPanel } from "@/features/agents/graph/agentGraphPanelStore";
 import {
   toggleTerminalPanel,
   useTerminalPanel,
@@ -113,7 +113,6 @@ export function ChannelScreenHeader({
   // scope: `openAgentActivityPanel` keeps the previous choice when this channel
   // has nobody working, rather than clearing it.
   const activityPanel = useAgentActivityPanel();
-  const navigate = useNavigate();
   const channelWorkingPubkey = activeChannel
     ? (activeChannelTurns.find(
         (channel) => channel.channelId === activeChannel.id,
@@ -124,7 +123,7 @@ export function ChannelScreenHeader({
       aria-label="Open agent activity graph"
       className="relative"
       data-testid="channel-header-agent-activity"
-      onClick={() => navigate({ to: "/agents/graph" })}
+      onClick={toggleAgentGraphPanel}
       size="icon"
       title="Agent activity"
       type="button"
