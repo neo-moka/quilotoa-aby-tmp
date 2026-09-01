@@ -4,6 +4,7 @@ import { ProfileAvatar } from "@/features/profile/ui/ProfileAvatar";
 import { cn } from "@/shared/lib/cn";
 import { Spinner } from "@/shared/ui/spinner";
 
+import { curvedEdgeGeometry } from "./agentGraphEdgeGeometry";
 import type { AgentGraphEdge, AgentGraphNode } from "./agentGraphModel";
 
 /**
@@ -35,20 +36,21 @@ function nodePositions(nodes: AgentGraphNode[]): Map<string, NodePosition> {
   return positions;
 }
 
-function edgePath(from: NodePosition, to: NodePosition): string {
-  const dx = to.x - from.x;
-  const dy = to.y - from.y;
-  const distance = Math.hypot(dx, dy) || 1;
-  const ux = dx / distance;
-  const uy = dy / distance;
-  // Trim both ends to the node circles; leave room for the arrowhead.
-  const startX = from.x + ux * (NODE_RADIUS + 4);
-  const startY = from.y + uy * (NODE_RADIUS + 4);
-  const endX = to.x - ux * (NODE_RADIUS + 10);
-  const endY = to.y - uy * (NODE_RADIUS + 10);
-  const midX = (startX + endX) / 2 - uy * CURVE_OFFSET;
-  const midY = (startY + endY) / 2 + ux * CURVE_OFFSET;
-  return `M ${startX} ${startY} Q ${midX} ${midY} ${endX} ${endY}`;
+function edgeGeometry(
+  from: NodePosition,
+  to: NodePosition,
+  edge: AgentGraphEdge,
+) {
+  return curvedEdgeGeometry({
+    fromX: from.x,
+    fromY: from.y,
+    toX: to.x,
+    toY: to.y,
+    startTrim: NODE_RADIUS + 4,
+    endTrim: NODE_RADIUS + 4,
+    bow: CURVE_OFFSET,
+    arrowSize: 7 + Math.min(3, Math.log2(edge.count + 1)),
+  });
 }
 
 function edgeWidth(count: number): number {
@@ -73,6 +75,9 @@ export function AgentGraphCanvas({
   onSelectNode: (pubkey: string | null) => void;
 }) {
   const positions = React.useMemo(() => nodePositions(nodes), [nodes]);
+  // Gradient/filter ids must be unique per mounted canvas: the floating
+  // panel and the /agents/graph page can render simultaneously.
+  const uid = React.useId();
 
   const isEdgeActive = (edge: AgentGraphEdge) =>
     selectedPubkey === null ||
@@ -94,37 +99,76 @@ export function AgentGraphCanvas({
         width={STAGE_SIZE}
       >
         <defs>
-          <marker
-            id="agent-graph-arrow"
-            markerHeight="7"
-            markerWidth="7"
-            orient="auto-start-reverse"
-            refX="6"
-            refY="3.5"
+          <filter
+            height="160%"
+            id={`${uid}-glow`}
+            width="160%"
+            x="-30%"
+            y="-30%"
           >
-            <path d="M 0 0 L 7 3.5 L 0 7 z" fill="currentColor" />
-          </marker>
+            <feGaussianBlur stdDeviation="4" />
+          </filter>
+          {edges.map((edge, index) => {
+            const from = positions.get(edge.from);
+            const to = positions.get(edge.to);
+            if (!from || !to) return null;
+            const isRecent = nowSeconds - edge.lastAt <= RECENT_WINDOW_SECONDS;
+            const geometry = edgeGeometry(from, to, edge);
+            const color = isRecent
+              ? "var(--primary)"
+              : "var(--muted-foreground)";
+            return (
+              // Direction reads from the stroke itself: faint at the sender,
+              // saturated at the receiver, matching the arrowhead's hue.
+              <linearGradient
+                gradientUnits="userSpaceOnUse"
+                id={`${uid}-edge-${index}`}
+                key={`${edge.from}→${edge.to}`}
+                x1={geometry.startX}
+                x2={geometry.endX}
+                y1={geometry.startY}
+                y2={geometry.endY}
+              >
+                <stop offset="0" stopColor={color} stopOpacity="0.25" />
+                <stop offset="1" stopColor={color} stopOpacity="0.95" />
+              </linearGradient>
+            );
+          })}
         </defs>
-        {edges.map((edge) => {
+        {edges.map((edge, index) => {
           const from = positions.get(edge.from);
           const to = positions.get(edge.to);
           if (!from || !to) return null;
           const isRecent = nowSeconds - edge.lastAt <= RECENT_WINDOW_SECONDS;
           const active = isEdgeActive(edge);
-          const path = edgePath(from, to);
+          const geometry = edgeGeometry(from, to, edge);
+          const width = edgeWidth(edge.count);
           return (
-            <g key={`${edge.from}→${edge.to}`}>
+            <g key={`${edge.from}→${edge.to}`} opacity={active ? 1 : 0.2}>
+              {isRecent && active ? (
+                // Soft halo under hot edges — communication in progress glows.
+                <path
+                  d={geometry.d}
+                  fill="none"
+                  filter={`url(#${uid}-glow)`}
+                  opacity={0.35}
+                  stroke="var(--primary)"
+                  strokeLinecap="round"
+                  strokeWidth={width + 4}
+                />
+              ) : null}
               <path
-                className={cn(
-                  "fill-none transition-opacity",
-                  isRecent ? "text-primary" : "text-muted-foreground/80",
-                  active ? "opacity-100" : "opacity-25",
-                )}
-                d={path}
-                markerEnd="url(#agent-graph-arrow)"
-                stroke="currentColor"
-                strokeDasharray={edge.replyCount === 0 ? "5 4" : undefined}
-                strokeWidth={edgeWidth(edge.count)}
+                d={geometry.d}
+                fill="none"
+                stroke={`url(#${uid}-edge-${index})`}
+                strokeDasharray={edge.replyCount === 0 ? "6 5" : undefined}
+                strokeLinecap="round"
+                strokeWidth={width}
+              />
+              <polygon
+                fill={isRecent ? "var(--primary)" : "var(--muted-foreground)"}
+                opacity={0.95}
+                points={geometry.arrowPoints}
               />
               {active ? (
                 // Flowing "packets" sliding toward the arrowhead: fast and
@@ -135,7 +179,7 @@ export function AgentGraphCanvas({
                     "fill-none text-primary",
                     isRecent ? "buzz-graph-flow" : "buzz-graph-flow-slow",
                   )}
-                  d={path}
+                  d={geometry.d}
                   opacity={isRecent ? 0.95 : 0.45}
                   stroke="currentColor"
                   strokeDasharray="3 19"

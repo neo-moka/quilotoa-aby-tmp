@@ -6,6 +6,7 @@ import { cn } from "@/shared/lib/cn";
 import { Spinner } from "@/shared/ui/spinner";
 
 import { project, spherePositions } from "./agentGraph3d";
+import { curvedEdgeGeometry } from "./agentGraphEdgeGeometry";
 import type { AgentGraphEdge, AgentGraphNode } from "./agentGraphModel";
 
 const STAGE_SIZE = 640;
@@ -18,6 +19,26 @@ const MAX_PITCH = 1.1;
 const AUTO_SPIN = 0.0028;
 const INERTIA_DECAY = 0.94;
 const RECENT_WINDOW_SECONDS = 10 * 60;
+
+type ProjectedNode = { x: number; y: number; scale: number };
+
+function edgeGeometry3d(
+  from: ProjectedNode,
+  to: ProjectedNode,
+  edge: AgentGraphEdge,
+) {
+  const depth = (from.scale + to.scale) / 2;
+  return curvedEdgeGeometry({
+    fromX: from.x,
+    fromY: from.y,
+    toX: to.x,
+    toY: to.y,
+    startTrim: NODE_RADIUS * from.scale + 4,
+    endTrim: NODE_RADIUS * to.scale + 4,
+    bow: 14 * depth,
+    arrowSize: (6 + Math.min(3, Math.log2(edge.count + 1))) * depth,
+  });
+}
 
 /**
  * Orbit-mode rendering of the agent graph: nodes on a sphere, dragged with
@@ -44,6 +65,9 @@ export function AgentGraph3DCanvas({
   onSelectNode: (pubkey: string | null) => void;
 }) {
   const shouldReduceMotion = useReducedMotion();
+  // Gradient/filter ids must be unique per mounted canvas: the floating
+  // panel and the /agents/graph page can render simultaneously.
+  const uid = React.useId();
   const [rotation, setRotation] = React.useState({ yaw: 0, pitch: -0.28 });
   const dragRef = React.useRef<{
     pointerId: number;
@@ -156,50 +180,77 @@ export function AgentGraph3DCanvas({
         width={STAGE_SIZE}
       >
         <defs>
-          <marker
-            id="agent-graph-arrow-3d"
-            markerHeight="7"
-            markerWidth="7"
-            orient="auto-start-reverse"
-            refX="6"
-            refY="3.5"
+          <filter
+            height="160%"
+            id={`${uid}-glow3d`}
+            width="160%"
+            x="-30%"
+            y="-30%"
           >
-            <path d="M 0 0 L 7 3.5 L 0 7 z" fill="currentColor" />
-          </marker>
+            <feGaussianBlur stdDeviation="4" />
+          </filter>
+          {edges.map((edge, index) => {
+            const from = projectedByPubkey.get(edge.from);
+            const to = projectedByPubkey.get(edge.to);
+            if (!from || !to) return null;
+            const isRecent = nowSeconds - edge.lastAt <= RECENT_WINDOW_SECONDS;
+            const geometry = edgeGeometry3d(from, to, edge);
+            const color = isRecent
+              ? "var(--primary)"
+              : "var(--muted-foreground)";
+            return (
+              <linearGradient
+                gradientUnits="userSpaceOnUse"
+                id={`${uid}-edge3d-${index}`}
+                key={`${edge.from}→${edge.to}`}
+                x1={geometry.startX}
+                x2={geometry.endX}
+                y1={geometry.startY}
+                y2={geometry.endY}
+              >
+                <stop offset="0" stopColor={color} stopOpacity="0.25" />
+                <stop offset="1" stopColor={color} stopOpacity="0.95" />
+              </linearGradient>
+            );
+          })}
         </defs>
-        {edges.map((edge) => {
+        {edges.map((edge, index) => {
           const from = projectedByPubkey.get(edge.from);
           const to = projectedByPubkey.get(edge.to);
           if (!from || !to) return null;
-          const deltaX = to.x - from.x;
-          const deltaY = to.y - from.y;
-          const distance = Math.hypot(deltaX, deltaY) || 1;
-          const unitX = deltaX / distance;
-          const unitY = deltaY / distance;
-          const startX = from.x + unitX * (NODE_RADIUS * from.scale + 4);
-          const startY = from.y + unitY * (NODE_RADIUS * from.scale + 4);
-          const endX = to.x - unitX * (NODE_RADIUS * to.scale + 10);
-          const endY = to.y - unitY * (NODE_RADIUS * to.scale + 10);
-          const path = `M ${startX} ${startY} L ${endX} ${endY}`;
           const depth = (from.scale + to.scale) / 2;
           const isRecent = nowSeconds - edge.lastAt <= RECENT_WINDOW_SECONDS;
           const active = isEdgeActive(edge);
-          const baseOpacity = active ? 0.55 + (depth - 0.7) * 0.9 : 0.15;
+          const geometry = edgeGeometry3d(from, to, edge);
+          const width = (1 + Math.min(3, Math.log2(edge.count + 1))) * depth;
+          const groupOpacity = active
+            ? Math.max(0.35, Math.min(1, 0.65 + (depth - 0.8)))
+            : 0.15;
           return (
-            <g key={`${edge.from}→${edge.to}`}>
+            <g key={`${edge.from}→${edge.to}`} opacity={groupOpacity}>
+              {isRecent && active ? (
+                <path
+                  d={geometry.d}
+                  fill="none"
+                  filter={`url(#${uid}-glow3d)`}
+                  opacity={0.35}
+                  stroke="var(--primary)"
+                  strokeLinecap="round"
+                  strokeWidth={width + 4}
+                />
+              ) : null}
               <path
-                className={cn(
-                  isRecent ? "text-primary" : "text-muted-foreground/80",
-                )}
-                d={path}
+                d={geometry.d}
                 fill="none"
-                markerEnd="url(#agent-graph-arrow-3d)"
-                opacity={Math.max(0.12, Math.min(1, baseOpacity))}
-                stroke="currentColor"
-                strokeDasharray={edge.replyCount === 0 ? "5 4" : undefined}
-                strokeWidth={
-                  (1 + Math.min(3, Math.log2(edge.count + 1))) * depth
-                }
+                stroke={`url(#${uid}-edge3d-${index})`}
+                strokeDasharray={edge.replyCount === 0 ? "6 5" : undefined}
+                strokeLinecap="round"
+                strokeWidth={width}
+              />
+              <polygon
+                fill={isRecent ? "var(--primary)" : "var(--muted-foreground)"}
+                opacity={0.95}
+                points={geometry.arrowPoints}
               />
               {active ? (
                 <path
@@ -207,9 +258,9 @@ export function AgentGraph3DCanvas({
                     "text-primary",
                     isRecent ? "buzz-graph-flow" : "buzz-graph-flow-slow",
                   )}
-                  d={path}
+                  d={geometry.d}
                   fill="none"
-                  opacity={(isRecent ? 0.95 : 0.45) * Math.min(1, depth)}
+                  opacity={isRecent ? 0.95 : 0.45}
                   stroke="currentColor"
                   strokeDasharray="3 19"
                   strokeLinecap="round"
