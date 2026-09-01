@@ -266,6 +266,8 @@ export type RelayAgent = {
   pubkey: string;
   ownerPubkey: string | null;
   name: string;
+  /** Avatar from the agent's latest kind:0 profile `picture`, if any. */
+  avatarUrl: string | null;
   agentType: string;
   channels: string[];
   channelIds: string[];

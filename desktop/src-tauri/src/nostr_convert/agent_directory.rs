@@ -77,12 +77,12 @@ pub fn relay_agents_from_directory_events(
     }
 
     let mut agents: Vec<_> = agents.into_values().collect();
+    apply_profile_avatars(&mut agents, profile_events);
     agents.sort_by(|left, right| left.name.cmp(&right.name));
     agents
 }
 
-/// Resolve each agent's owner from its latest signed NIP-OA profile.
-pub fn verified_agent_owners_from_profiles(events: &[Event]) -> HashMap<String, String> {
+fn latest_profiles_by_pubkey(events: &[Event]) -> HashMap<String, &Event> {
     let mut latest_profiles: HashMap<String, &Event> = HashMap::new();
     for profile in events {
         let agent_pubkey = profile.pubkey.to_hex();
@@ -94,11 +94,40 @@ pub fn verified_agent_owners_from_profiles(events: &[Event]) -> HashMap<String, 
         }
     }
     latest_profiles
+}
+
+/// Resolve each agent's owner from its latest signed NIP-OA profile.
+pub fn verified_agent_owners_from_profiles(events: &[Event]) -> HashMap<String, String> {
+    latest_profiles_by_pubkey(events)
         .into_iter()
         .filter_map(|(agent_pubkey, profile)| {
             profile_valid_oa_owner_pubkey(profile).map(|owner| (agent_pubkey, owner))
         })
         .collect()
+}
+
+/// Resolve each agent's avatar from its latest kind:0 profile `picture`.
+fn agent_avatars_from_profiles(events: &[Event]) -> HashMap<String, String> {
+    latest_profiles_by_pubkey(events)
+        .into_iter()
+        .filter_map(|(agent_pubkey, profile)| {
+            let content = serde_json::from_str::<serde_json::Value>(&profile.content).ok()?;
+            let picture = content.get("picture")?.as_str()?.trim().to_string();
+            (!picture.is_empty()).then_some((agent_pubkey, picture))
+        })
+        .collect()
+}
+
+/// Overlay profile-sourced avatars onto a built agent list. The profile wins
+/// over anything a legacy kind:10100 record carried: it is what everyone else
+/// in the community sees the agent as.
+fn apply_profile_avatars(agents: &mut [RelayAgentInfo], profile_events: &[Event]) {
+    let avatars = agent_avatars_from_profiles(profile_events);
+    for agent in agents {
+        if let Some(url) = avatars.get(&agent.pubkey) {
+            agent.avatar_url = Some(url.clone());
+        }
+    }
 }
 
 fn latest_verified_managed_policies<'a>(
@@ -131,6 +160,7 @@ fn relay_agent_from_managed_policy(agent_pubkey: &str, event: &Event) -> Option<
         pubkey: agent_pubkey.to_string(),
         owner_pubkey: Some(event.pubkey.to_hex()),
         name: content.name,
+        avatar_url: None,
         agent_type: "agent".to_string(),
         channels: Vec::new(),
         channel_ids: Vec::new(),
@@ -152,6 +182,7 @@ pub fn relay_agents_from_managed_agent_events(
         .into_iter()
         .filter_map(|(agent_pubkey, event)| relay_agent_from_managed_policy(&agent_pubkey, event))
         .collect();
+    apply_profile_avatars(&mut agents, profile_events);
     agents.sort_by(|left, right| left.name.cmp(&right.name));
     agents
 }
