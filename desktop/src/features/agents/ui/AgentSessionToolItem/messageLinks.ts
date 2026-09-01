@@ -58,12 +58,33 @@ function getMessageSendResultRecord(
   }
 
   const stdout = getToolString(directRecord, ["stdout"]);
-  if (!stdout) {
-    return null;
+  if (stdout) {
+    const stdoutRecord = asRecord(parseToolResultValue(stdout));
+    if (getMessageEventId(stdoutRecord)) {
+      return stdoutRecord;
+    }
   }
 
-  const stdoutRecord = asRecord(parseToolResultValue(stdout));
-  return getMessageEventId(stdoutRecord) ? stdoutRecord : null;
+  // ACP terminal results wrap the CLI's JSON in markdown
+  // ("- **output:** {\"accepted\":true,\"event_id\":…}"), so neither the
+  // direct parse nor the stdout field sees it — without this the sent
+  // bubble can never resolve its content and shows "unavailable".
+  return embeddedMessageSendRecord(result);
+}
+
+function embeddedMessageSendRecord(
+  result: string,
+): Record<string, unknown> | null {
+  const match = result.match(
+    /\{[^{}]*"(?:event_id|eventId|message_id|messageId)"[^{}]*\}/,
+  );
+  if (!match) return null;
+  try {
+    const record = asRecord(JSON.parse(match[0]));
+    return getMessageEventId(record) ? record : null;
+  } catch {
+    return null;
+  }
 }
 
 function getMessageEventId(record: Record<string, unknown>) {
