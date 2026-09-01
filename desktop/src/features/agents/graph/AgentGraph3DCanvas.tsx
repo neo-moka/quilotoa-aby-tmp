@@ -73,6 +73,8 @@ export function AgentGraph3DCanvas({
     pointerId: number;
     lastX: number;
     lastY: number;
+    startX: number;
+    startY: number;
     velocityYaw: number;
   } | null>(null);
 
@@ -108,6 +110,8 @@ export function AgentGraph3DCanvas({
       pointerId: event.pointerId,
       lastX: event.clientX,
       lastY: event.clientY,
+      startX: event.clientX,
+      startY: event.clientY,
       velocityYaw: 0,
     };
     event.currentTarget.setPointerCapture(event.pointerId);
@@ -130,8 +134,17 @@ export function AgentGraph3DCanvas({
     }));
   };
   const onPointerEnd = (event: React.PointerEvent<HTMLDivElement>) => {
-    if (dragRef.current?.pointerId === event.pointerId) {
-      dragRef.current = null;
+    const drag = dragRef.current;
+    if (drag?.pointerId !== event.pointerId) return;
+    dragRef.current = null;
+    // A background click (no meaningful orbit drag) clears the selection,
+    // matching the 2D stage.
+    const moved = Math.hypot(
+      event.clientX - drag.startX,
+      event.clientY - drag.startY,
+    );
+    if (moved < 5) {
+      onSelectNode(null);
     }
   };
 
