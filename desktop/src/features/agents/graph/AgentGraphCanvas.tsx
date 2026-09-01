@@ -109,20 +109,35 @@ export function AgentGraphCanvas({
           if (!from || !to) return null;
           const isRecent = nowSeconds - edge.lastAt <= RECENT_WINDOW_SECONDS;
           const active = isEdgeActive(edge);
+          const path = edgePath(from, to);
           return (
-            <path
-              className={cn(
-                "fill-none transition-opacity",
-                isRecent ? "text-primary" : "text-muted-foreground/50",
-                active ? "opacity-100" : "opacity-15",
-              )}
-              d={edgePath(from, to)}
-              key={`${edge.from}→${edge.to}`}
-              markerEnd="url(#agent-graph-arrow)"
-              stroke="currentColor"
-              strokeDasharray={edge.replyCount === 0 ? "5 4" : undefined}
-              strokeWidth={edgeWidth(edge.count)}
-            />
+            <g key={`${edge.from}→${edge.to}`}>
+              <path
+                className={cn(
+                  "fill-none transition-opacity",
+                  isRecent ? "text-primary" : "text-muted-foreground/50",
+                  active ? "opacity-100" : "opacity-15",
+                )}
+                d={path}
+                markerEnd="url(#agent-graph-arrow)"
+                stroke="currentColor"
+                strokeDasharray={edge.replyCount === 0 ? "5 4" : undefined}
+                strokeWidth={edgeWidth(edge.count)}
+              />
+              {isRecent && active ? (
+                // Flowing "packets" — a sparse dash sliding toward the
+                // arrowhead, only on edges with traffic in the last window.
+                <path
+                  className="buzz-graph-flow fill-none text-primary"
+                  d={path}
+                  opacity={0.9}
+                  stroke="currentColor"
+                  strokeDasharray="3 19"
+                  strokeLinecap="round"
+                  strokeWidth={2.5}
+                />
+              ) : null}
+            </g>
           );
         })}
       </svg>

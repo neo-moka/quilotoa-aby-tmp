@@ -71,6 +71,25 @@
   }
 }
 
+/* Message "packets" travelling along an agent-graph edge: a sparse dash
+   pattern whose offset slides toward the arrowhead. Applied only to edges
+   with recent traffic. */
+@keyframes buzz-graph-flow {
+  to {
+    stroke-dashoffset: -22;
+  }
+}
+
+.buzz-graph-flow {
+  animation: buzz-graph-flow 900ms linear infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .buzz-graph-flow {
+    animation: none;
+  }
+}
+
 .buzz-wave-hand {
   display: inline-block;
   transform-origin: 70% 70%;
