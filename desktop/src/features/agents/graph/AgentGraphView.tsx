@@ -446,10 +446,8 @@ export function AgentGraphView({
               ? cn(
                   "flex min-h-0 flex-1 flex-col overflow-y-auto",
                   detailPane ? "p-0" : "p-3",
-                  "[@container(min-width:44rem)]:flex-none [@container(min-width:44rem)]:border-l [@container(min-width:44rem)]:border-border",
-                  detailPane
-                    ? "[@container(min-width:44rem)]:w-[30rem]"
-                    : "[@container(min-width:44rem)]:w-80 [@container(min-width:44rem)]:p-4",
+                  "[@container(min-width:44rem)]:w-80 [@container(min-width:44rem)]:flex-none [@container(min-width:44rem)]:border-l [@container(min-width:44rem)]:border-border",
+                  !detailPane && "[@container(min-width:44rem)]:p-4",
                 )
               : "hidden w-80 shrink-0 flex-col overflow-y-auto border-l border-border p-4 [@container(min-width:44rem)]:flex",
           )}
