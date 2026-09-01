@@ -89,25 +89,24 @@ export function AgentGraphFloatingPanel() {
       className={cn(
         "fixed z-50 flex flex-col overflow-hidden rounded-xl border border-border bg-background shadow-2xl",
         isMaximized && "inset-4",
+        // Docked default: the right half of the window, full height — the
+        // graph sits beside the channel instead of covering it. Dragging the
+        // header converts it into a free-floating window.
+        !isMaximized &&
+          !position &&
+          "bottom-4 right-4 top-16 w-[min(46vw,56rem)]",
       )}
       data-testid="agent-graph-floating-panel"
       ref={panelRef}
       style={
-        isMaximized
+        isMaximized || !position
           ? undefined
-          : position
-            ? {
-                height: PANEL_HEIGHT,
-                left: position.x,
-                top: position.y,
-                width: PANEL_WIDTH,
-              }
-            : {
-                height: PANEL_HEIGHT,
-                right: EDGE_MARGIN,
-                top: 72,
-                width: PANEL_WIDTH,
-              }
+          : {
+              height: PANEL_HEIGHT,
+              left: position.x,
+              top: position.y,
+              width: PANEL_WIDTH,
+            }
       }
     >
       <AgentGraphView
@@ -134,7 +133,6 @@ export function AgentGraphFloatingPanel() {
           </span>
         }
         onHeaderPointerDown={onHeaderPointerDown}
-        showDetails={isMaximized}
         variant="panel"
       />
     </div>

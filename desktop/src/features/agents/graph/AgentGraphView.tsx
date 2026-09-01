@@ -57,12 +57,10 @@ function formatAgo(atSeconds: number, nowSeconds: number): string {
  */
 export function AgentGraphView({
   variant = "page",
-  showDetails = true,
   headerTrailing,
   onHeaderPointerDown,
 }: {
   variant?: "page" | "panel";
-  showDetails?: boolean;
   headerTrailing?: React.ReactNode;
   onHeaderPointerDown?: (event: React.PointerEvent<HTMLElement>) => void;
 }) {
@@ -279,7 +277,7 @@ export function AgentGraphView({
         {headerTrailing}
       </header>
 
-      <div className="flex min-h-0 flex-1">
+      <div className="flex min-h-0 flex-1 [container-type:inline-size]">
         <div
           className={cn(
             "relative min-w-0 flex-1 overflow-hidden",
@@ -382,32 +380,33 @@ export function AgentGraphView({
           </div>
         </div>
 
-        {showDetails ? (
-          <aside className="hidden w-80 shrink-0 flex-col overflow-y-auto border-l border-border p-4 lg:flex">
-            <h2 className="pb-2 text-2xs font-semibold uppercase tracking-wide text-muted-foreground">
-              {selectedPubkey
-                ? `Traffic — ${nameByPubkey.get(selectedPubkey) ?? "agent"}`
-                : "Recent traffic"}
-            </h2>
-            {detailEdges.length === 0 ? (
-              <p className="py-4 text-sm text-muted-foreground">
-                No messages between agents yet.
-              </p>
-            ) : (
-              <ul className="flex flex-col gap-3">
-                {detailEdges.map((edge) => (
-                  <EdgeDetail
-                    channelNameById={channelNameById}
-                    edge={edge}
-                    key={`${edge.from}→${edge.to}`}
-                    nameByPubkey={nameByPubkey}
-                    nowSeconds={nowSeconds}
-                  />
-                ))}
-              </ul>
-            )}
-          </aside>
-        ) : null}
+        {/* The traffic list rides along whenever the view itself is wide
+            enough — half-docked, maximized, or the full page — and bows out
+            in a small floating window, all by container width. */}
+        <aside className="hidden w-80 shrink-0 flex-col overflow-y-auto border-l border-border p-4 [@container(min-width:44rem)]:flex">
+          <h2 className="pb-2 text-2xs font-semibold uppercase tracking-wide text-muted-foreground">
+            {selectedPubkey
+              ? `Traffic — ${nameByPubkey.get(selectedPubkey) ?? "agent"}`
+              : "Recent traffic"}
+          </h2>
+          {detailEdges.length === 0 ? (
+            <p className="py-4 text-sm text-muted-foreground">
+              No messages between agents yet.
+            </p>
+          ) : (
+            <ul className="flex flex-col gap-3">
+              {detailEdges.map((edge) => (
+                <EdgeDetail
+                  channelNameById={channelNameById}
+                  edge={edge}
+                  key={`${edge.from}→${edge.to}`}
+                  nameByPubkey={nameByPubkey}
+                  nowSeconds={nowSeconds}
+                />
+              ))}
+            </ul>
+          )}
+        </aside>
       </div>
     </div>
   );
