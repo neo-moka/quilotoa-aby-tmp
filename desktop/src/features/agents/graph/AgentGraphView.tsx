@@ -141,10 +141,28 @@ export function AgentGraphView({
     });
   };
   const onStagePointerEnd = (event: React.PointerEvent<HTMLDivElement>) => {
-    if (dragRef.current?.pointerId === event.pointerId) {
-      dragRef.current = null;
+    const drag = dragRef.current;
+    if (drag?.pointerId !== event.pointerId) return;
+    dragRef.current = null;
+    // A click on empty background (no meaningful drag) clears the selection —
+    // without this the node filter latches until the same node is re-clicked.
+    const moved = Math.hypot(
+      event.clientX - drag.startX,
+      event.clientY - drag.startY,
+    );
+    if (moved < 5) {
+      setSelectedPubkey(null);
     }
   };
+
+  // Escape clears the selection from anywhere in the view.
+  React.useEffect(() => {
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") setSelectedPubkey(null);
+    };
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, []);
 
   const channelNameById = React.useMemo(() => {
     const byId = new Map<string, string>();
