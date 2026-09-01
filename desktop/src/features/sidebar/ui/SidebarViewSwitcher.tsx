@@ -30,7 +30,10 @@ export function SidebarViewSwitcher({
   return (
     <fieldset
       className={cn(
-        "flex items-center gap-0.5 rounded-lg bg-sidebar-border/30 p-0.5",
+        // `container-type` lets the pills answer to the switcher's own width:
+        // in a narrow sidebar the labels give way (truncate, then sr-only)
+        // instead of overflowing the pill group.
+        "flex min-w-0 items-center gap-0.5 rounded-lg bg-sidebar-border/30 p-0.5 [container-type:inline-size]",
         className,
       )}
       data-testid="sidebar-view-switcher"
@@ -49,7 +52,8 @@ export function SidebarViewSwitcher({
               // Same metrics as `SidebarMenuButton` (h-8, text-sm, size-4
               // icons) so the selected pill and a selected channel row read
               // as the same control at two spots, not two different sizes.
-              "flex h-8 flex-1 cursor-pointer items-center justify-center gap-1.5 rounded-md px-2.5 text-sm font-medium transition-colors",
+              "flex h-8 min-w-0 flex-1 cursor-pointer items-center justify-center gap-1.5 rounded-md px-2.5 text-sm font-medium transition-colors",
+              "[@container(max-width:13rem)]:gap-0 [@container(max-width:13rem)]:px-1",
               "has-[:focus-visible]:ring-2 has-[:focus-visible]:ring-sidebar-ring",
               isSelected
                 ? "bg-sidebar-active text-sidebar-active-foreground shadow-xs"
@@ -60,6 +64,7 @@ export function SidebarViewSwitcher({
             // and tooling need a hittable target.
             data-testid={`sidebar-view-option-${view.id}`}
             key={view.id}
+            title={view.label}
           >
             <input
               checked={isSelected}
@@ -71,7 +76,11 @@ export function SidebarViewSwitcher({
               value={view.id}
             />
             <view.icon aria-hidden className="size-4 shrink-0" />
-            {view.label}
+            {/* Below ~13rem the label goes screen-reader-only: icon pills
+                with the name kept for a11y and in the title tooltip. */}
+            <span className="truncate [@container(max-width:13rem)]:sr-only">
+              {view.label}
+            </span>
           </label>
         );
       })}
