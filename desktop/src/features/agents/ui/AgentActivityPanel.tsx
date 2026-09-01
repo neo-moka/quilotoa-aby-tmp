@@ -3,7 +3,10 @@ import * as React from "react";
 import { GitFork } from "lucide-react";
 
 import { useActiveAgentTurnsByChannel } from "@/features/agents/activeAgentTurnsStore";
-import { openAgentGraphPanel } from "@/features/agents/graph/agentGraphPanelStore";
+import {
+  toggleDockGraph,
+  useAgentGraphPanel,
+} from "@/features/agents/graph/agentGraphPanelStore";
 import { Button } from "@/shared/ui/button";
 
 import {
@@ -34,6 +37,11 @@ import { ManagedAgentSessionPanel } from "./ManagedAgentSessionPanel";
 const LazyEmbeddedAgentGraph = React.lazy(async () => {
   const module = await import("@/features/agents/graph/AgentGraphView");
   return { default: module.AgentGraphView };
+});
+
+const LazyAgentTrafficPane = React.lazy(async () => {
+  const module = await import("@/features/agents/graph/AgentGraphTrafficList");
+  return { default: module.AgentTrafficPane };
 });
 
 /**
@@ -171,6 +179,18 @@ export function AgentActivityPanel({
   const panelView = useAgentRunPanelView();
   const showRunsList = panelView === "runs";
 
+  // Graph presentation: hidden by default; the header's graph button expands
+  // the dock to make room, and the stage's fullscreen control hands it the
+  // whole panel at window width.
+  const { dockGraph } = useAgentGraphPanel();
+  const windowWidth = typeof window === "undefined" ? 1600 : window.innerWidth;
+  const effectiveWidthPx =
+    dockGraph === "fullscreen"
+      ? windowWidth
+      : dockGraph === "expanded"
+        ? Math.max(widthPx, Math.min(1080, Math.round(windowWidth * 0.6)))
+        : widthPx;
+
   const showRaw = rawState.pubkey === resolvedPubkey && rawState.show;
   const activeTurns = React.useMemo(
     () =>
@@ -184,6 +204,36 @@ export function AgentActivityPanel({
         : [],
     [activeChannelTurns, resolvedPubkey],
   );
+
+  // The selected agent's header + live transcript, shared by the hidden
+  // (full-width) and expanded (rail) presentations below.
+  const detailContent =
+    !showRunsList && selectedAgent ? (
+      <div className="flex min-h-0 flex-1 flex-col" key={selectedAgent.pubkey}>
+        <AgentRunDetailHeader
+          agentAvatarUrl={selectedAgent.avatarUrl ?? null}
+          agentName={selectedAgent.name}
+          agentPubkey={selectedAgent.pubkey}
+          onBack={showAgentRunsList}
+        />
+        {/* Embedded, not standalone — the panel already draws the chrome;
+            `rawLayout="exclusive"` because a rail has no width for a
+            side-by-side raw view. */}
+        <ManagedAgentSessionPanel
+          agent={selectedAgent}
+          autoTail
+          channelId={null}
+          className="min-h-0 flex-1 rounded-none border-0 bg-transparent px-0 py-2 shadow-none"
+          emptyDescription="This agent has not started a turn yet."
+          panelPadding={false}
+          profiles={profiles}
+          rawLayout="exclusive"
+          showHeader={false}
+          showRaw={showRaw}
+          transcriptContentClassName="px-3"
+        />
+      </div>
+    ) : null;
 
   return (
     <AuxiliaryPanel
@@ -214,12 +264,15 @@ export function AgentActivityPanel({
           </AuxiliaryPanelHeaderGroup>
           <AuxiliaryPanelHeaderActions>
             <Button
-              aria-label="Open agent graph"
+              aria-label={
+                dockGraph === "hidden" ? "Show agent graph" : "Hide agent graph"
+              }
+              aria-pressed={dockGraph !== "hidden"}
               data-testid="agent-activity-open-graph"
-              onClick={openAgentGraphPanel}
+              onClick={toggleDockGraph}
               size="icon-xs"
               title="Agent graph"
-              variant="ghost"
+              variant={dockGraph !== "hidden" ? "secondary" : "ghost"}
             >
               <GitFork />
             </Button>
@@ -246,7 +299,7 @@ export function AgentActivityPanel({
       resizeHandleAriaLabel="Resize agent activity"
       resizeHandleTestId="agent-activity-panel-resize"
       testId="agent-activity-panel"
-      widthPx={widthPx}
+      widthPx={effectiveWidthPx}
     >
       {/* `flex flex-col` matters: the body is only `min-h-0 flex-1`, so without
           a column context the transcript's own `flex-1` has nothing to fill and
@@ -260,47 +313,31 @@ export function AgentActivityPanel({
             No active agents. Start or deploy an agent to watch it work.
           </p>
         ) : (
-          // One surface for both states: the graph always holds the left,
-          // and the rail beside it is the traffic list — or, once a node is
-          // clicked, that agent's transcript. The back arrow returns the rail
-          // to traffic without ever hiding the graph.
+          // Three presentations, one panel. Graph hidden (default): the body
+          // is the recent-traffic list, or the full-width transcript once an
+          // agent is chosen. Graph expanded: the dock widens and the graph
+          // holds the left with traffic/transcript as its rail. Fullscreen:
+          // the graph owns everything.
           <div className="flex min-h-0 flex-1 flex-col">
-            <React.Suspense fallback={null}>
-              <LazyEmbeddedAgentGraph
-                detailPane={
-                  !showRunsList && selectedAgent ? (
-                    <div
-                      className="flex min-h-0 flex-1 flex-col"
-                      key={selectedAgent.pubkey}
-                    >
-                      <AgentRunDetailHeader
-                        agentAvatarUrl={selectedAgent.avatarUrl ?? null}
-                        agentName={selectedAgent.name}
-                        agentPubkey={selectedAgent.pubkey}
-                        onBack={showAgentRunsList}
-                      />
-                      {/* Embedded, not standalone — the panel already draws
-                          the chrome; `rawLayout="exclusive"` because a rail
-                          has no width for a side-by-side raw view. */}
-                      <ManagedAgentSessionPanel
-                        agent={selectedAgent}
-                        autoTail
-                        channelId={null}
-                        className="min-h-0 flex-1 rounded-none border-0 bg-transparent px-0 py-2 shadow-none"
-                        emptyDescription="This agent has not started a turn yet."
-                        panelPadding={false}
-                        profiles={profiles}
-                        rawLayout="exclusive"
-                        showHeader={false}
-                        showRaw={showRaw}
-                        transcriptContentClassName="px-3"
-                      />
-                    </div>
-                  ) : undefined
-                }
-                variant="embedded"
-              />
-            </React.Suspense>
+            {dockGraph === "hidden" ? (
+              (detailContent ?? (
+                <React.Suspense fallback={null}>
+                  <LazyAgentTrafficPane />
+                </React.Suspense>
+              ))
+            ) : (
+              <React.Suspense fallback={null}>
+                <LazyEmbeddedAgentGraph
+                  detailPane={
+                    dockGraph === "fullscreen"
+                      ? undefined
+                      : (detailContent ?? undefined)
+                  }
+                  hideRail={dockGraph === "fullscreen"}
+                  variant="embedded"
+                />
+              </React.Suspense>
+            )}
           </div>
         )}
       </AuxiliaryPanelBody>

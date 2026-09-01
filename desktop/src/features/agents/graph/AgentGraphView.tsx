@@ -2,6 +2,8 @@ import * as React from "react";
 import {
   ArrowLeft,
   GitFork,
+  Maximize2,
+  Minimize2,
   Orbit,
   Radio,
   Scan,
@@ -11,12 +13,17 @@ import {
 
 import { openAgentActivityPanel } from "@/features/agents/agentActivityPanelStore";
 import { showAgentRunsList } from "@/features/agents/agentRunPanelStore";
+import {
+  setDockGraphFullscreen,
+  useAgentGraphPanel,
+} from "./agentGraphPanelStore";
 import { useChannelsQuery } from "@/features/channels/hooks";
 import { cn } from "@/shared/lib/cn";
 import { Button } from "@/shared/ui/button";
 import { Spinner } from "@/shared/ui/spinner";
 
-import { type AgentGraphEdge, edgesForNode } from "./agentGraphModel";
+import { edgesForNode } from "./agentGraphModel";
+import { EdgeDetail } from "./AgentGraphTrafficList";
 import { AgentGraph3DCanvas } from "./AgentGraph3DCanvas";
 import { AgentGraphCanvas } from "./AgentGraphCanvas";
 import { useAgentGraphData } from "./useAgentGraphData";
@@ -39,14 +46,6 @@ function readOrbitFlag(): boolean {
   }
 }
 
-function formatAgo(atSeconds: number, nowSeconds: number): string {
-  const delta = Math.max(0, nowSeconds - atSeconds);
-  if (delta < 60) return "now";
-  if (delta < 3_600) return `${Math.floor(delta / 60)}m`;
-  if (delta < 86_400) return `${Math.floor(delta / 3_600)}h`;
-  return `${Math.floor(delta / 86_400)}d`;
-}
-
 /**
  * Communication graph between agents (and the viewer): who is passing
  * messages to whom, mentions vs. thread replies (dependencies), and which
@@ -63,6 +62,7 @@ export function AgentGraphView({
   headerTrailing,
   onHeaderPointerDown,
   detailPane,
+  hideRail = false,
 }: {
   /**
    * `embedded` drops the header and auto-fits the stage to its container —
@@ -76,8 +76,11 @@ export function AgentGraphView({
    * dock uses it to put the clicked agent's transcript beside the graph.
    */
   detailPane?: React.ReactNode;
+  /** Fullscreen dock mode: the graph owns the panel, no rail at all. */
+  hideRail?: boolean;
 }) {
   const { model, workingPubkeys, isLoading } = useAgentGraphData();
+  const { dockGraph } = useAgentGraphPanel();
   const channelsQuery = useChannelsQuery();
   const [selectedPubkey, setSelectedPubkey] = React.useState<string | null>(
     null,
@@ -434,103 +437,74 @@ export function AgentGraphView({
             >
               <Scan />
             </Button>
+            {variant === "embedded" ? (
+              <Button
+                aria-label={
+                  dockGraph === "fullscreen"
+                    ? "Exit graph fullscreen"
+                    : "Graph fullscreen"
+                }
+                onClick={() =>
+                  setDockGraphFullscreen(dockGraph !== "fullscreen")
+                }
+                size="icon"
+                title={
+                  dockGraph === "fullscreen" ? "Exit fullscreen" : "Fullscreen"
+                }
+                type="button"
+                variant="ghost"
+              >
+                {dockGraph === "fullscreen" ? <Minimize2 /> : <Maximize2 />}
+              </Button>
+            ) : null}
           </div>
         </div>
 
         {/* Embedded (the dock's front door): the traffic list stacks under
             the stage — the graph says who is talking, the list says about
             what. Wide layouts keep it as a side rail by container width. */}
-        <aside
-          className={cn(
-            variant === "embedded"
-              ? cn(
-                  "flex min-h-0 flex-1 flex-col overflow-y-auto",
-                  detailPane ? "p-0" : "p-3",
-                  "[@container(min-width:44rem)]:w-80 [@container(min-width:44rem)]:flex-none [@container(min-width:44rem)]:border-l [@container(min-width:44rem)]:border-border",
-                  !detailPane && "[@container(min-width:44rem)]:p-4",
-                )
-              : "hidden w-80 shrink-0 flex-col overflow-y-auto border-l border-border p-4 [@container(min-width:44rem)]:flex",
-          )}
-        >
-          {detailPane ?? (
-            <>
-              <h2 className="pb-2 text-2xs font-semibold uppercase tracking-wide text-muted-foreground">
-                {selectedPubkey
-                  ? `Traffic — ${nameByPubkey.get(selectedPubkey) ?? "agent"}`
-                  : "Recent traffic"}
-              </h2>
-              {detailEdges.length === 0 ? (
-                <p className="py-4 text-sm text-muted-foreground">
-                  No messages between agents yet.
-                </p>
-              ) : (
-                <ul className="flex flex-col gap-3">
-                  {detailEdges.map((edge) => (
-                    <EdgeDetail
-                      channelNameById={channelNameById}
-                      edge={edge}
-                      key={`${edge.from}→${edge.to}`}
-                      nameByPubkey={nameByPubkey}
-                      nowSeconds={nowSeconds}
-                    />
-                  ))}
-                </ul>
-              )}
-            </>
-          )}
-        </aside>
+        {hideRail ? null : (
+          <aside
+            className={cn(
+              variant === "embedded"
+                ? cn(
+                    "flex min-h-0 flex-1 flex-col overflow-y-auto",
+                    detailPane ? "p-0" : "p-3",
+                    "[@container(min-width:44rem)]:w-80 [@container(min-width:44rem)]:flex-none [@container(min-width:44rem)]:border-l [@container(min-width:44rem)]:border-border",
+                    !detailPane && "[@container(min-width:44rem)]:p-4",
+                  )
+                : "hidden w-80 shrink-0 flex-col overflow-y-auto border-l border-border p-4 [@container(min-width:44rem)]:flex",
+            )}
+          >
+            {detailPane ?? (
+              <>
+                <h2 className="pb-2 text-2xs font-semibold uppercase tracking-wide text-muted-foreground">
+                  {selectedPubkey
+                    ? `Traffic — ${nameByPubkey.get(selectedPubkey) ?? "agent"}`
+                    : "Recent traffic"}
+                </h2>
+                {detailEdges.length === 0 ? (
+                  <p className="py-4 text-sm text-muted-foreground">
+                    No messages between agents yet.
+                  </p>
+                ) : (
+                  <ul className="flex flex-col gap-3">
+                    {detailEdges.map((edge) => (
+                      <EdgeDetail
+                        channelNameById={channelNameById}
+                        edge={edge}
+                        key={`${edge.from}→${edge.to}`}
+                        nameByPubkey={nameByPubkey}
+                        nowSeconds={nowSeconds}
+                      />
+                    ))}
+                  </ul>
+                )}
+              </>
+            )}
+          </aside>
+        )}
       </div>
     </div>
-  );
-}
-
-function EdgeDetail({
-  channelNameById,
-  edge,
-  nameByPubkey,
-  nowSeconds,
-}: {
-  channelNameById: Map<string, string>;
-  edge: AgentGraphEdge;
-  nameByPubkey: Map<string, string>;
-  nowSeconds: number;
-}) {
-  const latest = edge.recent[0];
-  const channelName = latest?.channelId
-    ? channelNameById.get(latest.channelId)
-    : undefined;
-  return (
-    <li
-      className="rounded-lg border border-border/60 p-2.5"
-      data-testid="agent-graph-edge-detail"
-    >
-      <p className="flex items-baseline gap-1 text-sm">
-        <span className="font-medium">
-          {nameByPubkey.get(edge.from) ?? "?"}
-        </span>
-        <span aria-hidden className="text-muted-foreground">
-          →
-        </span>
-        <span className="font-medium">{nameByPubkey.get(edge.to) ?? "?"}</span>
-        <span className="ml-auto text-2xs tabular-nums text-muted-foreground">
-          {formatAgo(edge.lastAt, nowSeconds)}
-        </span>
-      </p>
-      <p className="pt-0.5 text-2xs text-muted-foreground">
-        {edge.count} {edge.count === 1 ? "message" : "messages"}
-        {edge.replyCount > 0 ? ` · ${edge.replyCount} in-thread` : ""}
-        {channelName ? ` · #${channelName}` : ""}
-      </p>
-      {latest ? (
-        <p
-          className={cn(
-            "pt-1 text-xs text-foreground/90",
-            "line-clamp-2 break-words",
-          )}
-        >
-          {latest.snippet}
-        </p>
-      ) : null}
-    </li>
   );
 }
