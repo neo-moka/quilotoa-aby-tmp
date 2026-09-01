@@ -262,7 +262,10 @@ export function AgentGraphView({
   }, [model.edges]);
 
   return (
-    <div className="flex h-full min-h-0 flex-col bg-background">
+    // The view root is the size container: the body row below both flips
+    // its own direction and resizes its children against this ancestor — an
+    // element cannot query itself as its container.
+    <div className="flex h-full min-h-0 flex-col bg-background [container-type:inline-size]">
       {variant === "embedded" ? null : (
         <header
           className={cn(
@@ -309,7 +312,7 @@ export function AgentGraphView({
 
       <div
         className={cn(
-          "flex min-h-0 flex-1 [container-type:inline-size]",
+          "flex min-h-0 flex-1",
           // Embedded stacks in a narrow dock and goes side-by-side (stage +
           // traffic rail) once the container is wide enough.
           variant === "embedded" &&
