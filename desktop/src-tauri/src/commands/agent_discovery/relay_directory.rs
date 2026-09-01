@@ -253,6 +253,7 @@ mod tests {
             RelayAgentInfo {
                 pubkey: "a".repeat(64),
                 owner_pubkey: Some(cross_owner.clone()),
+                avatar_url: None,
                 name: "Verified cross-owner".to_string(),
                 agent_type: "agent".to_string(),
                 channels: Vec::new(),
@@ -265,6 +266,7 @@ mod tests {
             RelayAgentInfo {
                 pubkey: "c".repeat(64),
                 owner_pubkey: None,
+                avatar_url: None,
                 name: "Ownerless legacy".to_string(),
                 agent_type: "agent".to_string(),
                 channels: Vec::new(),
@@ -291,6 +293,7 @@ mod tests {
         let mut agents = vec![RelayAgentInfo {
             pubkey: "a".repeat(64),
             owner_pubkey: None,
+            avatar_url: None,
             name: "Ownerless legacy".to_string(),
             agent_type: "agent".to_string(),
             channels: Vec::new(),

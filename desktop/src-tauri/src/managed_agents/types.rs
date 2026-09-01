@@ -201,6 +201,11 @@ pub struct RelayAgentInfo {
     #[serde(default)]
     pub owner_pubkey: Option<String>,
     pub name: String,
+    /// Avatar resolved from the agent's latest kind:0 profile `picture`, so
+    /// list surfaces render the same image the chat timeline does instead of
+    /// falling back to initials.
+    #[serde(default)]
+    pub avatar_url: Option<String>,
     pub agent_type: String,
     pub channels: Vec<String>,
     #[serde(default)]
