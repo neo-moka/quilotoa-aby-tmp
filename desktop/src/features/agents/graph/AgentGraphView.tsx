@@ -23,14 +23,16 @@ import { useAgentGraphData } from "./useAgentGraphData";
 const MIN_ZOOM = 0.4;
 const MAX_ZOOM = 2.5;
 const ZOOM_STEP = 1.25;
-/** The 3D orbit mode is a per-user flag; it survives restarts. */
+/** The 3D orbit mode is a per-user flag; it survives restarts. Default ON. */
 const ORBIT_MODE_STORAGE_KEY = "buzz.agentGraph.orbit";
+/** How long a delivery pulse rings on the recipient after a new message. */
+const PULSE_DURATION_MS = 4_000;
 
 function readOrbitFlag(): boolean {
   try {
-    return window.localStorage.getItem(ORBIT_MODE_STORAGE_KEY) === "1";
+    return window.localStorage.getItem(ORBIT_MODE_STORAGE_KEY) !== "0";
   } catch {
-    return false;
+    return true;
   }
 }
 
@@ -185,6 +187,40 @@ export function AgentGraphView({
     [model, selectedPubkey],
   );
 
+  // Delivery pulses: when a refresh advances an edge's lastAt, its recipient
+  // just got a message — ring their node for a few seconds. The first model
+  // (no baseline) never pulses, so opening the graph doesn't light up
+  // everything at once.
+  const [pulsingPubkeys, setPulsingPubkeys] = React.useState<
+    ReadonlySet<string>
+  >(new Set());
+  const edgeLastAtRef = React.useRef<Map<string, number> | null>(null);
+  React.useEffect(() => {
+    const previous = edgeLastAtRef.current;
+    const next = new Map<string, number>();
+    const arrivals = new Set<string>();
+    for (const edge of model.edges) {
+      const key = `${edge.from}→${edge.to}`;
+      next.set(key, edge.lastAt);
+      const before = previous?.get(key);
+      if (previous && (before === undefined || edge.lastAt > before)) {
+        arrivals.add(edge.to);
+      }
+    }
+    edgeLastAtRef.current = next;
+    if (arrivals.size === 0) return;
+    setPulsingPubkeys((current) => new Set([...current, ...arrivals]));
+    // Deliberately not cancelled on re-run: each timer clears only its own
+    // arrivals, so overlapping refreshes cannot strand a pulse forever.
+    window.setTimeout(() => {
+      setPulsingPubkeys((current) => {
+        const remaining = new Set(current);
+        for (const pubkey of arrivals) remaining.delete(pubkey);
+        return remaining;
+      });
+    }, PULSE_DURATION_MS);
+  }, [model.edges]);
+
   return (
     <div className="flex h-full min-h-0 flex-col bg-background">
       <header
@@ -267,6 +303,7 @@ export function AgentGraphView({
                     nodes={model.nodes}
                     nowSeconds={nowSeconds}
                     onSelectNode={selectNode}
+                    pulsingPubkeys={pulsingPubkeys}
                     selectedPubkey={selectedPubkey}
                     workingPubkeys={workingPubkeys}
                   />
@@ -276,6 +313,7 @@ export function AgentGraphView({
                     nodes={model.nodes}
                     nowSeconds={nowSeconds}
                     onSelectNode={selectNode}
+                    pulsingPubkeys={pulsingPubkeys}
                     selectedPubkey={selectedPubkey}
                     workingPubkeys={workingPubkeys}
                   />

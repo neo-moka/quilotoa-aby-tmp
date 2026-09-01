@@ -32,6 +32,7 @@ export function AgentGraph3DCanvas({
   nowSeconds,
   selectedPubkey,
   workingPubkeys,
+  pulsingPubkeys,
   onSelectNode,
 }: {
   nodes: AgentGraphNode[];
@@ -39,6 +40,7 @@ export function AgentGraph3DCanvas({
   nowSeconds: number;
   selectedPubkey: string | null;
   workingPubkeys: ReadonlySet<string>;
+  pulsingPubkeys: ReadonlySet<string>;
   onSelectNode: (pubkey: string | null) => void;
 }) {
   const shouldReduceMotion = useReducedMotion();
@@ -182,33 +184,36 @@ export function AgentGraph3DCanvas({
           const depth = (from.scale + to.scale) / 2;
           const isRecent = nowSeconds - edge.lastAt <= RECENT_WINDOW_SECONDS;
           const active = isEdgeActive(edge);
-          const baseOpacity = active ? 0.25 + (depth - 0.7) * 1.2 : 0.08;
+          const baseOpacity = active ? 0.55 + (depth - 0.7) * 0.9 : 0.15;
           return (
             <g key={`${edge.from}→${edge.to}`}>
               <path
                 className={cn(
-                  isRecent ? "text-primary" : "text-muted-foreground/60",
+                  isRecent ? "text-primary" : "text-muted-foreground/80",
                 )}
                 d={path}
                 fill="none"
                 markerEnd="url(#agent-graph-arrow-3d)"
-                opacity={Math.max(0.06, Math.min(1, baseOpacity))}
+                opacity={Math.max(0.12, Math.min(1, baseOpacity))}
                 stroke="currentColor"
                 strokeDasharray={edge.replyCount === 0 ? "5 4" : undefined}
                 strokeWidth={
                   (1 + Math.min(3, Math.log2(edge.count + 1))) * depth
                 }
               />
-              {isRecent && active ? (
+              {active ? (
                 <path
-                  className="buzz-graph-flow text-primary"
+                  className={cn(
+                    "text-primary",
+                    isRecent ? "buzz-graph-flow" : "buzz-graph-flow-slow",
+                  )}
                   d={path}
                   fill="none"
-                  opacity={0.9}
+                  opacity={(isRecent ? 0.95 : 0.45) * Math.min(1, depth)}
                   stroke="currentColor"
                   strokeDasharray="3 19"
                   strokeLinecap="round"
-                  strokeWidth={2.5 * depth}
+                  strokeWidth={(isRecent ? 2.5 : 2) * depth}
                 />
               ) : null}
             </g>
@@ -241,6 +246,12 @@ export function AgentGraph3DCanvas({
               type="button"
             >
               <span className="relative inline-flex">
+                {pulsingPubkeys.has(node.pubkey) ? (
+                  <span
+                    aria-hidden
+                    className="buzz-graph-pulse absolute -inset-1 rounded-full border-2 border-primary"
+                  />
+                ) : null}
                 {isWorking ? (
                   <Spinner
                     aria-hidden

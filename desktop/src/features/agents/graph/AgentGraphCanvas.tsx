@@ -61,6 +61,7 @@ export function AgentGraphCanvas({
   nowSeconds,
   selectedPubkey,
   workingPubkeys,
+  pulsingPubkeys,
   onSelectNode,
 }: {
   nodes: AgentGraphNode[];
@@ -68,6 +69,7 @@ export function AgentGraphCanvas({
   nowSeconds: number;
   selectedPubkey: string | null;
   workingPubkeys: ReadonlySet<string>;
+  pulsingPubkeys: ReadonlySet<string>;
   onSelectNode: (pubkey: string | null) => void;
 }) {
   const positions = React.useMemo(() => nodePositions(nodes), [nodes]);
@@ -115,8 +117,8 @@ export function AgentGraphCanvas({
               <path
                 className={cn(
                   "fill-none transition-opacity",
-                  isRecent ? "text-primary" : "text-muted-foreground/50",
-                  active ? "opacity-100" : "opacity-15",
+                  isRecent ? "text-primary" : "text-muted-foreground/80",
+                  active ? "opacity-100" : "opacity-25",
                 )}
                 d={path}
                 markerEnd="url(#agent-graph-arrow)"
@@ -124,17 +126,21 @@ export function AgentGraphCanvas({
                 strokeDasharray={edge.replyCount === 0 ? "5 4" : undefined}
                 strokeWidth={edgeWidth(edge.count)}
               />
-              {isRecent && active ? (
-                // Flowing "packets" — a sparse dash sliding toward the
-                // arrowhead, only on edges with traffic in the last window.
+              {active ? (
+                // Flowing "packets" sliding toward the arrowhead: fast and
+                // bright while the edge is hot, a quiet ambient drift after —
+                // the exchange always reads as alive, never frozen.
                 <path
-                  className="buzz-graph-flow fill-none text-primary"
+                  className={cn(
+                    "fill-none text-primary",
+                    isRecent ? "buzz-graph-flow" : "buzz-graph-flow-slow",
+                  )}
                   d={path}
-                  opacity={0.9}
+                  opacity={isRecent ? 0.95 : 0.45}
                   stroke="currentColor"
                   strokeDasharray="3 19"
                   strokeLinecap="round"
-                  strokeWidth={2.5}
+                  strokeWidth={isRecent ? 2.5 : 2}
                 />
               ) : null}
             </g>
@@ -162,6 +168,12 @@ export function AgentGraphCanvas({
             type="button"
           >
             <span className="relative inline-flex">
+              {pulsingPubkeys.has(node.pubkey) ? (
+                <span
+                  aria-hidden
+                  className="buzz-graph-pulse absolute -inset-1 rounded-full border-2 border-primary"
+                />
+              ) : null}
               {isWorking ? (
                 <Spinner
                   aria-hidden
