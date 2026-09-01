@@ -10,6 +10,7 @@ import {
 } from "lucide-react";
 
 import { openAgentActivityPanel } from "@/features/agents/agentActivityPanelStore";
+import { showAgentRunsList } from "@/features/agents/agentRunPanelStore";
 import { useChannelsQuery } from "@/features/channels/hooks";
 import { cn } from "@/shared/lib/cn";
 import { Button } from "@/shared/ui/button";
@@ -61,6 +62,7 @@ export function AgentGraphView({
   variant = "page",
   headerTrailing,
   onHeaderPointerDown,
+  detailPane,
 }: {
   /**
    * `embedded` drops the header and auto-fits the stage to its container —
@@ -69,6 +71,11 @@ export function AgentGraphView({
   variant?: "page" | "panel" | "embedded";
   headerTrailing?: React.ReactNode;
   onHeaderPointerDown?: (event: React.PointerEvent<HTMLElement>) => void;
+  /**
+   * When set, the side rail shows this instead of the traffic list — the
+   * dock uses it to put the clicked agent's transcript beside the graph.
+   */
+  detailPane?: React.ReactNode;
 }) {
   const { model, workingPubkeys, isLoading } = useAgentGraphData();
   const channelsQuery = useChannelsQuery();
@@ -173,18 +180,9 @@ export function AgentGraphView({
       event.clientY - drag.startY,
     );
     if (moved < 5) {
-      setSelectedPubkey(null);
+      selectNode(null);
     }
   };
-
-  // Escape clears the selection from anywhere in the view.
-  React.useEffect(() => {
-    const onKeyDown = (event: KeyboardEvent) => {
-      if (event.key === "Escape") setSelectedPubkey(null);
-    };
-    window.addEventListener("keydown", onKeyDown);
-    return () => window.removeEventListener("keydown", onKeyDown);
-  }, []);
 
   const channelNameById = React.useMemo(() => {
     const byId = new Map<string, string>();
@@ -214,10 +212,23 @@ export function AgentGraphView({
       // transcript alongside the graph. The viewer has no agent transcript.
       if (pubkey && pubkey !== viewerPubkey) {
         openAgentActivityPanel(pubkey);
+      } else if (pubkey === null && variant === "embedded") {
+        // Clearing the selection in the dock also returns its rail from the
+        // agent detail back to the traffic list.
+        showAgentRunsList();
       }
     },
-    [viewerPubkey],
+    [variant, viewerPubkey],
   );
+
+  // Escape clears the selection from anywhere in the view.
+  React.useEffect(() => {
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") selectNode(null);
+    };
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, [selectNode]);
 
   const detailEdges = React.useMemo(
     () =>
@@ -433,33 +444,41 @@ export function AgentGraphView({
           className={cn(
             variant === "embedded"
               ? cn(
-                  "flex min-h-0 flex-1 flex-col overflow-y-auto p-3",
-                  "[@container(min-width:44rem)]:w-80 [@container(min-width:44rem)]:flex-none [@container(min-width:44rem)]:border-l [@container(min-width:44rem)]:border-border [@container(min-width:44rem)]:p-4",
+                  "flex min-h-0 flex-1 flex-col overflow-y-auto",
+                  detailPane ? "p-0" : "p-3",
+                  "[@container(min-width:44rem)]:flex-none [@container(min-width:44rem)]:border-l [@container(min-width:44rem)]:border-border",
+                  detailPane
+                    ? "[@container(min-width:44rem)]:w-[30rem]"
+                    : "[@container(min-width:44rem)]:w-80 [@container(min-width:44rem)]:p-4",
                 )
               : "hidden w-80 shrink-0 flex-col overflow-y-auto border-l border-border p-4 [@container(min-width:44rem)]:flex",
           )}
         >
-          <h2 className="pb-2 text-2xs font-semibold uppercase tracking-wide text-muted-foreground">
-            {selectedPubkey
-              ? `Traffic — ${nameByPubkey.get(selectedPubkey) ?? "agent"}`
-              : "Recent traffic"}
-          </h2>
-          {detailEdges.length === 0 ? (
-            <p className="py-4 text-sm text-muted-foreground">
-              No messages between agents yet.
-            </p>
-          ) : (
-            <ul className="flex flex-col gap-3">
-              {detailEdges.map((edge) => (
-                <EdgeDetail
-                  channelNameById={channelNameById}
-                  edge={edge}
-                  key={`${edge.from}→${edge.to}`}
-                  nameByPubkey={nameByPubkey}
-                  nowSeconds={nowSeconds}
-                />
-              ))}
-            </ul>
+          {detailPane ?? (
+            <>
+              <h2 className="pb-2 text-2xs font-semibold uppercase tracking-wide text-muted-foreground">
+                {selectedPubkey
+                  ? `Traffic — ${nameByPubkey.get(selectedPubkey) ?? "agent"}`
+                  : "Recent traffic"}
+              </h2>
+              {detailEdges.length === 0 ? (
+                <p className="py-4 text-sm text-muted-foreground">
+                  No messages between agents yet.
+                </p>
+              ) : (
+                <ul className="flex flex-col gap-3">
+                  {detailEdges.map((edge) => (
+                    <EdgeDetail
+                      channelNameById={channelNameById}
+                      edge={edge}
+                      key={`${edge.from}→${edge.to}`}
+                      nameByPubkey={nameByPubkey}
+                      nowSeconds={nowSeconds}
+                    />
+                  ))}
+                </ul>
+              )}
+            </>
           )}
         </aside>
       </div>
