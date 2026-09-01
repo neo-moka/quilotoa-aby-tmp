@@ -260,60 +260,48 @@ export function AgentActivityPanel({
             No active agents. Start or deploy an agent to watch it work.
           </p>
         ) : (
-          <>
-            {showRunsList ? (
-              // The graph is this view's whole front door: who is talking to
-              // whom (working agents wear the spinner ring), with recent
-              // traffic stacked below — the graph already carries the roster,
-              // so a standing-by list would repeat it. Clicking a node flips
-              // this same panel to that agent's transcript. Lazy so the dock
-              // shell doesn't carry the graph bundle until shown.
-              <div className="flex min-h-0 flex-1 flex-col">
-                <React.Suspense fallback={null}>
-                  <LazyEmbeddedAgentGraph variant="embedded" />
-                </React.Suspense>
-              </div>
-            ) : null}
-            {!showRunsList && selectedAgent ? (
-              <AgentRunDetailHeader
-                agentAvatarUrl={selectedAgent.avatarUrl ?? null}
-                agentName={selectedAgent.name}
-                agentPubkey={selectedAgent.pubkey}
-                key={`${selectedAgent.pubkey}-header`}
-                onBack={showAgentRunsList}
+          // One surface for both states: the graph always holds the left,
+          // and the rail beside it is the traffic list — or, once a node is
+          // clicked, that agent's transcript. The back arrow returns the rail
+          // to traffic without ever hiding the graph.
+          <div className="flex min-h-0 flex-1 flex-col">
+            <React.Suspense fallback={null}>
+              <LazyEmbeddedAgentGraph
+                detailPane={
+                  !showRunsList && selectedAgent ? (
+                    <div
+                      className="flex min-h-0 flex-1 flex-col"
+                      key={selectedAgent.pubkey}
+                    >
+                      <AgentRunDetailHeader
+                        agentAvatarUrl={selectedAgent.avatarUrl ?? null}
+                        agentName={selectedAgent.name}
+                        agentPubkey={selectedAgent.pubkey}
+                        onBack={showAgentRunsList}
+                      />
+                      {/* Embedded, not standalone — the panel already draws
+                          the chrome; `rawLayout="exclusive"` because a rail
+                          has no width for a side-by-side raw view. */}
+                      <ManagedAgentSessionPanel
+                        agent={selectedAgent}
+                        autoTail
+                        channelId={null}
+                        className="min-h-0 flex-1 rounded-none border-0 bg-transparent px-0 py-2 shadow-none"
+                        emptyDescription="This agent has not started a turn yet."
+                        panelPadding={false}
+                        profiles={profiles}
+                        rawLayout="exclusive"
+                        showHeader={false}
+                        showRaw={showRaw}
+                        transcriptContentClassName="px-3"
+                      />
+                    </div>
+                  ) : undefined
+                }
+                variant="embedded"
               />
-            ) : null}
-            {!showRunsList && selectedAgent ? (
-              // Embedded, not standalone — the same treatment
-              // `AgentSessionThreadPanel` gives it, because both put it under a
-              // panel that already has a header. It defaults to a standalone
-              // card with its own header, which suits its third caller (a
-              // preview inside a profile) and produces a boxed-in look with two
-              // stacked headers anywhere else. Dissolved at the call site so
-              // that preview keeps its card.
-              //
-              // `rawLayout="exclusive"` for the same reason the channel panel
-              // uses it: the responsive default puts the raw rail beside the
-              // transcript, which a sidebar has no width for.
-              <ManagedAgentSessionPanel
-                agent={selectedAgent}
-                autoTail
-                channelId={null}
-                className="min-h-0 flex-1 rounded-none border-0 bg-transparent px-0 py-2 shadow-none"
-                emptyDescription="This agent has not started a turn yet."
-                key={selectedAgent.pubkey}
-                panelPadding={false}
-                profiles={profiles}
-                rawLayout="exclusive"
-                showHeader={false}
-                showRaw={showRaw}
-                // The section's own padding is stripped above (px-0) so the
-                // scrollbar can hug the panel edge; without this the rows
-                // would hug it too and read as an unstyled dump.
-                transcriptContentClassName="px-3"
-              />
-            ) : null}
-          </>
+            </React.Suspense>
+          </div>
         )}
       </AuxiliaryPanelBody>
     </AuxiliaryPanel>
