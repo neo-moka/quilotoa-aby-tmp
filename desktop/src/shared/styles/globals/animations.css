@@ -84,8 +84,34 @@
   animation: buzz-graph-flow 900ms linear infinite;
 }
 
+/* Same packet flow, ambient tempo — edges whose traffic is older keep a
+   quiet drift so the whole graph reads as live, not frozen. */
+.buzz-graph-flow-slow {
+  animation: buzz-graph-flow 2400ms linear infinite;
+}
+
+/* Delivery pulse: an expanding, fading ring around a node that just
+   received a message. */
+@keyframes buzz-graph-pulse {
+  0% {
+    opacity: 0.75;
+    transform: scale(1);
+  }
+
+  100% {
+    opacity: 0;
+    transform: scale(2);
+  }
+}
+
+.buzz-graph-pulse {
+  animation: buzz-graph-pulse 1100ms ease-out infinite;
+}
+
 @media (prefers-reduced-motion: reduce) {
-  .buzz-graph-flow {
+  .buzz-graph-flow,
+  .buzz-graph-flow-slow,
+  .buzz-graph-pulse {
     animation: none;
   }
 }
