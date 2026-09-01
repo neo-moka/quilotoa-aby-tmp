@@ -47,7 +47,7 @@ import { parseImetaTags } from "@/shared/ui/markdown/parseImeta";
 import { useMessageEmoji } from "@/features/messages/lib/useMessageEmoji";
 import { parseWaveMessageContent } from "@/features/messages/lib/waveMessage";
 import { resolveSnapshotSharedBy } from "@/features/messages/lib/snapshotSharedBy";
-import { splitAgentSignalReactions } from "@/features/messages/lib/agentSignalReactions";
+import { useAgentSignalSplit } from "@/features/messages/lib/useAgentSignalSplit";
 import { AgentSignalStatusLine } from "./AgentSignalStatusLine";
 import { resolveMentionProps } from "@/shared/lib/resolveMentionNames";
 import { VideoReviewCommentMarkdown } from "@/shared/ui/VideoReviewCommentMarkdown";
@@ -212,31 +212,12 @@ export const MessageRow = React.memo(
     );
     // Agent lifecycle signals (👀 seen / 💬 working) leave the reaction chips
     // and render as WhatsApp-style status below the message instead.
-    // The tick only advances when a working signal is due to cross the
-    // staleness cutoff, so an orphaned 💬 (agent restarted mid-turn) demotes
-    // itself to "seen" without user interaction — and idle rows never tick.
-    const [signalClockMs, setSignalClockMs] = React.useState(() => Date.now());
-    const agentSignalSplit = React.useMemo(
-      () =>
-        splitAgentSignalReactions(
-          rawReactions,
-          isKnownAgentPubkey,
-          signalClockMs,
-        ),
-      [isKnownAgentPubkey, rawReactions, signalClockMs],
+    const agentSignalSplit = useAgentSignalSplit(
+      rawReactions,
+      isKnownAgentPubkey,
     );
     const reactions = agentSignalSplit.humanReactions ?? rawReactions;
-    const { seenByAgents, workingAgents, workingExpiresAtMs } =
-      agentSignalSplit;
-    React.useEffect(() => {
-      if (workingExpiresAtMs === null) return;
-      const delay = Math.max(0, workingExpiresAtMs - Date.now()) + 1_000;
-      const timer = window.setTimeout(
-        () => setSignalClockMs(Date.now()),
-        delay,
-      );
-      return () => window.clearTimeout(timer);
-    }, [workingExpiresAtMs]);
+    const { seenByAgents, workingAgents } = agentSignalSplit;
     const profilePopoverRole =
       message.role === "bot" ||
       (message.pubkey && isKnownAgentPubkey(message.pubkey))

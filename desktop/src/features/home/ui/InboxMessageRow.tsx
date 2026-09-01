@@ -10,6 +10,8 @@ import { getConfigNudgeAuthorPubkey } from "@/features/messages/ui/configNudgeAu
 import { MessageActionBar } from "@/features/messages/ui/MessageActionBar";
 import { MessageAgentOwner } from "@/features/messages/ui/MessageAgentOwner";
 import { MessageMetaSeparator } from "@/features/messages/ui/MessageHeader";
+import { useAgentSignalSplit } from "@/features/messages/lib/useAgentSignalSplit";
+import { AgentSignalStatusLine } from "@/features/messages/ui/AgentSignalStatusLine";
 import { MessageReactions } from "@/features/messages/ui/MessageReactions";
 import { UnreadDivider } from "@/features/messages/ui/UnreadDivider";
 import { useReactionHandler } from "@/features/messages/ui/useReactionHandler";
@@ -81,7 +83,7 @@ export function InboxMessageRow({
     null,
   );
   const {
-    reactions,
+    reactions: rawReactions,
     canToggle: canToggleReactions,
     pending: reactionPending,
     errorMessage: reactionErrorMessage,
@@ -101,6 +103,14 @@ export function InboxMessageRow({
     },
     [agentPubkeys, knownAgentPubkeys],
   );
+  // Agent lifecycle signals (👀 seen / 💬 working) leave the reaction chips
+  // and render as WhatsApp-style status below the message, same as MessageRow.
+  const agentSignalSplit = useAgentSignalSplit(
+    rawReactions,
+    isKnownAgentPubkey,
+  );
+  const reactions = agentSignalSplit.humanReactions ?? rawReactions;
+  const { seenByAgents, workingAgents } = agentSignalSplit;
   const isAuthorAgent = isKnownAgentPubkey(message.authorPubkey);
   const profileRole = isAuthorAgent ? "bot" : undefined;
   const hoverTimestampLabel = formatTimeWithoutDayPeriod(
@@ -291,6 +301,10 @@ export function InboxMessageRow({
               }}
               pending={reactionPending}
               reactions={reactions}
+            />
+            <AgentSignalStatusLine
+              seenByAgents={seenByAgents}
+              workingAgents={workingAgents}
             />
             {reactionErrorMessage ? (
               <p className="mt-1.5 text-xs text-destructive">
