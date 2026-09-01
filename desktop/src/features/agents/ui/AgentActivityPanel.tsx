@@ -1,6 +1,10 @@
 import * as React from "react";
 
+import { GitFork } from "lucide-react";
+
 import { useActiveAgentTurnsByChannel } from "@/features/agents/activeAgentTurnsStore";
+import { openAgentGraphPanel } from "@/features/agents/graph/agentGraphPanelStore";
+import { Button } from "@/shared/ui/button";
 import {
   useManagedAgentsQuery,
   useRelayAgentsQuery,
@@ -207,6 +211,16 @@ export function AgentActivityPanel({
             ) : null}
           </AuxiliaryPanelHeaderGroup>
           <AuxiliaryPanelHeaderActions>
+            <Button
+              aria-label="Open agent graph"
+              data-testid="agent-activity-open-graph"
+              onClick={openAgentGraphPanel}
+              size="icon-xs"
+              title="Agent graph"
+              variant="ghost"
+            >
+              <GitFork />
+            </Button>
             {selectedAgent ? (
               <AgentActivitySettingsMenu
                 activeTurns={activeTurns}
