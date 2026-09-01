@@ -111,15 +111,22 @@ export function AgentGraphView({
     setPan({ x: 0, y: 0 });
   }, []);
 
-  // Embedded in the dock, the 640px stage must shrink to whatever column it
-  // got: fit once per mount, leaving the toolbar free to re-zoom.
+  // Embedded in the dock, the 640px stage must fit whatever box it got — and
+  // refit when the dock is resized or the layout flips between stacked and
+  // side-by-side. Manual zooming still works between resizes.
   React.useLayoutEffect(() => {
     if (variant !== "embedded") return;
     const wrapper = stageWrapperRef.current;
     if (!wrapper) return;
-    const fit =
-      Math.min(wrapper.clientWidth, wrapper.clientHeight) / STAGE_FIT_BASE;
-    setZoom(Math.max(MIN_ZOOM, Math.min(1, fit)));
+    const refit = () => {
+      const fit =
+        Math.min(wrapper.clientWidth, wrapper.clientHeight) / STAGE_FIT_BASE;
+      setZoom(Math.max(MIN_ZOOM, Math.min(1, fit)));
+    };
+    refit();
+    const observer = new ResizeObserver(refit);
+    observer.observe(wrapper);
+    return () => observer.disconnect();
   }, [variant]);
 
   // Wheel zoom needs a non-passive listener: React's synthetic onWheel cannot
@@ -303,13 +310,19 @@ export function AgentGraphView({
       <div
         className={cn(
           "flex min-h-0 flex-1 [container-type:inline-size]",
-          variant === "embedded" && "flex-col",
+          // Embedded stacks in a narrow dock and goes side-by-side (stage +
+          // traffic rail) once the container is wide enough.
+          variant === "embedded" &&
+            "flex-col [@container(min-width:44rem)]:flex-row",
         )}
       >
         <div
           className={cn(
             variant === "embedded"
-              ? "relative h-72 w-full shrink-0 overflow-hidden border-b border-border/60"
+              ? cn(
+                  "relative h-72 w-full shrink-0 overflow-hidden border-b border-border/60",
+                  "[@container(min-width:44rem)]:h-auto [@container(min-width:44rem)]:min-h-0 [@container(min-width:44rem)]:min-w-0 [@container(min-width:44rem)]:flex-1 [@container(min-width:44rem)]:border-b-0",
+                )
               : "relative min-w-0 flex-1 overflow-hidden",
             dragRef.current ? "cursor-grabbing" : "cursor-grab",
           )}
@@ -416,7 +429,10 @@ export function AgentGraphView({
         <aside
           className={cn(
             variant === "embedded"
-              ? "flex min-h-0 flex-1 flex-col overflow-y-auto p-3"
+              ? cn(
+                  "flex min-h-0 flex-1 flex-col overflow-y-auto p-3",
+                  "[@container(min-width:44rem)]:w-80 [@container(min-width:44rem)]:flex-none [@container(min-width:44rem)]:border-l [@container(min-width:44rem)]:border-border [@container(min-width:44rem)]:p-4",
+                )
               : "hidden w-80 shrink-0 flex-col overflow-y-auto border-l border-border p-4 [@container(min-width:44rem)]:flex",
           )}
         >
