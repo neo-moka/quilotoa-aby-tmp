@@ -221,9 +221,7 @@ export function AgentGraphCanvas({
               {isWorking ? (
                 <Spinner
                   aria-hidden
-                  className="absolute border-2 text-primary"
-                  size={NODE_RADIUS * 2 + 12}
-                  style={{ left: -6, top: -6 }}
+                  className="absolute -inset-1.5 h-auto w-auto border-2 border-primary/25 border-t-primary"
                 />
               ) : null}
               <ProfileAvatar
