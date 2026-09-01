@@ -39,6 +39,13 @@ Object.defineProperty(dom.window.navigator, "mediaDevices", {
 });
 dom.window.requestAnimationFrame = (callback) => setTimeout(callback, 0);
 globalThis.requestAnimationFrame = dom.window.requestAnimationFrame;
+// @heroui-pro/react's sheet module calls window.matchMedia at import time;
+// jsdom does not implement it.
+dom.window.matchMedia = () => ({
+  matches: false,
+  addEventListener() {},
+  removeEventListener() {},
+});
 
 globalThis.__TAURI_INTERNALS__ = {
   invoke: (command, args) => ipc.invoke(command, args),

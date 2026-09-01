@@ -13,8 +13,13 @@ export function MessageAgentAddressPrefix({
   profiles?: UserProfileLookup;
   pubkeys: readonly string[];
 }) {
+  // The leading-inline-content marker can inject this prefix into any first
+  // prose block of the message body — including headings, whose
+  // text-xl/semibold typography the chips would otherwise inherit.
+  // Addressing is metadata, not prose: pin it to the conversation base size
+  // regardless of the host block.
   return (
-    <>
+    <span className="text-message font-normal tracking-normal">
       {pubkeys.map((pubkey) => {
         const profile = profiles?.[pubkey];
         const label =
@@ -42,6 +47,6 @@ export function MessageAgentAddressPrefix({
           </React.Fragment>
         );
       })}
-    </>
+    </span>
   );
 }
