@@ -3,10 +3,7 @@ import * as React from "react";
 import { GitFork } from "lucide-react";
 
 import { useActiveAgentTurnsByChannel } from "@/features/agents/activeAgentTurnsStore";
-import {
-  toggleDockGraph,
-  useAgentGraphPanel,
-} from "@/features/agents/graph/agentGraphPanelStore";
+import { openAgentGraphPanel } from "@/features/agents/graph/agentGraphPanelStore";
 import { Button } from "@/shared/ui/button";
 
 import {
@@ -33,11 +30,6 @@ import { AgentActivitySettingsMenu } from "./AgentActivitySettingsMenu";
 import type { AgentActivityCandidate } from "./AgentActivitySelector";
 import { AgentRunDetailHeader } from "./AgentRunDetailHeader";
 import { ManagedAgentSessionPanel } from "./ManagedAgentSessionPanel";
-
-const LazyEmbeddedAgentGraph = React.lazy(async () => {
-  const module = await import("@/features/agents/graph/AgentGraphView");
-  return { default: module.AgentGraphView };
-});
 
 const LazyAgentTrafficPane = React.lazy(async () => {
   const module = await import("@/features/agents/graph/AgentGraphTrafficList");
@@ -179,18 +171,6 @@ export function AgentActivityPanel({
   const panelView = useAgentRunPanelView();
   const showRunsList = panelView === "runs";
 
-  // Graph presentation: hidden by default; the header's graph button expands
-  // the dock to make room, and the stage's fullscreen control hands it the
-  // whole panel at window width.
-  const { dockGraph } = useAgentGraphPanel();
-  const windowWidth = typeof window === "undefined" ? 1600 : window.innerWidth;
-  const effectiveWidthPx =
-    dockGraph === "fullscreen"
-      ? windowWidth
-      : dockGraph === "expanded"
-        ? Math.max(widthPx, Math.min(1080, Math.round(windowWidth * 0.6)))
-        : widthPx;
-
   const showRaw = rawState.pubkey === resolvedPubkey && rawState.show;
   const activeTurns = React.useMemo(
     () =>
@@ -264,15 +244,12 @@ export function AgentActivityPanel({
           </AuxiliaryPanelHeaderGroup>
           <AuxiliaryPanelHeaderActions>
             <Button
-              aria-label={
-                dockGraph === "hidden" ? "Show agent graph" : "Hide agent graph"
-              }
-              aria-pressed={dockGraph !== "hidden"}
+              aria-label="Open agent graph panel"
               data-testid="agent-activity-open-graph"
-              onClick={toggleDockGraph}
+              onClick={openAgentGraphPanel}
               size="icon-xs"
               title="Agent graph"
-              variant={dockGraph !== "hidden" ? "secondary" : "ghost"}
+              variant="ghost"
             >
               <GitFork />
             </Button>
@@ -299,7 +276,7 @@ export function AgentActivityPanel({
       resizeHandleAriaLabel="Resize agent activity"
       resizeHandleTestId="agent-activity-panel-resize"
       testId="agent-activity-panel"
-      widthPx={effectiveWidthPx}
+      widthPx={widthPx}
     >
       {/* `flex flex-col` matters: the body is only `min-h-0 flex-1`, so without
           a column context the transcript's own `flex-1` has nothing to fill and
@@ -313,29 +290,14 @@ export function AgentActivityPanel({
             No active agents. Start or deploy an agent to watch it work.
           </p>
         ) : (
-          // Three presentations, one panel. Graph hidden (default): the body
-          // is the recent-traffic list, or the full-width transcript once an
-          // agent is chosen. Graph expanded: the dock widens and the graph
-          // holds the left with traffic/transcript as its rail. Fullscreen:
-          // the graph owns everything.
+          // The dock stays light: recent traffic by default, the full-width
+          // transcript once an agent is chosen. The graph lives in the
+          // app-level floating panel behind the header's graph button, where
+          // it can be dragged, resized and maximized.
           <div className="flex min-h-0 flex-1 flex-col">
-            {dockGraph === "hidden" ? (
-              (detailContent ?? (
-                <React.Suspense fallback={null}>
-                  <LazyAgentTrafficPane />
-                </React.Suspense>
-              ))
-            ) : (
+            {detailContent ?? (
               <React.Suspense fallback={null}>
-                <LazyEmbeddedAgentGraph
-                  detailPane={
-                    dockGraph === "fullscreen"
-                      ? undefined
-                      : (detailContent ?? undefined)
-                  }
-                  hideRail={dockGraph === "fullscreen"}
-                  variant="embedded"
-                />
+                <LazyAgentTrafficPane />
               </React.Suspense>
             )}
           </div>
