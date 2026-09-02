@@ -23,6 +23,7 @@ import { Button } from "@/shared/ui/button";
 import { Spinner } from "@/shared/ui/spinner";
 
 import { edgesForNode } from "./agentGraphModel";
+import { AgentGraphFilterPopover } from "./AgentGraphFilterPopover";
 import { EdgeDetail } from "./AgentGraphTrafficList";
 import { AgentGraph3DCanvas } from "./AgentGraph3DCanvas";
 import { AgentGraphCanvas } from "./AgentGraphCanvas";
@@ -35,6 +36,23 @@ const MAX_ZOOM = 2.5;
 const ZOOM_STEP = 1.25;
 /** The 3D orbit mode is a per-user flag; it survives restarts. Default ON. */
 const ORBIT_MODE_STORAGE_KEY = "buzz.agentGraph.orbit";
+/** Pubkeys the user chose to hide from the graph; persists per user. */
+const HIDDEN_NODES_STORAGE_KEY = "buzz.agentGraph.hiddenNodes";
+
+function readHiddenNodes(): ReadonlySet<string> {
+  try {
+    const raw = window.localStorage.getItem(HIDDEN_NODES_STORAGE_KEY);
+    if (!raw) return new Set();
+    const parsed = JSON.parse(raw);
+    return new Set(
+      Array.isArray(parsed)
+        ? parsed.filter((value): value is string => typeof value === "string")
+        : [],
+    );
+  } catch {
+    return new Set();
+  }
+}
 /** How long a delivery pulse rings on the recipient after a new message. */
 const PULSE_DURATION_MS = 4_000;
 
@@ -79,8 +97,46 @@ export function AgentGraphView({
   /** Fullscreen dock mode: the graph owns the panel, no rail at all. */
   hideRail?: boolean;
 }) {
-  const { model, workingPubkeys, isLoading } = useAgentGraphData();
+  const { model: fullModel, workingPubkeys, isLoading } = useAgentGraphData();
   const { dockGraph } = useAgentGraphPanel();
+
+  // Participant filter: hidden nodes drop from the stage together with every
+  // edge touching them; the full roster stays available to the popover so
+  // hiding is always reversible.
+  const [hiddenPubkeys, setHiddenPubkeys] = React.useState(readHiddenNodes);
+  const toggleNodeVisible = React.useCallback(
+    (pubkey: string, visible: boolean) => {
+      setHiddenPubkeys((current) => {
+        const next = new Set(current);
+        if (visible) next.delete(pubkey);
+        else next.add(pubkey);
+        try {
+          window.localStorage.setItem(
+            HIDDEN_NODES_STORAGE_KEY,
+            JSON.stringify([...next]),
+          );
+        } catch {
+          // Best-effort persistence.
+        }
+        return next;
+      });
+    },
+    [],
+  );
+  const model = React.useMemo(() => {
+    if (hiddenPubkeys.size === 0) return fullModel;
+    const nodes = fullModel.nodes.filter(
+      (node) => !hiddenPubkeys.has(node.pubkey),
+    );
+    const visible = new Set(nodes.map((node) => node.pubkey));
+    return {
+      ...fullModel,
+      nodes,
+      edges: fullModel.edges.filter(
+        (edge) => visible.has(edge.from) && visible.has(edge.to),
+      ),
+    };
+  }, [fullModel, hiddenPubkeys]);
   const channelsQuery = useChannelsQuery();
   const [selectedPubkey, setSelectedPubkey] = React.useState<string | null>(
     null,
@@ -406,6 +462,11 @@ export function AgentGraphView({
           )}
 
           <div className="absolute bottom-3 right-3 flex flex-col gap-1 rounded-lg border border-border/70 bg-background/90 p-1 shadow-sm backdrop-blur">
+            <AgentGraphFilterPopover
+              hiddenPubkeys={hiddenPubkeys}
+              nodes={fullModel.nodes}
+              onToggle={toggleNodeVisible}
+            />
             <Button
               aria-label={isOrbit ? "Switch to 2D view" : "Switch to 3D orbit"}
               aria-pressed={isOrbit}
