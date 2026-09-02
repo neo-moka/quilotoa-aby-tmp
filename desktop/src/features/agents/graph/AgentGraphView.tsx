@@ -279,7 +279,14 @@ export function AgentGraphView({
     // The view root is the size container: the body row below both flips
     // its own direction and resizes its children against this ancestor — an
     // element cannot query itself as its container.
-    <div className="flex h-full min-h-0 flex-col bg-background [container-type:inline-size]">
+    <div
+      className={cn(
+        "flex h-full min-h-0 flex-col [container-type:inline-size]",
+        // The floating panel supplies its own elevated surface (bg-popover);
+        // painting bg-background here would flatten it back to the app bg.
+        variant === "page" ? "bg-background" : "bg-transparent",
+      )}
+    >
       {variant === "embedded" ? null : (
         <header
           className={cn(

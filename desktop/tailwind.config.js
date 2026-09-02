@@ -58,6 +58,12 @@ export default {
         // it tapers out at each corner instead of turning it.
         "panel-left":
           "-1px 0 0 0 hsl(from var(--border) h s l / 0.8), -16px 0 32px -12px rgb(0 0 0 / 0.18)",
+        // A free-floating window over the app, no backdrop to separate it:
+        // an all-around hairline draws the boundary (it is what dark mode
+        // sees — black drop shadows vanish there), and two soft drops carry
+        // the lift on light surfaces.
+        "floating-panel":
+          "0 0 0 1px hsl(from var(--border) h s l / 0.9), 0 24px 64px -16px rgb(0 0 0 / 0.5), 0 8px 24px -8px rgb(0 0 0 / 0.35)",
       },
       borderRadius: {
         lg: "var(--radius)",

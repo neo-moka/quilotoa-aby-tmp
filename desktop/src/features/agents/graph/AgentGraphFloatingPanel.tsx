@@ -175,7 +175,7 @@ export function AgentGraphFloatingPanel() {
   return (
     <div
       className={cn(
-        "fixed z-50 flex flex-col overflow-hidden rounded-xl border border-border bg-background shadow-2xl",
+        "fixed z-50 flex flex-col overflow-hidden rounded-xl bg-popover shadow-floating-panel",
         isMaximized && "inset-4",
         // Docked default: the right half of the window, full height — the
         // graph sits beside the channel instead of covering it.
