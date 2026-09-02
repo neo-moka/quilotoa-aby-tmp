@@ -84,6 +84,7 @@ import { useProviderApiKeyFieldState } from "./providerApiKeyFieldState";
 import { buildRuntimeModelProviderPayload } from "./agentDefinitionSubmitPayload";
 import { AgentDefinitionDialogFooter } from "./AgentDefinitionDialogFooter";
 import { AgentDefinitionDialogShell } from "./AgentDefinitionDialogShell";
+import { useAgentRunLocation } from "./AgentRunLocationContext";
 import { AddCustomHarnessDialog } from "./AddCustomHarnessDialog";
 import {
   ADD_CUSTOM_HARNESS_OPTION,
@@ -426,6 +427,11 @@ export function AgentDefinitionDialog({
     setModel(nextPair.model);
   }
   const { data: bakedEnvKeys } = useBakedBuildEnvKeysQuery({ enabled: open });
+  // "remote" only inside the create flow when the "Run on" draft points at a
+  // buzz-backend-* provider: the runtime binary, its credentials, and the
+  // model env all live on the deploy target, so the local readiness gates
+  // below must not block submit on this machine's state.
+  const remoteRunSelected = useAgentRunLocation() === "remote";
   const localModeGate = React.useMemo(
     () =>
       computeLocalModeGate({
@@ -434,7 +440,7 @@ export function AgentDefinitionDialog({
         globalEnvVars: globalConfig.env_vars,
         globalProvider: inheritedProviderDefault.value,
         globalModel: inheritedModelDefault.value,
-        isProviderMode: false,
+        isProviderMode: remoteRunSelected,
         model,
         provider: trimmedProvider,
         runtimeId: runtime,
@@ -447,6 +453,7 @@ export function AgentDefinitionDialog({
       inheritedModelDefault.value,
       inheritedProviderDefault.value,
       model,
+      remoteRunSelected,
       trimmedProvider,
       runtime,
       runtimeFileConfig,
@@ -491,7 +498,10 @@ export function AgentDefinitionDialog({
   );
   const selectedRuntimeIsAvailable =
     runtime.trim().length === 0 ||
-    selectedRuntime?.availability === "available";
+    selectedRuntime?.availability === "available" ||
+    // Remote deploys run the harness on the provider's host — whether the
+    // binary is installed on THIS machine is irrelevant there.
+    remoteRunSelected;
   // Gate model/provider validity through missingNormalizedFields — single
   // source of truth with the readiness gate so display and Save can't drift.
   const canSubmit =
