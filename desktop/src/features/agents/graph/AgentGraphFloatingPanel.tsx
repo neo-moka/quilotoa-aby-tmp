@@ -17,6 +17,62 @@ const PANEL_HEIGHT = 620;
 const EDGE_MARGIN = 16;
 const MIN_WIDTH = 480;
 const MIN_HEIGHT = 380;
+/** Last window geometry, restored on every open. `position: null` = docked. */
+const WINDOW_STORAGE_KEY = "buzz.agentGraph.window";
+
+type StoredWindow = {
+  position: { x: number; y: number } | null;
+  size: { width: number; height: number } | null;
+};
+
+function isFiniteNumber(value: unknown): value is number {
+  return typeof value === "number" && Number.isFinite(value);
+}
+
+function readStoredWindow(): StoredWindow {
+  try {
+    const raw = window.localStorage.getItem(WINDOW_STORAGE_KEY);
+    if (!raw) return { position: null, size: null };
+    const parsed = JSON.parse(raw) as StoredWindow;
+    const size =
+      parsed.size &&
+      isFiniteNumber(parsed.size.width) &&
+      isFiniteNumber(parsed.size.height)
+        ? {
+            width: Math.max(MIN_WIDTH, parsed.size.width),
+            height: Math.max(MIN_HEIGHT, parsed.size.height),
+          }
+        : null;
+    const position =
+      parsed.position &&
+      isFiniteNumber(parsed.position.x) &&
+      isFiniteNumber(parsed.position.y)
+        ? {
+            // Clamp into the current viewport so a geometry saved on a
+            // bigger screen never strands the window off-screen.
+            x: Math.min(
+              Math.max(EDGE_MARGIN, parsed.position.x),
+              Math.max(
+                EDGE_MARGIN,
+                window.innerWidth - (size?.width ?? PANEL_WIDTH) - EDGE_MARGIN,
+              ),
+            ),
+            y: Math.min(
+              Math.max(EDGE_MARGIN, parsed.position.y),
+              Math.max(
+                EDGE_MARGIN,
+                window.innerHeight -
+                  (size?.height ?? PANEL_HEIGHT) -
+                  EDGE_MARGIN,
+              ),
+            ),
+          }
+        : null;
+    return { position, size };
+  } catch {
+    return { position: null, size: null };
+  }
+}
 
 type PanelPoint = { x: number; y: number };
 type PanelSize = { width: number; height: number };
@@ -39,8 +95,27 @@ const CORNERS: Array<{ corner: Corner; className: string; cursor: string }> = [
  */
 export function AgentGraphFloatingPanel() {
   const { isOpen, isMaximized } = useAgentGraphPanel();
-  const [position, setPosition] = React.useState<PanelPoint | null>(null);
-  const [size, setSize] = React.useState<PanelSize | null>(null);
+  const [position, setPosition] = React.useState<PanelPoint | null>(
+    () => readStoredWindow().position,
+  );
+  const [size, setSize] = React.useState<PanelSize | null>(
+    () => readStoredWindow().size,
+  );
+
+  // Persistence is debounced so a drag doesn't hammer localStorage at 60fps.
+  React.useEffect(() => {
+    const timer = window.setTimeout(() => {
+      try {
+        window.localStorage.setItem(
+          WINDOW_STORAGE_KEY,
+          JSON.stringify({ position, size } satisfies StoredWindow),
+        );
+      } catch {
+        // Best-effort; a full quota just means no memory of the geometry.
+      }
+    }, 300);
+    return () => window.clearTimeout(timer);
+  }, [position, size]);
   const dragRef = React.useRef<{
     pointerId: number;
     offsetX: number;
