@@ -215,6 +215,9 @@ export function AgentGraphFloatingPanel() {
             </Button>
           </span>
         }
+        // The floating window is the graph, whole: recent traffic already
+        // lives in the Agent activity dock, so a rail here repeated it.
+        hideRail
         onHeaderPointerDown={onHeaderPointerDown}
         variant="panel"
       />
