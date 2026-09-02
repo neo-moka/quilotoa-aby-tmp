@@ -449,9 +449,19 @@ export function extractToolIdentity(update: Record<string, unknown>): {
   );
   const title =
     asString(update.title) ?? knownName ?? firstSpecific ?? "Tool call";
+  // ACP's own semantic tag. Some harnesses (opencode) title an execution
+  // with the bare command line and report no tool name at all, so nothing
+  // in `candidates` says "shell" — but `kind: "execute"` does. Surfacing it
+  // as the toolName lets the classifier's shell handling (and the buzz CLI
+  // pretty-printer behind it) fire instead of the generic "Ran tool" row.
+  const acpKind = asString(update.kind);
   return {
     title,
-    toolName: knownName ?? normalizeToolName(firstSpecific ?? title),
+    toolName:
+      knownName ??
+      (acpKind === "execute"
+        ? "execute"
+        : normalizeToolName(firstSpecific ?? title)),
     buzzToolName: knownName ?? null,
   };
 }

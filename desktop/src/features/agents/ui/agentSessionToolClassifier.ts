@@ -138,6 +138,25 @@ export function classifyTool(
     }
   }
 
+  // Last chance before the generic row: a harness this module has never met
+  // may still be running the buzz CLI. `args.command` is a command line by
+  // construction and gets the full parse; a title only counts when it IS the
+  // command (starts with `buzz `) — a title that merely mentions one
+  // ("note: buzz messages send …") must not render as an outgoing message.
+  const command =
+    getToolString(input.args, ["command"]) ??
+    (/^buzz\s/.test(input.title.trim()) ? input.title.trim() : null);
+  const buzzCli = command ? parseBuzzCliCommand(command) : null;
+  if (buzzCli) {
+    return input.isError
+      ? {
+          ...buzzCli,
+          renderClass: "error",
+          label: `${buzzCli.label} failed`,
+        }
+      : buzzCli;
+  }
+
   return genericDescriptor(input);
 }
 
@@ -185,12 +204,14 @@ function classifyDeveloperHarnessTool(
   if (!kind) return null;
 
   if (kind === "shell") {
-    // ACP-bridged harnesses often carry the command only in the tool title
-    // ("terminal: buzz messages send …"), not in args — without this the
-    // buzz CLI parser never fires and the row shows the raw prefixed title.
+    // ACP-bridged harnesses often carry the command only in the tool title —
+    // prefixed ("terminal: buzz messages send …") or bare (opencode titles
+    // the call with the command line itself). Without this the buzz CLI
+    // parser never fires and the row shows the raw title.
     const command =
       getToolString(input.args, ["command"]) ??
-      commandFromShellTitle(input.title);
+      commandFromShellTitle(input.title) ??
+      bareCommandTitle(input.title);
     const buzzCli = command ? parseBuzzCliCommand(command) : null;
     if (buzzCli) {
       return buzzCli;
@@ -397,6 +418,17 @@ export function commandFromShellTitle(title: string): string | null {
   if (!match) return null;
   const base = normalizeToolNameText(match[1]);
   return SHELL_TOOL_BASES.has(base) ? match[2] : null;
+}
+
+/**
+ * Treat an unprefixed title as the command line itself. Only once the call is
+ * already known to be a shell execution (ACP `kind: "execute"` or a shell
+ * tool name) — and only when the title has a space, so a bare tool label
+ * like "bash" or "Tool call" is not mistaken for a one-word command.
+ */
+function bareCommandTitle(title: string): string | null {
+  const trimmed = title.trim();
+  return trimmed.includes(" ") ? trimmed : null;
 }
 
 export function parseBuzzCliCommand(
