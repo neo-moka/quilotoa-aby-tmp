@@ -100,7 +100,7 @@ export function AgentActivityRail({
     // hoverable, tooltip and all, but invisible. Above it, the rail starts at
     // the top like the panel it folds down from.
     <aside
-      aria-label="Agent activity"
+      aria-label="Participants"
       className="relative z-40 flex h-full w-12 shrink-0 flex-col items-center gap-2 overflow-y-auto bg-sidebar py-3 before:pointer-events-none before:absolute before:bottom-0 before:left-0 before:top-0 before:w-px before:bg-border/80 before:content-['']"
       data-testid="agent-activity-rail"
     >

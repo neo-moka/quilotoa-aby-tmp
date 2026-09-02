@@ -1,10 +1,6 @@
-import * as React from "react";
-
-import { useChannelsQuery } from "@/features/channels/hooks";
 import { cn } from "@/shared/lib/cn";
 
 import type { AgentGraphEdge } from "./agentGraphModel";
-import { useAgentGraphData } from "./useAgentGraphData";
 
 export function formatAgo(atSeconds: number, nowSeconds: number): string {
   const delta = Math.max(0, nowSeconds - atSeconds);
@@ -62,57 +58,5 @@ export function EdgeDetail({
         </p>
       ) : null}
     </li>
-  );
-}
-
-/**
- * The recent-traffic list on its own: the Agent activity dock's default body
- * while the graph is hidden. Shares the graph's data (same query keys, so no
- * extra fetching when both mount).
- */
-export function AgentTrafficPane({ className }: { className?: string }) {
-  const { model } = useAgentGraphData();
-  const channelsQuery = useChannelsQuery();
-  const nowSeconds = Math.floor(Date.now() / 1_000);
-
-  const channelNameById = React.useMemo(() => {
-    const byId = new Map<string, string>();
-    for (const channel of channelsQuery.data ?? []) {
-      byId.set(channel.id, channel.name);
-    }
-    return byId;
-  }, [channelsQuery.data]);
-
-  const nameByPubkey = React.useMemo(() => {
-    const byPubkey = new Map<string, string>();
-    for (const node of model.nodes) {
-      byPubkey.set(node.pubkey, node.name);
-    }
-    return byPubkey;
-  }, [model.nodes]);
-
-  return (
-    <div className={cn("min-h-0 flex-1 overflow-y-auto p-4", className)}>
-      <h2 className="pb-2 text-2xs font-semibold uppercase tracking-wide text-muted-foreground">
-        Recent traffic
-      </h2>
-      {model.edges.length === 0 ? (
-        <p className="py-4 text-sm text-muted-foreground">
-          No messages between agents yet.
-        </p>
-      ) : (
-        <ul className="flex flex-col gap-3">
-          {model.edges.map((edge) => (
-            <EdgeDetail
-              channelNameById={channelNameById}
-              edge={edge}
-              key={`${edge.from}→${edge.to}`}
-              nameByPubkey={nameByPubkey}
-              nowSeconds={nowSeconds}
-            />
-          ))}
-        </ul>
-      )}
-    </div>
   );
 }

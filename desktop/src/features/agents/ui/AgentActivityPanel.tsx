@@ -3,6 +3,7 @@ import * as React from "react";
 import { GitFork } from "lucide-react";
 
 import { useActiveAgentTurnsByChannel } from "@/features/agents/activeAgentTurnsStore";
+import { selectAgentActivityAgent } from "@/features/agents/agentActivityPanelStore";
 import { openAgentGraphPanel } from "@/features/agents/graph/agentGraphPanelStore";
 import { Button } from "@/shared/ui/button";
 
@@ -22,19 +23,16 @@ import {
   AuxiliaryPanelTitle,
 } from "@/shared/layout/AuxiliaryPanel";
 import {
+  showAgentRunDetail,
   showAgentRunsList,
   useAgentRunPanelView,
 } from "@/features/agents/agentRunPanelStore";
 import { resolveActivityAgentPubkey } from "./agentActivitySelection";
 import { AgentActivitySettingsMenu } from "./AgentActivitySettingsMenu";
 import type { AgentActivityCandidate } from "./AgentActivitySelector";
+import { AgentParticipantsList } from "./AgentParticipantsList";
 import { AgentRunDetailHeader } from "./AgentRunDetailHeader";
 import { ManagedAgentSessionPanel } from "./ManagedAgentSessionPanel";
-
-const LazyAgentTrafficPane = React.lazy(async () => {
-  const module = await import("@/features/agents/graph/AgentGraphTrafficList");
-  return { default: module.AgentTrafficPane };
-});
 
 /**
  * Right-side panel for watching one agent work, independent of whatever
@@ -229,7 +227,7 @@ export function AgentActivityPanel({
           <AuxiliaryPanelHeaderGroup>
             {/* The detail view names the agent in its own header, so repeating
                 it here would say the same word twice in adjacent rows. */}
-            <AuxiliaryPanelTitle>Agent activity</AuxiliaryPanelTitle>
+            <AuxiliaryPanelTitle>Participants</AuxiliaryPanelTitle>
             {/* Working count, not roster count: the chip answers "how much is
                 happening", and an idle roster of five would overstate that as
                 a permanent 5. Hidden at zero — a `0` next to the title reads
@@ -283,26 +281,23 @@ export function AgentActivityPanel({
           a column context the transcript's own `flex-1` has nothing to fill and
           the panel does not reach the bottom. */}
       <AuxiliaryPanelBody className="flex flex-col">
-        {agents.length === 0 ? (
-          <p
-            className="px-4 py-6 text-center text-sm text-muted-foreground"
-            data-testid="agent-activity-panel-empty"
-          >
-            No active agents. Start or deploy an agent to watch it work.
-          </p>
-        ) : (
-          // The dock stays light: recent traffic by default, the full-width
-          // transcript once an agent is chosen. The graph lives in the
-          // app-level floating panel behind the header's graph button, where
-          // it can be dragged, resized and maximized.
-          <div className="flex min-h-0 flex-1 flex-col">
-            {detailContent ?? (
-              <React.Suspense fallback={null}>
-                <LazyAgentTrafficPane />
-              </React.Suspense>
-            )}
-          </div>
-        )}
+        {/* The dock stays light: the participants roster by default, the
+            full-width transcript once an agent is chosen. The graph lives in
+            the app-level floating panel behind the header's graph button,
+            where it can be dragged, resized and maximized. */}
+        <div className="flex min-h-0 flex-1 flex-col">
+          {detailContent ?? (
+            <AgentParticipantsList
+              agents={agents}
+              onSelectAgent={(pubkey) => {
+                selectAgentActivityAgent(pubkey);
+                showAgentRunDetail();
+              }}
+              profiles={profiles}
+              workingPubkeys={workingPubkeys}
+            />
+          )}
+        </div>
       </AuxiliaryPanelBody>
     </AuxiliaryPanel>
   );

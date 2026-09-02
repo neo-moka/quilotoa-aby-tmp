@@ -55,7 +55,7 @@ export const RIGHT_DOCK_VIEWS: Record<
   RightDockViewDefinition
 > = {
   "agent-activity": {
-    label: "Agent activity",
+    label: "Participants",
     Component: AgentActivityDockView,
   },
 };
