@@ -175,7 +175,11 @@ export function AgentGraphFloatingPanel() {
   return (
     <div
       className={cn(
-        "fixed z-50 flex flex-col overflow-hidden rounded-xl bg-popover shadow-floating-panel",
+        // Inline elevation on purpose: a ring hairline the dark theme can
+        // actually see plus heavy arbitrary drops — no config token, so dev
+        // servers never serve a stale build without it.
+        "fixed z-50 flex flex-col overflow-hidden rounded-xl bg-popover ring-1 ring-border",
+        "shadow-[0_32px_96px_-16px_rgba(0,0,0,0.8),0_12px_32px_-8px_rgba(0,0,0,0.5)]",
         isMaximized && "inset-4",
         // Docked default: the right half of the window, full height — the
         // graph sits beside the channel instead of covering it.
