@@ -154,6 +154,8 @@ export type McpDraft = {
   name: string;
   kind: "remote" | "command";
   url: string;
+  /** Only meaningful for remote drafts: "apikey" requires `auth`. */
+  authMode: "apikey" | "none";
   auth: string;
   command: string;
 };
@@ -176,9 +178,20 @@ export function validateMcpDraft(
   if (existingNames.includes(name)) {
     return { error: `"${name}" already exists.` };
   }
+  if (
+    draft.kind === "remote" &&
+    draft.authMode === "apikey" &&
+    draft.auth.trim().length === 0
+  ) {
+    return { error: "An API key connection needs its key." };
+  }
   const def: McpConnectionDef =
     draft.kind === "remote"
-      ? { name, url: draft.url, auth: draft.auth }
+      ? {
+          name,
+          url: draft.url,
+          auth: draft.authMode === "apikey" ? draft.auth : "",
+        }
       : { name, command: draft.command };
   try {
     mcpDefEnvEntry(def);

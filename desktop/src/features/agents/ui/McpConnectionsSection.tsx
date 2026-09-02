@@ -1,4 +1,4 @@
-import { Plug, Trash2 } from "lucide-react";
+import { Plug, Plus, Trash2 } from "lucide-react";
 import * as React from "react";
 
 import {
@@ -9,12 +9,12 @@ import {
   removeMcpDef,
   toggleMcpName,
   upsertMcpDef,
-  validateMcpDraft,
   type McpConnectionDef,
 } from "@/features/agents/lib/mcpConnections";
 import { Button } from "@/shared/ui/button";
-import { Input } from "@/shared/ui/input";
 import { Switch } from "@/shared/ui/switch";
+
+import { AddMcpConnectionDialog } from "./AddMcpConnectionDialog";
 
 type ConnectionRow = McpConnectionDef & { builtin: boolean };
 
@@ -47,40 +47,12 @@ export function McpConnectionsSection({
     return [...builtins, ...defined];
   }, [envVars]);
 
-  const [draftName, setDraftName] = React.useState("");
-  const [draftKind, setDraftKind] = React.useState<"remote" | "command">(
-    "remote",
-  );
-  const [draftUrl, setDraftUrl] = React.useState("");
-  const [draftAuth, setDraftAuth] = React.useState("");
-  const [draftCommand, setDraftCommand] = React.useState("");
-  const [draftError, setDraftError] = React.useState<string | null>(null);
+  const [addOpen, setAddOpen] = React.useState(false);
 
-  const resetDraft = () => {
-    setDraftName("");
-    setDraftUrl("");
-    setDraftAuth("");
-    setDraftCommand("");
-    setDraftError(null);
-  };
-
-  const handleAdd = () => {
-    const result = validateMcpDraft(
-      {
-        name: draftName,
-        kind: draftKind,
-        url: draftUrl,
-        auth: draftAuth,
-        command: draftCommand,
-      },
-      rows.map((row) => row.name),
-    );
-    if (result.error !== undefined) {
-      setDraftError(result.error);
-      return;
-    }
-    onEnvVarsChange(upsertMcpDef(envVars, result.def));
-    resetDraft();
+  const handleAdd = (def: McpConnectionDef, fleetDefault: boolean) => {
+    let next = upsertMcpDef(envVars, def);
+    if (fleetDefault) next = toggleMcpName(next, def.name, true);
+    onEnvVarsChange(next);
   };
 
   return (
@@ -145,66 +117,22 @@ export function McpConnectionsSection({
         </ul>
       ) : null}
 
-      <div className="space-y-2 rounded-md border border-dashed border-border/60 p-3">
-        <div className="flex flex-wrap items-center gap-2">
-          <Input
-            aria-label="Connection name"
-            className="h-8 w-36"
-            onChange={(event) => setDraftName(event.target.value)}
-            placeholder="name (e.g. meli-ads)"
-            value={draftName}
-          />
-          <div className="flex items-center gap-1 rounded-md bg-muted/50 p-0.5 text-xs">
-            {(["remote", "command"] as const).map((kind) => (
-              <button
-                className={
-                  draftKind === kind
-                    ? "rounded bg-background px-2 py-1 font-medium shadow-sm"
-                    : "rounded px-2 py-1 text-muted-foreground"
-                }
-                key={kind}
-                onClick={() => setDraftKind(kind)}
-                type="button"
-              >
-                {kind === "remote" ? "Remote URL" : "Command"}
-              </button>
-            ))}
-          </div>
-        </div>
-        {draftKind === "remote" ? (
-          <div className="flex flex-wrap items-center gap-2">
-            <Input
-              aria-label="MCP URL"
-              className="h-8 min-w-56 flex-1"
-              onChange={(event) => setDraftUrl(event.target.value)}
-              placeholder="https://host/mcp"
-              value={draftUrl}
-            />
-            <Input
-              aria-label="Bearer credential"
-              className="h-8 w-44"
-              onChange={(event) => setDraftAuth(event.target.value)}
-              placeholder="bearer (optional)"
-              type="password"
-              value={draftAuth}
-            />
-          </div>
-        ) : (
-          <Input
-            aria-label="Command path"
-            className="h-8 w-full"
-            onChange={(event) => setDraftCommand(event.target.value)}
-            placeholder="/opt/buzz-agents/bin/my-mcp"
-            value={draftCommand}
-          />
-        )}
-        {draftError ? (
-          <p className="text-xs text-destructive">{draftError}</p>
-        ) : null}
-        <Button onClick={handleAdd} size="sm" type="button" variant="secondary">
-          Add connection
-        </Button>
-      </div>
+      <Button
+        onClick={() => setAddOpen(true)}
+        size="sm"
+        type="button"
+        variant="secondary"
+      >
+        <Plus className="mr-1 h-3.5 w-3.5" />
+        Add connection
+      </Button>
+
+      <AddMcpConnectionDialog
+        existingNames={rows.map((row) => row.name)}
+        onAdd={handleAdd}
+        onOpenChange={setAddOpen}
+        open={addOpen}
+      />
     </div>
   );
 }

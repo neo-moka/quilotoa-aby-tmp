@@ -82,7 +82,14 @@ test("remove drops the def and its default-list mention", () => {
 });
 
 test("draft validation: normalizes, rejects dupes and incomplete forms", () => {
-  const base = { name: "", kind: "remote", url: "", auth: "", command: "" };
+  const base = {
+    name: "",
+    kind: "remote",
+    url: "",
+    authMode: "none",
+    auth: "",
+    command: "",
+  };
   const ok = validateMcpDraft(
     { ...base, name: " Foo ", url: "https://f/mcp" },
     ["dropi"],
@@ -100,6 +107,26 @@ test("draft validation: normalizes, rejects dupes and incomplete forms", () => {
     [],
   );
   assert.equal(cmd.def.command, "/bin/bar-mcp");
+});
+
+test("draft validation: API key mode requires the key, none drops it", () => {
+  const base = {
+    name: "foo",
+    kind: "remote",
+    url: "https://f/mcp",
+    authMode: "apikey",
+    auth: "",
+    command: "",
+  };
+  assert.match(validateMcpDraft(base, []).error, /API key/);
+  const withKey = validateMcpDraft({ ...base, auth: "sk-1" }, []);
+  assert.equal(withKey.def.auth, "sk-1");
+  // "None" ignores whatever was typed in the key field before switching.
+  const none = validateMcpDraft(
+    { ...base, authMode: "none", auth: "sk-typed-then-switched" },
+    [],
+  );
+  assert.equal(none.def.auth, "");
 });
 
 test("agent selection: inherits until the agent pins its own list", () => {
