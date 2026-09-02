@@ -20,6 +20,15 @@ const MIN_HEIGHT = 380;
 
 type PanelPoint = { x: number; y: number };
 type PanelSize = { width: number; height: number };
+type Corner = "tl" | "tr" | "bl" | "br";
+
+/** Invisible corner hit zones; the cursor is the affordance, as in any OS window. */
+const CORNERS: Array<{ corner: Corner; className: string; cursor: string }> = [
+  { corner: "tl", className: "left-0 top-0", cursor: "cursor-nwse-resize" },
+  { corner: "tr", className: "right-0 top-0", cursor: "cursor-nesw-resize" },
+  { corner: "bl", className: "bottom-0 left-0", cursor: "cursor-nesw-resize" },
+  { corner: "br", className: "bottom-0 right-0", cursor: "cursor-nwse-resize" },
+];
 
 /**
  * The agent graph as an app-level floating window: draggable by its header,
@@ -39,12 +48,13 @@ export function AgentGraphFloatingPanel() {
   } | null>(null);
   const resizeRef = React.useRef<{
     pointerId: number;
+    corner: Corner;
     startX: number;
     startY: number;
+    startLeft: number;
+    startTop: number;
     startWidth: number;
     startHeight: number;
-    startLeft: number;
-    anchored: "right" | "free";
   } | null>(null);
   const panelRef = React.useRef<HTMLDivElement | null>(null);
 
@@ -69,23 +79,29 @@ export function AgentGraphFloatingPanel() {
   );
 
   const onResizePointerDown = React.useCallback(
-    (event: React.PointerEvent<HTMLElement>) => {
+    (corner: Corner) => (event: React.PointerEvent<HTMLElement>) => {
       const panel = panelRef.current;
       if (!panel) return;
       event.preventDefault();
       const rect = panel.getBoundingClientRect();
+      // Any grip converts a docked panel into a free window in place, so
+      // every corner then follows the same math: resize while keeping the
+      // opposite corner anchored.
+      setPosition({ x: rect.left, y: rect.top });
+      setSize({ width: rect.width, height: rect.height });
       resizeRef.current = {
         pointerId: event.pointerId,
+        corner,
         startX: event.clientX,
         startY: event.clientY,
+        startLeft: rect.left,
+        startTop: rect.top,
         startWidth: rect.width,
         startHeight: rect.height,
-        startLeft: rect.left,
-        anchored: position ? "free" : "right",
       };
       (event.currentTarget as HTMLElement).setPointerCapture(event.pointerId);
     },
-    [position],
+    [],
   );
 
   React.useEffect(() => {
@@ -94,28 +110,34 @@ export function AgentGraphFloatingPanel() {
       if (resize && resize.pointerId === event.pointerId) {
         const deltaX = event.clientX - resize.startX;
         const deltaY = event.clientY - resize.startY;
-        // The grip sits on the bottom-left corner: pulling left widens,
-        // pulling down lengthens. A right-docked panel grows leftward from
-        // its anchored edge; a free window shifts its left edge instead.
+        const growsRight = resize.corner === "tr" || resize.corner === "br";
+        const growsDown = resize.corner === "bl" || resize.corner === "br";
         const width = Math.min(
-          Math.max(MIN_WIDTH, resize.startWidth - deltaX),
+          Math.max(
+            MIN_WIDTH,
+            resize.startWidth + (growsRight ? deltaX : -deltaX),
+          ),
           window.innerWidth - EDGE_MARGIN * 2,
         );
         const height = Math.min(
-          Math.max(MIN_HEIGHT, resize.startHeight + deltaY),
+          Math.max(
+            MIN_HEIGHT,
+            resize.startHeight + (growsDown ? deltaY : -deltaY),
+          ),
           window.innerHeight - EDGE_MARGIN * 2,
         );
         setSize({ width, height });
-        if (resize.anchored === "free") {
-          setPosition((current) =>
-            current
-              ? {
-                  x: resize.startLeft + (resize.startWidth - width),
-                  y: current.y,
-                }
-              : current,
-          );
-        }
+        // Left/top-edge corners move the origin so the opposite corner
+        // stays put; clamped sizes feed the shift so hitting a min never
+        // slides the window.
+        setPosition({
+          x: growsRight
+            ? resize.startLeft
+            : resize.startLeft + (resize.startWidth - width),
+          y: growsDown
+            ? resize.startTop
+            : resize.startTop + (resize.startHeight - height),
+        });
         return;
       }
 
@@ -226,28 +248,22 @@ export function AgentGraphFloatingPanel() {
         onHeaderPointerDown={onHeaderPointerDown}
         variant="panel"
       />
-      {isMaximized ? null : (
-        <button
-          aria-label="Resize agent graph panel"
-          className="absolute bottom-0 left-0 z-10 h-5 w-5 cursor-nesw-resize touch-none rounded-tr-md text-muted-foreground/50 hover:text-muted-foreground"
-          data-testid="agent-graph-panel-resize"
-          onPointerDown={onResizePointerDown}
-          type="button"
-        >
-          <svg
-            aria-hidden
-            className="h-full w-full p-1"
-            fill="none"
-            stroke="currentColor"
-            strokeLinecap="round"
-            strokeWidth="1.5"
-            viewBox="0 0 12 12"
-          >
-            <path d="M 1 5 L 5 11 M 1 9 L 2.2 11" transform="scale(1,1)" />
-            <path d="M 1 4 L 8 11" />
-          </svg>
-        </button>
-      )}
+      {isMaximized
+        ? null
+        : CORNERS.map(({ corner, className, cursor }) => (
+            <button
+              aria-label={`Resize agent graph panel from ${corner}`}
+              className={cn(
+                "absolute z-10 h-4 w-4 touch-none",
+                className,
+                cursor,
+              )}
+              data-testid={`agent-graph-panel-resize-${corner}`}
+              key={corner}
+              onPointerDown={onResizePointerDown(corner)}
+              type="button"
+            />
+          ))}
     </div>,
     document.body,
   );
