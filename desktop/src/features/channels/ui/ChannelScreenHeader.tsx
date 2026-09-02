@@ -120,12 +120,12 @@ export function ChannelScreenHeader({
     : null;
   const activityButton = activeChannel ? (
     <Button
-      aria-label="Open agent activity graph"
+      aria-label="Open agent graph"
       className="relative"
       data-testid="channel-header-agent-activity"
       onClick={toggleAgentGraphPanel}
       size="icon"
-      title="Agent activity"
+      title="Agent graph"
       type="button"
       variant={activityPanel.isOpen ? "secondary" : "outline"}
     >
