@@ -1663,10 +1663,11 @@ pub fn format_prompt(batch: &FlushBatch, args: &FormatPromptArgs<'_>) -> Vec<Str
         sections.push(format_issue_context_hints(last_event));
     } else {
         let reply_anchor = if is_dm {
-            thread_tags
-                .root_event_id
-                .is_some()
-                .then(|| last_event.event.id.to_hex())
+            // Anchor to the thread ROOT, like the channel path below: anchoring
+            // to the triggering event nests the agent's reply one level deeper
+            // than the human's message, which the thread panel renders as a
+            // collapsed "1 reply" branch instead of a flat conversation.
+            thread_tags.root_event_id.clone()
         } else {
             resolve_reply_anchor(
                 &sender_pubkey,
@@ -4453,7 +4454,7 @@ mod tests {
         let root_id = "b".repeat(64);
         let event = make_event_with_tags(
             "thanks",
-            vec![vec!["e".into(), root_id, "".into(), "reply".into()]],
+            vec![vec!["e".into(), root_id.clone(), "".into(), "reply".into()]],
         );
         let event_id = event.id.to_hex();
         let batch = FlushBatch {
@@ -4482,8 +4483,67 @@ mod tests {
         )
         .join("\n\n");
         assert!(
-            prompt.contains(&format!("--reply-to {event_id}")),
-            "DM thread reply should include reply instruction"
+            prompt.contains(&format!("--reply-to {root_id}")),
+            "DM thread reply should anchor to the thread root"
+        );
+        assert!(
+            !prompt.contains(&format!("--reply-to {event_id}")),
+            "DM thread reply should NOT anchor to the triggering event id"
+        );
+    }
+
+    #[test]
+    fn test_dm_nested_thread_reply_anchors_to_root_not_triggering_or_parent() {
+        let ch = Uuid::new_v4();
+        let root_id = "a".repeat(64);
+        let parent_id = "b".repeat(64);
+        let event = make_event_with_tags(
+            "nested question",
+            vec![
+                vec!["e".into(), root_id.clone(), "".into(), "root".into()],
+                vec!["e".into(), parent_id.clone(), "".into(), "reply".into()],
+            ],
+        );
+        let event_id = event.id.to_hex();
+        let batch = FlushBatch {
+            channel_id: ch,
+            events: vec![BatchEvent {
+                event,
+                prompt_tag: "@mention".into(),
+                received_at: Instant::now(),
+                is_issue: false,
+            }],
+            cancelled_events: vec![],
+            cancel_reason: None,
+        };
+        let ci = PromptChannelInfo {
+            name: "DM".into(),
+            channel_type: "dm".into(),
+            description: None,
+        };
+
+        // DM deep reply: anchor to the thread ROOT so the agent's reply stays
+        // flat at layer 1 — NOT the triggering event or its parent, which the
+        // thread panel would render as a collapsed depth-2 branch.
+        let prompt = format_prompt(
+            &batch,
+            &FormatPromptArgs {
+                channel_info: Some(&ci),
+                ..Default::default()
+            },
+        )
+        .join("\n\n");
+        assert!(
+            prompt.contains(&format!("--reply-to {root_id}")),
+            "DM nested reply should anchor to the thread root"
+        );
+        assert!(
+            !prompt.contains(&format!("--reply-to {event_id}")),
+            "instruction should NOT anchor to the triggering event id"
+        );
+        assert!(
+            !prompt.contains(&format!("--reply-to {parent_id}")),
+            "instruction should NOT anchor to the parent event id"
         );
     }
 
