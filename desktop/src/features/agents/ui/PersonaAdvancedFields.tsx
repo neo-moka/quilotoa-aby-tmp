@@ -2,6 +2,9 @@ import * as React from "react";
 import { useAgentAccessOwnerOnlyQuery } from "../useAgentAccessOwnerOnly";
 import { Input } from "@/shared/ui/input";
 import { cn } from "@/shared/lib/cn";
+import { MCP_LIST_ENV_KEY } from "@/features/agents/lib/mcpConnections";
+
+import { AgentMcpSection } from "./AgentMcpSection";
 import { EnvVarsEditor, type EnvVarsValue } from "./EnvVarsEditor";
 import {
   CreateAgentRespondToField,
@@ -236,10 +239,12 @@ export function PersonaAdvancedFields({
         </div>
       </div>
 
+      <AgentMcpSection envVars={envVars} onEnvVarsChange={onEnvVarsChange} />
+
       <EnvVarsEditor
         disabled={disabled}
         fileSatisfiedKeys={fileSatisfiedEnvKeys}
-        hiddenKeys={effectiveHiddenKeys}
+        hiddenKeys={[...effectiveHiddenKeys, MCP_LIST_ENV_KEY]}
         keyAnnotations={CARD_MINT_KEY_ANNOTATIONS}
         onChange={onEnvVarsChange}
         requiredKeys={requiredEnvKeys}

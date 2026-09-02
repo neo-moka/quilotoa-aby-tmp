@@ -37,6 +37,7 @@ import {
   AgentConfigFields,
   EMPTY_GLOBAL_CONFIG,
 } from "@/features/agents/ui/AgentConfigFields";
+import { McpConnectionsSection } from "@/features/agents/ui/McpConnectionsSection";
 import { cn } from "@/shared/lib/cn";
 import { Button } from "@/shared/ui/button";
 
@@ -313,6 +314,12 @@ export function AgentDefaultsEditor({
           ) : (
             configFields
           )}
+          <McpConnectionsSection
+            envVars={renderedConfig.env_vars}
+            onEnvVarsChange={(env_vars) =>
+              handleConfigChange({ ...renderedConfig, env_vars })
+            }
+          />
         </>
       )}
 

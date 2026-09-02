@@ -2,6 +2,9 @@ import * as React from "react";
 import { cn } from "@/shared/lib/cn";
 import { Input } from "@/shared/ui/input";
 import { Textarea } from "@/shared/ui/textarea";
+import { MCP_LIST_ENV_KEY } from "@/features/agents/lib/mcpConnections";
+
+import { AgentMcpSection } from "./AgentMcpSection";
 import { EnvVarsEditor, type EnvVarsValue } from "./EnvVarsEditor";
 import {
   CARD_MINT_KEY_ANNOTATIONS,
@@ -324,11 +327,13 @@ export function EditAgentAdvancedFields({
         </div>
       )}
 
+      <AgentMcpSection envVars={envVars} onEnvVarsChange={onEnvVarsChange} />
+
       {/* Env vars */}
       <EnvVarsEditor
         disabled={disabled}
         fileSatisfiedKeys={fileSatisfiedEnvKeys}
-        hiddenKeys={effectiveHiddenKeys}
+        hiddenKeys={[...effectiveHiddenKeys, MCP_LIST_ENV_KEY]}
         focusKey={focusKey}
         helperText="Per-agent env vars. Override the template's vars on collision."
         inheritedFrom={inheritedEnvVars}

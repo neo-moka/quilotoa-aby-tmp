@@ -34,7 +34,7 @@ import shlex
 import subprocess
 import sys
 
-VERSION = "0.3.0"
+VERSION = "0.4.0"
 
 # Catálogo de MCPs gestionables por agente vía la env var NEOMOKA_MCP (lista
 # separada por comas, p. ej. "dropi"; se define en Environment variables —
@@ -206,24 +206,114 @@ def divert_multiline(env: dict, slug: str) -> tuple:
     return env, files
 
 
-def mcp_management_block(slug: str, env: dict) -> str:
+MCP_DEF_PREFIX = "NEOMOKA_MCP_DEF_"
+
+
+def extract_mcp_defs(env: dict) -> tuple:
+    """Separa las definiciones de conexión (NEOMOKA_MCP_DEF_*) del env.
+
+    Devuelve (env sin las defs, registro dinámico). Las defs vienen de la
+    sección global del Desktop como JSON {"name", "url"?, "auth"?, "command"?};
+    se materializan en el server (grupo + token + wrapper) y NUNCA se
+    persisten en el agent.env del agente. El registro resultante extiende
+    KNOWN_MCPS sin permitir que una def pise un built-in.
+    """
+    clean = dict(env)
+    registry = dict(KNOWN_MCPS)
+    for key in sorted(env):
+        if not key.startswith(MCP_DEF_PREFIX):
+            continue
+        raw = clean.pop(key)
+        try:
+            def_ = json.loads(raw)
+        except (TypeError, ValueError):
+            print(f"{key}: JSON inválido, ignorado", file=sys.stderr)
+            continue
+        name = def_.get("name") if isinstance(def_, dict) else None
+        if not isinstance(name, str) or not re.match(r"^[a-z][a-z0-9-]{0,23}$", name):
+            print(f"{key}: def sin nombre válido, ignorada", file=sys.stderr)
+            continue
+        if name in KNOWN_MCPS:
+            continue  # los built-ins ya están aprovisionados a mano
+        url = def_.get("url") if isinstance(def_.get("url"), str) else None
+        command = def_.get("command") if isinstance(def_.get("command"), str) else None
+        if bool(url) == bool(command):
+            print(f"{key}: necesita exactamente url o command, ignorada", file=sys.stderr)
+            continue
+        registry[name] = {
+            "group": "mcp" + name.replace("-", ""),
+            "command": f"/opt/buzz-agents/bin/{name}-mcp",
+            "def": {"url": url, "auth": def_.get("auth"), "command": command},
+        }
+    return clean, registry
+
+
+def mcp_provisioning_block(registry: dict, wanted: set) -> str:
+    """Bash que materializa en el server las conexiones definidas y pedidas.
+
+    Solo se aprovisionan las defs que este agente usa (grupo, token 0640
+    root:grupo cuando hay auth, y wrapper stdio 0755). Idempotente: cada
+    deploy reescribe wrapper y token, así una rotación de credencial llega
+    con el siguiente Start.
+    """
+    lines = []
+    for name, spec in sorted(registry.items()):
+        def_ = spec.get("def")
+        if def_ is None or name not in wanted:
+            continue
+        group = spec["group"]
+        wrapper = spec["command"]
+        token_path = f"/opt/buzz-agents/mcp/{name}-mcp-token"
+        if def_["url"]:
+            if def_.get("auth"):
+                exec_line = (
+                    f"exec /usr/bin/mcp-remote {shlex.quote(def_['url'])} "
+                    f'--header "Authorization: Bearer $(cat {token_path})"'
+                )
+            else:
+                exec_line = f"exec /usr/bin/mcp-remote {shlex.quote(def_['url'])}"
+        else:
+            exec_line = f"exec {def_['command']}"
+        wrapper_b64 = base64.b64encode(
+            f"#!/bin/sh\n# Generado por buzz-backend-neomoka (NEOMOKA_MCP_DEF).\n{exec_line}\n".encode()
+        ).decode()
+        lines.append(f"\n# --- conexión MCP '{name}' ---")
+        lines.append(f"getent group {group} >/dev/null || groupadd {group}")
+        if def_["url"] and def_.get("auth"):
+            auth_b64 = base64.b64encode(str(def_["auth"]).encode()).decode()
+            lines.append("install -d -m 0755 /opt/buzz-agents/mcp")
+            lines.append(
+                f"printf '%s' {shlex.quote(auth_b64)} | base64 -d > {token_path}"
+            )
+            lines.append(f"chown root:{group} {token_path}")
+            lines.append(f"chmod 0640 {token_path}")
+        lines.append(
+            f"printf '%s' {shlex.quote(wrapper_b64)} | base64 -d > {wrapper}"
+        )
+        lines.append(f"chmod 0755 {wrapper}")
+    return "\n".join(lines) + ("\n" if lines else "")
+
+
+def mcp_management_block(slug: str, env: dict, registry: dict) -> str:
     """Bloque bash que aplica NEOMOKA_MCP: grupos Unix + enabled en config.yaml.
 
     Solo se emite cuando la variable viene en el env del agente. El set se
-    aplica exacto: los MCP listados se habilitan (grupo + enabled true) y los
-    conocidos no listados se deshabilitan (fuera del grupo + enabled false).
-    El config.yaml solo se toca si existe (agentes hermes); en su ausencia el
-    grupo sigue siendo el interruptor real (el wrapper no puede leer el token).
+    aplica exacto sobre el registro (built-ins + defs del catálogo): lo
+    listado se habilita (grupo + enabled true) y lo conocido no listado se
+    deshabilita (fuera del grupo + enabled false). El config.yaml solo se
+    toca si existe (agentes hermes); en su ausencia el grupo sigue siendo el
+    interruptor real (el wrapper no puede leer el token).
     """
     raw = env.get("NEOMOKA_MCP")
     if raw is None:
         return ""
     wanted = {name.strip() for name in str(raw).split(",") if name.strip()}
-    for name in sorted(wanted - set(KNOWN_MCPS)):
+    for name in sorted(wanted - set(registry)):
         print(f"NEOMOKA_MCP: mcp desconocido {name!r}, ignorado", file=sys.stderr)
     q_slug = shlex.quote(slug)
     lines = ["\n# --- MCP por agente (NEOMOKA_MCP) ---"]
-    for name, spec in KNOWN_MCPS.items():
+    lines.append(mcp_provisioning_block(registry, wanted))
+    for name, spec in registry.items():
         group = spec["group"]
         if name in wanted:
             lines.append(
@@ -262,6 +352,7 @@ PYMCP"""
 def remote_script(slug: str, display_name: str, env: dict) -> str:
     """Script bash que corre en el servidor. Los secretos viajan por stdin del
     ssh (nunca argv) y aterrizan solo en archivos 0600/0400."""
+    env, registry = extract_mcp_defs(env)
     env, sidecar_files = divert_multiline(env, slug)
     env_b64 = base64.b64encode(env_file_lines(env).encode()).decode()
     sidecar_block = ""
@@ -274,7 +365,7 @@ def remote_script(slug: str, display_name: str, env: dict) -> str:
         )
     agent_command = env["BUZZ_ACP_AGENT_COMMAND"]
     is_hermes = "hermes" in os.path.basename(agent_command)
-    mcp_block = mcp_management_block(slug, env)
+    mcp_block = mcp_management_block(slug, env, registry)
     q_slug = shlex.quote(slug)
     # Va dentro de un heredoc sin comillas: solo texto plano inofensivo.
     safe_name = re.sub(r"[^A-Za-z0-9 ._-]", "", display_name).strip() or slug
