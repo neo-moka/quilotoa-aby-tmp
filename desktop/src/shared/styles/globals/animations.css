@@ -108,11 +108,44 @@
   animation: buzz-graph-pulse 1100ms ease-out infinite;
 }
 
+/* A message "balloon" riding its edge from sender to receiver: the
+   element's offset-path is the edge curve itself; the animation drives
+   offset-distance once, fading in on departure and out on arrival. */
+@keyframes buzz-graph-flight {
+  0% {
+    offset-distance: 0%;
+    opacity: 0;
+  }
+
+  10% {
+    opacity: 1;
+  }
+
+  82% {
+    opacity: 1;
+  }
+
+  100% {
+    offset-distance: 100%;
+    opacity: 0;
+  }
+}
+
+.buzz-graph-flight {
+  offset-rotate: 0deg;
+  animation: buzz-graph-flight 2600ms ease-in-out forwards;
+}
+
 @media (prefers-reduced-motion: reduce) {
   .buzz-graph-flow,
   .buzz-graph-flow-slow,
-  .buzz-graph-pulse {
+  .buzz-graph-pulse,
+  .buzz-graph-flight {
     animation: none;
+  }
+
+  .buzz-graph-flight {
+    display: none;
   }
 }
 

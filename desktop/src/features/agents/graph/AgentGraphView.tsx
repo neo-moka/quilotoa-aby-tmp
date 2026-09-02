@@ -22,7 +22,7 @@ import { cn } from "@/shared/lib/cn";
 import { Button } from "@/shared/ui/button";
 import { Spinner } from "@/shared/ui/spinner";
 
-import { edgesForNode } from "./agentGraphModel";
+import { type AgentGraphFlight, edgesForNode } from "./agentGraphModel";
 import { AgentGraphFilterPopover } from "./AgentGraphFilterPopover";
 import { EdgeDetail } from "./AgentGraphTrafficList";
 import { AgentGraph3DCanvas } from "./AgentGraph3DCanvas";
@@ -55,6 +55,8 @@ function readHiddenNodes(): ReadonlySet<string> {
 }
 /** How long a delivery pulse rings on the recipient after a new message. */
 const PULSE_DURATION_MS = 4_000;
+/** Balloon lifetime: the CSS flight (2.6s) plus a little settling room. */
+const FLIGHT_DURATION_MS = 3_200;
 
 function readOrbitFlag(): boolean {
   try {
@@ -304,22 +306,45 @@ export function AgentGraphView({
   const [pulsingPubkeys, setPulsingPubkeys] = React.useState<
     ReadonlySet<string>
   >(new Set());
+  const [flights, setFlights] = React.useState<readonly AgentGraphFlight[]>([]);
   const edgeLastAtRef = React.useRef<Map<string, number> | null>(null);
   React.useEffect(() => {
     const previous = edgeLastAtRef.current;
     const next = new Map<string, number>();
     const arrivals = new Set<string>();
+    const departures: AgentGraphFlight[] = [];
     for (const edge of model.edges) {
       const key = `${edge.from}→${edge.to}`;
       next.set(key, edge.lastAt);
       const before = previous?.get(key);
       if (previous && (before === undefined || edge.lastAt > before)) {
         arrivals.add(edge.to);
+        const snippet = edge.recent[0]?.snippet;
+        if (snippet) {
+          departures.push({
+            key: `${key}:${edge.lastAt}`,
+            from: edge.from,
+            to: edge.to,
+            snippet,
+          });
+        }
       }
     }
     edgeLastAtRef.current = next;
     if (arrivals.size === 0) return;
     setPulsingPubkeys((current) => new Set([...current, ...arrivals]));
+    if (departures.length > 0) {
+      // A refresh can bring a burst; cap the balloons so the stage stays
+      // readable and the newest exchanges win.
+      setFlights((current) => [...current, ...departures].slice(-6));
+      window.setTimeout(() => {
+        setFlights((current) =>
+          current.filter(
+            (flight) => !departures.some((d) => d.key === flight.key),
+          ),
+        );
+      }, FLIGHT_DURATION_MS);
+    }
     // Deliberately not cancelled on re-run: each timer clears only its own
     // arrivals, so overlapping refreshes cannot strand a pulse forever.
     window.setTimeout(() => {
@@ -439,6 +464,7 @@ export function AgentGraphView({
                 {isOrbit ? (
                   <AgentGraph3DCanvas
                     edges={model.edges}
+                    flights={flights}
                     nodes={model.nodes}
                     nowSeconds={nowSeconds}
                     onSelectNode={selectNode}
@@ -449,6 +475,7 @@ export function AgentGraphView({
                 ) : (
                   <AgentGraphCanvas
                     edges={model.edges}
+                    flights={flights}
                     nodes={model.nodes}
                     nowSeconds={nowSeconds}
                     onSelectNode={selectNode}

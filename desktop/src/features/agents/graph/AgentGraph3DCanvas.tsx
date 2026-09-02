@@ -7,7 +7,11 @@ import { Spinner } from "@/shared/ui/spinner";
 
 import { project, spherePositions } from "./agentGraph3d";
 import { curvedEdgeGeometry } from "./agentGraphEdgeGeometry";
-import type { AgentGraphEdge, AgentGraphNode } from "./agentGraphModel";
+import type {
+  AgentGraphEdge,
+  AgentGraphFlight,
+  AgentGraphNode,
+} from "./agentGraphModel";
 
 const STAGE_SIZE = 640;
 const CENTER = STAGE_SIZE / 2;
@@ -25,7 +29,7 @@ type ProjectedNode = { x: number; y: number; scale: number };
 function edgeGeometry3d(
   from: ProjectedNode,
   to: ProjectedNode,
-  edge: AgentGraphEdge,
+  messageCount: number,
 ) {
   const depth = (from.scale + to.scale) / 2;
   return curvedEdgeGeometry({
@@ -36,7 +40,7 @@ function edgeGeometry3d(
     startTrim: NODE_RADIUS * from.scale + 4,
     endTrim: NODE_RADIUS * to.scale + 4,
     bow: 14 * depth,
-    arrowSize: (6 + Math.min(3, Math.log2(edge.count + 1))) * depth,
+    arrowSize: (6 + Math.min(3, Math.log2(messageCount + 1))) * depth,
   });
 }
 
@@ -54,6 +58,7 @@ export function AgentGraph3DCanvas({
   selectedPubkey,
   workingPubkeys,
   pulsingPubkeys,
+  flights,
   onSelectNode,
 }: {
   nodes: AgentGraphNode[];
@@ -62,6 +67,7 @@ export function AgentGraph3DCanvas({
   selectedPubkey: string | null;
   workingPubkeys: ReadonlySet<string>;
   pulsingPubkeys: ReadonlySet<string>;
+  flights: readonly AgentGraphFlight[];
   onSelectNode: (pubkey: string | null) => void;
 }) {
   const shouldReduceMotion = useReducedMotion();
@@ -207,7 +213,7 @@ export function AgentGraph3DCanvas({
             const to = projectedByPubkey.get(edge.to);
             if (!from || !to) return null;
             const isRecent = nowSeconds - edge.lastAt <= RECENT_WINDOW_SECONDS;
-            const geometry = edgeGeometry3d(from, to, edge);
+            const geometry = edgeGeometry3d(from, to, edge.count);
             const color = isRecent
               ? "var(--primary)"
               : "var(--muted-foreground)";
@@ -234,7 +240,7 @@ export function AgentGraph3DCanvas({
           const depth = (from.scale + to.scale) / 2;
           const isRecent = nowSeconds - edge.lastAt <= RECENT_WINDOW_SECONDS;
           const active = isEdgeActive(edge);
-          const geometry = edgeGeometry3d(from, to, edge);
+          const geometry = edgeGeometry3d(from, to, edge.count);
           const width = (1 + Math.min(3, Math.log2(edge.count + 1))) * depth;
           const groupOpacity = active
             ? Math.max(0.35, Math.min(1, 0.65 + (depth - 0.8)))
@@ -284,6 +290,24 @@ export function AgentGraph3DCanvas({
           );
         })}
       </svg>
+
+      {/* Message balloons in flight — path recomputed each frame so they
+          keep riding their edge while the sphere spins. */}
+      {flights.map((flight) => {
+        const from = projectedByPubkey.get(flight.from);
+        const to = projectedByPubkey.get(flight.to);
+        if (!from || !to) return null;
+        const geometry = edgeGeometry3d(from, to, 1);
+        return (
+          <span
+            className="buzz-graph-flight pointer-events-none absolute left-0 top-0 z-20 max-w-44 truncate rounded-full bg-popover/95 px-2.5 py-1 text-2xs text-foreground shadow-md ring-1 ring-border"
+            key={flight.key}
+            style={{ offsetPath: `path("${geometry.d}")` }}
+          >
+            {flight.snippet}
+          </span>
+        );
+      })}
 
       {[...projectedByPubkey.values()]
         .sort((left, right) => right.z - left.z)
