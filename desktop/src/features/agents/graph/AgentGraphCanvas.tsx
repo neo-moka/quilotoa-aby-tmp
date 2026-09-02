@@ -176,21 +176,18 @@ export function AgentGraphCanvas({
                 opacity={0.95}
                 points={geometry.arrowPoints}
               />
-              {active ? (
-                // Flowing "packets" sliding toward the arrowhead: fast and
-                // bright while the edge is hot, a quiet ambient drift after —
-                // the exchange always reads as alive, never frozen.
+              {active && isRecent ? (
+                // Flowing "packets" sliding toward the arrowhead while the
+                // edge is hot; cold edges rest as static strokes so a quiet
+                // graph reads as quiet.
                 <path
-                  className={cn(
-                    "fill-none text-primary",
-                    isRecent ? "buzz-graph-flow" : "buzz-graph-flow-slow",
-                  )}
+                  className="buzz-graph-flow fill-none text-primary"
                   d={geometry.d}
-                  opacity={isRecent ? 0.95 : 0.45}
+                  opacity={0.95}
                   stroke="currentColor"
                   strokeDasharray="3 19"
                   strokeLinecap="round"
-                  strokeWidth={isRecent ? 2.5 : 2}
+                  strokeWidth={2.5}
                 />
               ) : null}
             </g>
