@@ -133,6 +133,7 @@ export function AgentActivityPanel({
       .map((agent) => ({
         pubkey: agent.pubkey,
         name: agent.name,
+        avatarUrl: agent.avatarUrl ?? null,
         status: "deployed" as const,
       }));
     return [...managed, ...relayOnly];
