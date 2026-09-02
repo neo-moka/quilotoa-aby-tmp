@@ -835,3 +835,39 @@ test("parseSystemPromptSections (modern) does NOT split on bracket [Team Instruc
     },
   ]);
 });
+
+test("extractToolIdentity maps ACP execute kind to the shell toolName for bare-command titles", () => {
+  // opencode's ACP bridge: no tool name anywhere, the title is the command
+  // line itself, and only `kind: "execute"` says this was a shell run.
+  const identity = extractToolIdentity({
+    sessionUpdate: "tool_call",
+    toolCallId: "call-1",
+    status: "in_progress",
+    title:
+      'buzz messages send --channel "e9aeef12-74b4-4971-a981-9bba82b49a81" --content "hola"',
+    kind: "execute",
+    rawInput: {},
+  });
+
+  assert.equal(identity.toolName, "execute");
+  assert.equal(
+    identity.title,
+    'buzz messages send --channel "e9aeef12-74b4-4971-a981-9bba82b49a81" --content "hola"',
+  );
+  assert.equal(identity.buzzToolName, null);
+});
+
+test("extractToolIdentity keeps explicit tool names ahead of the execute kind", () => {
+  const identity = extractToolIdentity({
+    sessionUpdate: "tool_call",
+    toolCallId: "call-2",
+    status: "in_progress",
+    toolName: "send_message",
+    title: "Send message",
+    kind: "execute",
+    rawInput: {},
+  });
+
+  assert.equal(identity.buzzToolName, "send_message");
+  assert.equal(identity.toolName, "send_message");
+});

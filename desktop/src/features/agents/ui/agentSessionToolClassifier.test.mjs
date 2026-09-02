@@ -295,3 +295,67 @@ test("a harness reporting no tool name still classifies a titled terminal buzz c
   assert.equal(descriptor.renderClass, "message");
   assert.equal(descriptor.action.verb, "Sent");
 });
+
+test("opencode execute-kind tool with bare command title classifies as buzz message send", () => {
+  // opencode's ACP bridge reports no tool name: the title IS the command
+  // line, and the only shell signal is ACP `kind: "execute"`, which
+  // extractToolIdentity surfaces as toolName "execute".
+  const descriptor = classifyTool({
+    title:
+      'buzz messages send --channel "e9aeef12-74b4-4971-a981-9bba82b49a81" --reply-to "96c845142f7fac" --content "hola"',
+    toolName: "execute",
+    buzzToolName: null,
+    args: {},
+    result: "",
+    isError: false,
+  });
+
+  assert.equal(descriptor.renderClass, "message");
+  assert.equal(descriptor.label, "Send Message");
+  assert.equal(descriptor.preview, "hola");
+});
+
+test("execute-kind tool with a non-buzz bare command renders as shell, not generic", () => {
+  const descriptor = classifyTool({
+    title: "ls -la /tmp",
+    toolName: "execute",
+    buzzToolName: null,
+    args: {},
+    result: "",
+    isError: false,
+  });
+
+  assert.equal(descriptor.renderClass, "shell");
+  assert.equal(descriptor.label, "Ran command");
+  assert.equal(descriptor.preview, "ls -la /tmp");
+});
+
+test("unknown harness tool running a buzz command in its title escapes the generic row", () => {
+  // No shell signal at all (unrecognized tool name, no execute kind): the
+  // last-chance buzz CLI parse should still recognize the command line.
+  const descriptor = classifyTool({
+    title: "buzz messages send --channel agents --content 'listo'",
+    toolName: "some_future_harness_tool",
+    buzzToolName: null,
+    args: {},
+    result: "",
+    isError: false,
+  });
+
+  assert.equal(descriptor.renderClass, "message");
+  assert.equal(descriptor.label, "Send Message");
+});
+
+test("one-word titles never get mistaken for command lines", () => {
+  const descriptor = classifyTool({
+    title: "bash",
+    toolName: "execute",
+    buzzToolName: null,
+    args: {},
+    result: "",
+    isError: false,
+  });
+
+  assert.equal(descriptor.renderClass, "shell");
+  assert.equal(descriptor.preview, null);
+});
