@@ -150,6 +150,77 @@ export function removeMcpDef(
   return next;
 }
 
+export type McpDraft = {
+  name: string;
+  kind: "remote" | "command";
+  url: string;
+  auth: string;
+  command: string;
+};
+
+/**
+ * Validate an add-connection draft against the current catalog. Returns the
+ * definition to store, or a user-facing error. Pure so the dialog's only job
+ * is wiring inputs.
+ */
+export function validateMcpDraft(
+  draft: McpDraft,
+  existingNames: readonly string[],
+): { def: McpConnectionDef; error?: undefined } | { error: string } {
+  const name = draft.name.trim().toLowerCase();
+  if (!isValidMcpName(name)) {
+    return {
+      error: "Name must be a short lowercase slug (letters, digits, dashes).",
+    };
+  }
+  if (existingNames.includes(name)) {
+    return { error: `"${name}" already exists.` };
+  }
+  const def: McpConnectionDef =
+    draft.kind === "remote"
+      ? { name, url: draft.url, auth: draft.auth }
+      : { name, command: draft.command };
+  try {
+    mcpDefEnvEntry(def);
+  } catch {
+    return {
+      error:
+        draft.kind === "remote"
+          ? "A remote connection needs its MCP URL."
+          : "A command connection needs its executable path.",
+    };
+  }
+  return { def };
+}
+
+export type AgentMcpSelection = {
+  /** Names offered by the catalog (built-ins + global definitions). */
+  catalog: string[];
+  /** True when the agent pins its own list instead of inheriting. */
+  customized: boolean;
+  /** The list that will apply to this agent on its next start. */
+  effective: string[];
+  /** The global default list (what "inherit" resolves to). */
+  globalDefaults: string[];
+};
+
+/** Resolve what the per-agent MCP section should show. */
+export function resolveAgentMcpSelection(
+  agentEnvVars: Readonly<Record<string, string>>,
+  globalEnvVars: Readonly<Record<string, string>>,
+): AgentMcpSelection {
+  const globalDefaults = parseMcpList(globalEnvVars[MCP_LIST_ENV_KEY]);
+  const customized = agentEnvVars[MCP_LIST_ENV_KEY] !== undefined;
+  return {
+    catalog: mcpCatalogNames(globalEnvVars),
+    customized,
+    effective: customized
+      ? parseMcpList(agentEnvVars[MCP_LIST_ENV_KEY])
+      : globalDefaults,
+    globalDefaults,
+  };
+}
+
 /** Toggle a connection inside a scope's `NEOMOKA_MCP` list. */
 export function toggleMcpName(
   envVars: Readonly<Record<string, string>>,

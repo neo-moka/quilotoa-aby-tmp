@@ -9,9 +9,11 @@ import {
   parseMcpDefs,
   parseMcpList,
   removeMcpDef,
+  resolveAgentMcpSelection,
   serializeMcpList,
   toggleMcpName,
   upsertMcpDef,
+  validateMcpDraft,
 } from "./mcpConnections.ts";
 
 test("names: lowercase slugs only, env-suffix safe", () => {
@@ -77,6 +79,47 @@ test("remove drops the def and its default-list mention", () => {
   env = removeMcpDef(env, "foo");
   assert.equal(env.NEOMOKA_MCP_DEF_FOO, undefined);
   assert.equal(env.NEOMOKA_MCP, "dropi");
+});
+
+test("draft validation: normalizes, rejects dupes and incomplete forms", () => {
+  const base = { name: "", kind: "remote", url: "", auth: "", command: "" };
+  const ok = validateMcpDraft(
+    { ...base, name: " Foo ", url: "https://f/mcp" },
+    ["dropi"],
+  );
+  assert.equal(ok.error, undefined);
+  assert.equal(ok.def.name, "foo");
+  assert.ok(validateMcpDraft({ ...base, name: "x!" }, []).error);
+  assert.ok(validateMcpDraft({ ...base, name: "dropi" }, ["dropi"]).error);
+  assert.ok(validateMcpDraft({ ...base, name: "foo" }, []).error);
+  assert.ok(
+    validateMcpDraft({ ...base, name: "foo", kind: "command" }, []).error,
+  );
+  const cmd = validateMcpDraft(
+    { ...base, name: "bar", kind: "command", command: "/bin/bar-mcp" },
+    [],
+  );
+  assert.equal(cmd.def.command, "/bin/bar-mcp");
+});
+
+test("agent selection: inherits until the agent pins its own list", () => {
+  const globalEnv = upsertMcpDef(
+    { NEOMOKA_MCP: "dropi" },
+    { name: "foo", url: "https://f/mcp" },
+  );
+  const inheriting = resolveAgentMcpSelection({}, globalEnv);
+  assert.deepEqual(inheriting, {
+    catalog: ["dropi", "foo"],
+    customized: false,
+    effective: ["dropi"],
+    globalDefaults: ["dropi"],
+  });
+  const pinned = resolveAgentMcpSelection({ NEOMOKA_MCP: "foo" }, globalEnv);
+  assert.equal(pinned.customized, true);
+  assert.deepEqual(pinned.effective, ["foo"]);
+  const optedOut = resolveAgentMcpSelection({ NEOMOKA_MCP: "" }, globalEnv);
+  assert.equal(optedOut.customized, true);
+  assert.deepEqual(optedOut.effective, []);
 });
 
 test("toggle is idempotent and preserves other entries", () => {

@@ -3,14 +3,13 @@ import * as React from "react";
 
 import {
   BUILTIN_MCP_NAMES,
-  isValidMcpName,
   MCP_LIST_ENV_KEY,
-  mcpDefEnvEntry,
   parseMcpDefs,
   parseMcpList,
   removeMcpDef,
   toggleMcpName,
   upsertMcpDef,
+  validateMcpDraft,
   type McpConnectionDef,
 } from "@/features/agents/lib/mcpConnections";
 import { Button } from "@/shared/ui/button";
@@ -66,32 +65,21 @@ export function McpConnectionsSection({
   };
 
   const handleAdd = () => {
-    const name = draftName.trim().toLowerCase();
-    if (!isValidMcpName(name)) {
-      setDraftError(
-        "Name must be a short lowercase slug (letters, digits, dashes).",
-      );
+    const result = validateMcpDraft(
+      {
+        name: draftName,
+        kind: draftKind,
+        url: draftUrl,
+        auth: draftAuth,
+        command: draftCommand,
+      },
+      rows.map((row) => row.name),
+    );
+    if (result.error !== undefined) {
+      setDraftError(result.error);
       return;
     }
-    if (rows.some((row) => row.name === name)) {
-      setDraftError(`"${name}" already exists.`);
-      return;
-    }
-    const def: McpConnectionDef =
-      draftKind === "remote"
-        ? { name, url: draftUrl, auth: draftAuth }
-        : { name, command: draftCommand };
-    try {
-      mcpDefEnvEntry(def);
-    } catch {
-      setDraftError(
-        draftKind === "remote"
-          ? "A remote connection needs its MCP URL."
-          : "A command connection needs its executable path.",
-      );
-      return;
-    }
-    onEnvVarsChange(upsertMcpDef(envVars, def));
+    onEnvVarsChange(upsertMcpDef(envVars, result.def));
     resetDraft();
   };
 

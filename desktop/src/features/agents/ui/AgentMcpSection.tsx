@@ -3,8 +3,7 @@ import * as React from "react";
 
 import {
   MCP_LIST_ENV_KEY,
-  mcpCatalogNames,
-  parseMcpList,
+  resolveAgentMcpSelection,
   serializeMcpList,
   toggleMcpName,
 } from "@/features/agents/lib/mcpConnections";
@@ -33,21 +32,12 @@ export function AgentMcpSection({
   const runLocation = useAgentRunLocation();
   const { globalConfig } = useGlobalAgentConfig();
 
-  const catalog = React.useMemo(
-    () => mcpCatalogNames(globalConfig.env_vars ?? {}),
-    [globalConfig.env_vars],
-  );
-  const globalDefaults = React.useMemo(
-    () => parseMcpList((globalConfig.env_vars ?? {})[MCP_LIST_ENV_KEY]),
-    [globalConfig.env_vars],
+  const { catalog, customized, effective, globalDefaults } = React.useMemo(
+    () => resolveAgentMcpSelection(envVars, globalConfig.env_vars ?? {}),
+    [envVars, globalConfig.env_vars],
   );
 
   if (runLocation !== "remote" || catalog.length === 0) return null;
-
-  const customized = envVars[MCP_LIST_ENV_KEY] !== undefined;
-  const effective = customized
-    ? parseMcpList(envVars[MCP_LIST_ENV_KEY])
-    : globalDefaults;
 
   return (
     <div className="space-y-2" data-testid="agent-mcp-section">
