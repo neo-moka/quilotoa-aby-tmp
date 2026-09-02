@@ -3,17 +3,8 @@ import * as React from "react";
 import { useIsArchivedPredicate } from "@/features/identity-archive/hooks";
 import { usePresenceQuery } from "@/features/presence/hooks";
 import { PresenceDot } from "@/features/presence/ui/PresenceBadge";
-import {
-  useFlattenedUserSearchResults,
-  useInfiniteUserSearchQuery,
-  useUserSearchFetchMoreOnScroll,
-} from "@/features/profile/hooks";
-import type { UserProfileLookup } from "@/features/profile/lib/identity";
 import { ProfileAvatar } from "@/features/profile/ui/ProfileAvatar";
-import { useIdentityQuery } from "@/shared/api/hooks";
 import type { PresenceStatus } from "@/shared/api/types";
-import { useProfilePanel } from "@/shared/context/ProfilePanelContext";
-import { truncatePubkey } from "@/shared/lib/pubkey";
 import { Spinner } from "@/shared/ui/spinner";
 
 import type { AgentActivityCandidate } from "./AgentActivitySelector";
@@ -22,43 +13,26 @@ type ParticipantRow = {
   pubkey: string;
   name: string;
   avatarUrl: string | null;
-  isViewer: boolean;
 };
 
 /**
- * The activity panel's front door: everyone in the community, agents first.
+ * The activity panel's front door: the community's agents, working first.
  *
- * This replaced the recent-traffic list. Traffic answered "who talked to
- * whom", which the graph now owns outright; the roster answers the question
- * the dock is actually opened for — who is here, who is working right now,
- * and how do I get to their transcript. Agents row-click into their
- * transcript; humans open their profile.
+ * Agents only, on purpose: this dock exists to answer "which agents are here,
+ * which are working, and how do I get to their transcript". Humans have their
+ * own surfaces (channel members, profiles, DMs) — listing the whole community
+ * directory here just buried the agents under people the panel can't act on.
  */
 export function AgentParticipantsList({
   agents,
   onSelectAgent,
-  profiles,
   workingPubkeys,
 }: {
   agents: readonly AgentActivityCandidate[];
   onSelectAgent: (pubkey: string) => void;
-  profiles?: UserProfileLookup;
   workingPubkeys: ReadonlySet<string>;
 }): React.ReactElement {
-  const identityQuery = useIdentityQuery();
-  const viewerPubkey = identityQuery.data?.pubkey ?? null;
   const isArchived = useIsArchivedPredicate();
-  const { openProfilePanel } = useProfilePanel();
-
-  // Empty query = the full community directory, paged. The panel is
-  // channel-agnostic, so the roster is too — channel membership would silently
-  // hide whoever hasn't joined the channel you happen to be reading.
-  const directoryQuery = useInfiniteUserSearchQuery("", {
-    allowEmpty: true,
-    limit: 50,
-  });
-  const directoryResults = useFlattenedUserSearchResults(directoryQuery.data);
-  const handleScroll = useUserSearchFetchMoreOnScroll(directoryQuery);
 
   const agentRows = React.useMemo<ParticipantRow[]>(() => {
     const rows = agents
@@ -67,7 +41,6 @@ export function AgentParticipantsList({
         pubkey: agent.pubkey,
         name: agent.name,
         avatarUrl: agent.avatarUrl ?? null,
-        isViewer: false,
       }));
     rows.sort((a, b) => {
       const aWorking = workingPubkeys.has(a.pubkey) ? 0 : 1;
@@ -78,72 +51,20 @@ export function AgentParticipantsList({
     return rows;
   }, [agents, isArchived, workingPubkeys]);
 
-  const humanRows = React.useMemo<ParticipantRow[]>(() => {
-    const agentPubkeys = new Set(agents.map((agent) => agent.pubkey));
-    const rows: ParticipantRow[] = [];
-    const seen = new Set<string>();
-    for (const user of directoryResults) {
-      if (user.isAgent || agentPubkeys.has(user.pubkey)) continue;
-      if (isArchived(user.pubkey) || seen.has(user.pubkey)) continue;
-      seen.add(user.pubkey);
-      rows.push({
-        pubkey: user.pubkey,
-        name: user.displayName ?? truncatePubkey(user.pubkey),
-        avatarUrl: user.avatarUrl,
-        isViewer: user.pubkey === viewerPubkey,
-      });
-    }
-    // The directory can lag a fresh identity; the viewer belongs on their own
-    // roster regardless, so seed them from local identity when missing.
-    if (viewerPubkey && !seen.has(viewerPubkey)) {
-      const profile = profiles?.[viewerPubkey];
-      rows.push({
-        pubkey: viewerPubkey,
-        name:
-          profile?.displayName ??
-          identityQuery.data?.displayName ??
-          truncatePubkey(viewerPubkey),
-        avatarUrl: profile?.avatarUrl ?? null,
-        isViewer: true,
-      });
-    }
-    rows.sort((a, b) => {
-      if (a.isViewer !== b.isViewer) return a.isViewer ? -1 : 1;
-      return a.name.localeCompare(b.name);
-    });
-    return rows;
-  }, [
-    agents,
-    directoryResults,
-    identityQuery.data?.displayName,
-    isArchived,
-    profiles,
-    viewerPubkey,
-  ]);
-
   const presenceQuery = usePresenceQuery(
-    React.useMemo(
-      () => [...agentRows, ...humanRows].map((row) => row.pubkey),
-      [agentRows, humanRows],
-    ),
+    React.useMemo(() => agentRows.map((row) => row.pubkey), [agentRows]),
   );
   const presence = presenceQuery.data;
 
-  const renderRow = (row: ParticipantRow, isAgent: boolean) => {
+  const renderRow = (row: ParticipantRow) => {
     const status: PresenceStatus = presence?.[row.pubkey] ?? "offline";
-    const working = isAgent && workingPubkeys.has(row.pubkey);
-    const onClick = isAgent
-      ? () => onSelectAgent(row.pubkey)
-      : openProfilePanel
-        ? () => openProfilePanel(row.pubkey)
-        : undefined;
+    const working = workingPubkeys.has(row.pubkey);
     return (
       <li key={row.pubkey}>
         <button
-          className="flex w-full items-center gap-2.5 rounded-md px-3 py-1.5 text-left hover:bg-muted/60 disabled:cursor-default disabled:hover:bg-transparent"
+          className="flex w-full items-center gap-2.5 rounded-md px-3 py-1.5 text-left hover:bg-muted/60"
           data-testid={`participant-row-${row.pubkey}`}
-          disabled={onClick === undefined}
-          onClick={onClick}
+          onClick={() => onSelectAgent(row.pubkey)}
           type="button"
         >
           <span className="relative shrink-0">
@@ -157,12 +78,7 @@ export function AgentParticipantsList({
               status={status}
             />
           </span>
-          <span className="min-w-0 flex-1 truncate text-sm">
-            {row.name}
-            {row.isViewer ? (
-              <span className="text-muted-foreground"> (you)</span>
-            ) : null}
-          </span>
+          <span className="min-w-0 flex-1 truncate text-sm">{row.name}</span>
           {working ? (
             <Spinner
               aria-label={`${row.name} is working`}
@@ -179,7 +95,6 @@ export function AgentParticipantsList({
     <div
       className="min-h-0 flex-1 overflow-y-auto px-1 py-2"
       data-testid="agent-participants-list"
-      onScroll={handleScroll}
     >
       <h2 className="px-3 pb-1 text-2xs font-semibold uppercase tracking-wide text-muted-foreground">
         Agents
@@ -190,17 +105,7 @@ export function AgentParticipantsList({
         </p>
       ) : (
         <ul className="flex flex-col gap-0.5 pb-2">
-          {agentRows.map((row) => renderRow(row, true))}
-        </ul>
-      )}
-      <h2 className="px-3 pb-1 pt-2 text-2xs font-semibold uppercase tracking-wide text-muted-foreground">
-        People
-      </h2>
-      {humanRows.length === 0 ? (
-        <p className="px-3 text-sm text-muted-foreground">Nobody here yet.</p>
-      ) : (
-        <ul className="flex flex-col gap-0.5">
-          {humanRows.map((row) => renderRow(row, false))}
+          {agentRows.map((row) => renderRow(row))}
         </ul>
       )}
     </div>

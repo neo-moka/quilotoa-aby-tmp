@@ -293,7 +293,6 @@ export function AgentActivityPanel({
                 selectAgentActivityAgent(pubkey);
                 showAgentRunDetail();
               }}
-              profiles={profiles}
               workingPubkeys={workingPubkeys}
             />
           )}
