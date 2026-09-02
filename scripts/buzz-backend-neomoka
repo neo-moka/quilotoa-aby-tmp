@@ -34,15 +34,23 @@ import shlex
 import subprocess
 import sys
 
-VERSION = "0.2.0"
+VERSION = "0.3.0"
 
-# MCPs gestionables por agente vía la env var NEOMOKA_MCP (lista separada por
-# comas, p. ej. "dropi"; se define en Environment variables del diálogo del
-# Desktop y aplica en el siguiente Start/redeploy). Cada entrada declara el
-# grupo Unix que da acceso a sus credenciales compartidas en el server.
+# Catálogo de MCPs gestionables por agente vía la env var NEOMOKA_MCP (lista
+# separada por comas, p. ej. "dropi"; se define en Environment variables —
+# global en "Set agent defaults" o por agente — y aplica en el siguiente
+# Start/redeploy). Cada entrada declara el grupo Unix que da acceso a sus
+# credenciales compartidas en el server y el comando stdio de su wrapper.
 # Si la var está PRESENTE, el set se aplica exactamente (lo no listado se
 # desactiva); si está AUSENTE, el server no se toca (compatibilidad).
-KNOWN_MCPS = {"dropi": {"group": "mcpdropi"}}
+#
+# Alta de un MCP nuevo: aprovisionar en el server (wrapper en
+# /opt/buzz-agents/bin/<n>-mcp, token 0640 root:mcp<n> en
+# /opt/buzz-agents/mcp/, groupadd mcp<n>) y añadir su entrada aquí — el
+# deploy inserta el bloque en el config.yaml de agentes que no lo tengan.
+KNOWN_MCPS = {
+    "dropi": {"group": "mcpdropi", "command": "/opt/buzz-agents/bin/dropi-mcp"},
+}
 DEFAULT_HOST = "root@134.122.118.128"
 DEFAULT_IDENTITY = "~/workspace_skerna/.ssh/id_ed25519_moka_dev_ci"
 SSH_CONNECT_TIMEOUT = 15
@@ -224,6 +232,10 @@ def mcp_management_block(slug: str, env: dict) -> str:
         else:
             lines.append(f"gpasswd -d {q_slug} {group} >/dev/null 2>&1 || true")
         enabled = "true" if name in wanted else "false"
+        command = spec["command"]
+        # Toggle si el bloque existe; si falta y el MCP está pedido, inserta el
+        # bloque (bajo mcp_servers:, creando la sección si tampoco existe) —
+        # así un MCP dado de alta después de crear al agente también le llega.
         lines.append(
             f"""python3 - <<'PYMCP'
 import re
@@ -233,7 +245,13 @@ try:
 except FileNotFoundError:
     raise SystemExit(0)
 pattern = re.compile(r"(  {name}:\\n    command: [^\\n]*\\n    enabled: )(true|false)")
-updated = pattern.sub(lambda m: m.group(1) + "{enabled}", text, count=1)
+updated, hits = pattern.subn(lambda m: m.group(1) + "{enabled}", text, count=1)
+if hits == 0 and "{enabled}" == "true":
+    block = "  {name}:\\n    command: {command}\\n    enabled: true\\n"
+    if re.search(r"^mcp_servers:", updated, re.M):
+        updated = re.sub(r"^mcp_servers:\\n", "mcp_servers:\\n" + block, updated, count=1, flags=re.M)
+    else:
+        updated = updated.rstrip("\\n") + "\\n\\nmcp_servers:\\n" + block
 if updated != text:
     open(path, "w").write(updated)
 PYMCP"""
