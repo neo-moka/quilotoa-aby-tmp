@@ -142,7 +142,11 @@ def compose_agent_env(agent: dict) -> dict:
             auth_tag if isinstance(auth_tag, str) else json.dumps(auth_tag)
         )
     env["BUZZ_ACP_AGENT_COMMAND"] = command
-    env["BUZZ_ACP_AGENT_ARGS"] = ",".join(str(a) for a in args) or "acp"
+    # Verbatim como el spawn local (runtime.rs: agent_args.join(",")): una
+    # lista vacía produce "", y normalize_agent_args del harness filtra los
+    # args vacíos. Forzar "acp" aquí rompería wrappers como hermes-acp, que
+    # ya llevan el subcomando adentro ("acp acp").
+    env["BUZZ_ACP_AGENT_ARGS"] = ",".join(str(a) for a in args)
     if agent.get("respond_to"):
         env["BUZZ_ACP_RESPOND_TO"] = agent["respond_to"]
     if agent.get("respond_to_allowlist"):
