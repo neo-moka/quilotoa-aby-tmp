@@ -1,0 +1,347 @@
+#!/usr/bin/env python3
+"""Backend provider: despliega agentes del Desktop al develop server de Neomoka.
+
+Implementa el protocolo v1 de buzz-backend-* (ver
+desktop/src-tauri/src/managed_agents/backend.rs): un JSON por stdin, un JSON
+por stdout, un op por invocación.
+
+  {"op": "info", ...}    → capacidades + config_schema (pinta el formulario
+                           de "Where to run" en el diálogo de agente).
+  {"op": "deploy", "agent": {...}, "provider_config": {...}}
+                         → aprovisiona el agente como unidad systemd
+                           `buzz-agent-<slug>` en el servidor por SSH y
+                           devuelve {"agent_id": "<slug>"}.
+
+Instalación (el Desktop escanea PATH y ~/.local/bin):
+
+    ln -sf "$(git rev-parse --show-toplevel)/scripts/buzz-backend-neomoka" \
+        ~/.local/bin/buzz-backend-neomoka
+
+El deploy es idempotente: re-desplegar reescribe agent.env + unit y reinicia.
+El Desktop ya es dueño de la identidad (nsec, auth tag, kind:0, 30177, alta en
+canales); este script cubre solo la mitad runtime: usuario Unix, agent.env,
+unit systemd, wrapper de credenciales para hermes, y arranque.
+
+Errores: se reportan como {"ok": false, "error": "..."} con exit 0 — el
+Desktop redacta secretos del mensaje antes de mostrarlo.
+"""
+
+import base64
+import json
+import os
+import re
+import shlex
+import subprocess
+import sys
+
+VERSION = "0.1.0"
+DEFAULT_HOST = "root@134.122.118.128"
+DEFAULT_IDENTITY = "~/workspace_skerna/.ssh/id_ed25519_moka_dev_ci"
+SSH_CONNECT_TIMEOUT = 15
+DEPLOY_TIMEOUT = 540  # el Desktop corta en 600s; dejamos margen para reportar
+
+INFO_RESPONSE = {
+    "ok": True,
+    "name": "Neomoka develop server",
+    "version": VERSION,
+    "protocol_version": 1,
+    "description": (
+        "Aprovisiona el agente como unidad systemd en el develop server de "
+        "Neomoka por SSH (usuario Unix + agent.env + buzz-acp)."
+    ),
+    "config_schema": {
+        "type": "object",
+        "required": ["host"],
+        "properties": {
+            "host": {
+                "type": "string",
+                "title": "Servidor",
+                "description": "Destino SSH (usuario@host)",
+                "default": DEFAULT_HOST,
+            },
+            "identity_file": {
+                "type": "string",
+                "title": "Identidad SSH",
+                "description": "Ruta local de la identidad SSH con acceso root",
+                "default": DEFAULT_IDENTITY,
+            },
+            "dry_run": {
+                "type": "boolean",
+                "title": "Dry run",
+                "description": "true = imprime el plan en stderr sin tocar el servidor",
+            },
+        },
+    },
+}
+
+
+def fail(message: str) -> None:
+    print(json.dumps({"ok": False, "error": message}))
+    sys.exit(0)
+
+
+def slugify(name: str) -> str:
+    slug = re.sub(r"[^a-z0-9]+", "-", name.lower()).strip("-")
+    if not slug or not re.match(r"^[a-z0-9]", slug):
+        raise ValueError(f"nombre de agente no derivable a slug: {name!r}")
+    return slug[:32]
+
+
+def env_file_lines(env: dict) -> str:
+    """Serializa a formato EnvironmentFile de systemd (sin expansión de shell).
+
+    systemd no interpreta comillas dobles como shell, pero sí permite valores
+    entre comillas con escapes; los saltos de línea reales no son representables
+    de forma portable, así que se rechazan (un system prompt multilínea debe
+    viajar por BUZZ_ACP_SYSTEM_PROMPT_FILE, no inline).
+    """
+    lines = []
+    for key, value in sorted(env.items()):
+        if not re.match(r"^[A-Za-z_][A-Za-z0-9_]*$", key):
+            raise ValueError(f"nombre de variable inválido: {key!r}")
+        value = "" if value is None else str(value)
+        if "\n" in value or "\r" in value:
+            raise ValueError(
+                f"{key} contiene saltos de línea; usar la variante *_FILE"
+            )
+        escaped = value.replace("\\", "\\\\").replace('"', '\\"')
+        lines.append(f'{key}="{escaped}"')
+    return "\n".join(lines) + "\n"
+
+
+def compose_agent_env(agent: dict) -> dict:
+    """agent.env = policy_env (base) ← launch.env (autoritativo) ← credenciales.
+
+    El orden replica el spawn local: policy primero, el entorno de seis capas
+    del descriptor encima, y al final las claves que son del provider (creds,
+    comando del agente, respond_to, timeouts) que nada debe pisar.
+    """
+    launch = agent.get("launch") or {}
+    env: dict = {}
+    env.update(launch.get("policy_env") or {})
+    env.update(launch.get("env") or {})
+
+    command = launch.get("command") or agent.get("agent_command")
+    if not command:
+        raise ValueError("payload sin launch.command ni agent_command")
+    args = launch.get("args")
+    if args is None:
+        args = agent.get("agent_args") or []
+    for required, key in [
+        (agent.get("relay_url"), "BUZZ_RELAY_URL"),
+        (agent.get("private_key_nsec"), "BUZZ_PRIVATE_KEY"),
+    ]:
+        if not required:
+            raise ValueError(f"payload sin {key.lower()}")
+        env[key] = required
+    auth_tag = agent.get("auth_tag")
+    if auth_tag:
+        # El record lo guarda como string JSON; si llegara estructurado, se
+        # re-serializa para que el env quede con JSON válido y no repr().
+        env["BUZZ_AUTH_TAG"] = (
+            auth_tag if isinstance(auth_tag, str) else json.dumps(auth_tag)
+        )
+    env["BUZZ_ACP_AGENT_COMMAND"] = command
+    env["BUZZ_ACP_AGENT_ARGS"] = ",".join(str(a) for a in args) or "acp"
+    if agent.get("respond_to"):
+        env["BUZZ_ACP_RESPOND_TO"] = agent["respond_to"]
+    if agent.get("respond_to_allowlist"):
+        env["BUZZ_ACP_RESPOND_TO_ALLOWLIST"] = ",".join(
+            agent["respond_to_allowlist"]
+        )
+    for field, key in [
+        ("idle_timeout_seconds", "BUZZ_ACP_IDLE_TIMEOUT"),
+        ("max_turn_duration_seconds", "BUZZ_ACP_MAX_TURN_DURATION"),
+        ("turn_timeout_seconds", "BUZZ_ACP_TURN_TIMEOUT"),
+    ]:
+        if agent.get(field) is not None:
+            env[key] = str(agent[field])
+    return env
+
+
+def divert_multiline(env: dict, slug: str) -> tuple:
+    """Mueve los valores multilínea con variante *_FILE a archivos sidecar.
+
+    Los system prompts reales son multilínea y EnvironmentFile de systemd no
+    representa saltos de línea; buzz-acp ofrece BUZZ_ACP_SYSTEM_PROMPT_FILE y
+    BUZZ_ACP_HEARTBEAT_PROMPT_FILE justo para esto. Cualquier otra variable
+    multilínea sigue siendo un error explícito en env_file_lines.
+    """
+    diversions = [
+        ("BUZZ_ACP_SYSTEM_PROMPT", "BUZZ_ACP_SYSTEM_PROMPT_FILE", "system-prompt.md"),
+        (
+            "BUZZ_ACP_HEARTBEAT_PROMPT",
+            "BUZZ_ACP_HEARTBEAT_PROMPT_FILE",
+            "heartbeat-prompt.md",
+        ),
+    ]
+    files = {}
+    for inline_key, file_key, filename in diversions:
+        value = env.get(inline_key)
+        if isinstance(value, str) and ("\n" in value or "\r" in value):
+            files[filename] = value
+            env = dict(env)
+            del env[inline_key]
+            env[file_key] = f"/home/dropshipping/{slug}/{filename}"
+    return env, files
+
+
+def remote_script(slug: str, display_name: str, env: dict) -> str:
+    """Script bash que corre en el servidor. Los secretos viajan por stdin del
+    ssh (nunca argv) y aterrizan solo en archivos 0600/0400."""
+    env, sidecar_files = divert_multiline(env, slug)
+    env_b64 = base64.b64encode(env_file_lines(env).encode()).decode()
+    sidecar_block = ""
+    for filename, content in sorted(sidecar_files.items()):
+        content_b64 = base64.b64encode(content.encode()).decode()
+        sidecar_block += (
+            f"printf '%s' {shlex.quote(content_b64)} | base64 -d "
+            f"> /home/dropshipping/{shlex.quote(slug)}/{filename}\n"
+            f"chmod 0600 /home/dropshipping/{shlex.quote(slug)}/{filename}\n"
+        )
+    agent_command = env["BUZZ_ACP_AGENT_COMMAND"]
+    is_hermes = "hermes" in os.path.basename(agent_command)
+    q_slug = shlex.quote(slug)
+    # Va dentro de un heredoc sin comillas: solo texto plano inofensivo.
+    safe_name = re.sub(r"[^A-Za-z0-9 ._-]", "", display_name).strip() or slug
+    description = f"Buzz agent: {safe_name}"
+
+    hermes_block = ""
+    if is_hermes:
+        # hermes despoja BUZZ_PRIVATE_KEY/RELAY_URL/AUTH_TAG del env de su
+        # terminal (blocklist no configurable), así que el `buzz` que invoque
+        # necesita un wrapper que las re-inyecte desde un archivo 0400.
+        hermes_block = f"""
+# --- runtime hermes: config de plantilla + wrapper de credenciales ---
+if [ -d /root/.hermes ] && [ ! -d /home/{q_slug}/.hermes ]; then
+  cp -a /root/.hermes /home/{q_slug}/.hermes
+  chown -R {q_slug}:{q_slug} /home/{q_slug}/.hermes
+fi
+install -d -o {q_slug} -g {q_slug} -m 0700 /home/{q_slug}/.config/buzz /home/{q_slug}/bin
+grep -E '^(BUZZ_PRIVATE_KEY|BUZZ_RELAY_URL|BUZZ_AUTH_TAG)=' \\
+  /home/dropshipping/{q_slug}/agent.env > /home/{q_slug}/.config/buzz/credentials.env
+chown {q_slug}:{q_slug} /home/{q_slug}/.config/buzz/credentials.env
+chmod 0400 /home/{q_slug}/.config/buzz/credentials.env
+cat > /home/{q_slug}/bin/buzz <<'WRAP'
+#!/bin/bash
+set -a
+. "$HOME/.config/buzz/credentials.env"
+set +a
+exec /opt/buzz-agents/bin/buzz "$@"
+WRAP
+chown {q_slug}:{q_slug} /home/{q_slug}/bin/buzz
+chmod 0755 /home/{q_slug}/bin/buzz
+"""
+
+    return f"""set -euo pipefail
+
+# --- usuario Unix + workspace compartido ---
+getent group buzzagents >/dev/null || groupadd buzzagents
+id -u {q_slug} >/dev/null 2>&1 || useradd -m -G buzzagents -s /bin/bash {q_slug}
+install -d -o {q_slug} -g {q_slug} /home/{q_slug}/workspace
+[ -d /srv/buzz-shared ] && ln -sfn /srv/buzz-shared /home/{q_slug}/workspace/SHARED
+
+# --- agent.env (0600 root, layout estándar del server) ---
+install -d -m 0750 /home/dropshipping/{q_slug}
+umask 077
+printf '%s' {shlex.quote(env_b64)} | base64 -d > /home/dropshipping/{q_slug}/agent.env
+chmod 0600 /home/dropshipping/{q_slug}/agent.env
+{sidecar_block}
+{hermes_block}
+# --- unit systemd ---
+cat > /etc/systemd/system/buzz-agent-{q_slug}.service <<UNIT
+[Unit]
+Description={description}
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+User={q_slug}
+Group={q_slug}
+WorkingDirectory=/home/{q_slug}/workspace
+EnvironmentFile=/home/dropshipping/{q_slug}/agent.env
+ExecStart=/opt/buzz-agents/bin/buzz-acp
+Restart=on-failure
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target
+UNIT
+
+systemctl daemon-reload
+systemctl enable buzz-agent-{q_slug} >/dev/null 2>&1 || true
+systemctl restart buzz-agent-{q_slug}
+sleep 2
+state=$(systemctl is-active buzz-agent-{q_slug} || true)
+echo "buzz-agent-{q_slug}: $state" >&2
+[ "$state" = active ]
+"""
+
+
+def op_deploy(request: dict) -> dict:
+    agent = request.get("agent")
+    if not isinstance(agent, dict):
+        raise ValueError("request sin objeto agent")
+    config = request.get("provider_config") or {}
+
+    slug = slugify(str(agent.get("name") or ""))
+    env = compose_agent_env(agent)
+    script = remote_script(slug, str(agent.get("name")), env)
+
+    host = str(config.get("host") or DEFAULT_HOST)
+    identity = os.path.expanduser(str(config.get("identity_file") or DEFAULT_IDENTITY))
+    dry_run = config.get("dry_run") in (True, "true")
+
+    if dry_run:
+        print("--- dry run: script que se ejecutaría por SSH ---", file=sys.stderr)
+        print(script, file=sys.stderr)
+        return {"ok": True, "agent_id": slug, "dry_run": True}
+
+    ssh_cmd = [
+        "ssh",
+        "-i", identity,
+        "-o", "BatchMode=yes",
+        "-o", f"ConnectTimeout={SSH_CONNECT_TIMEOUT}",
+        "-o", "StrictHostKeyChecking=accept-new",
+        host,
+        "bash -s",
+    ]
+    proc = subprocess.run(
+        ssh_cmd,
+        input=script.encode(),
+        capture_output=True,
+        timeout=DEPLOY_TIMEOUT,
+    )
+    stderr_tail = proc.stderr.decode(errors="replace")[-2000:]
+    if stderr_tail:
+        print(stderr_tail, file=sys.stderr)
+    if proc.returncode != 0:
+        raise RuntimeError(
+            f"ssh/aprovisionamiento falló (exit {proc.returncode}): {stderr_tail.strip()[-500:]}"
+        )
+    return {"ok": True, "agent_id": slug}
+
+
+def main() -> None:
+    try:
+        request = json.loads(sys.stdin.read())
+    except (ValueError, OSError) as error:
+        fail(f"request inválido: {error}")
+        return
+
+    op = request.get("op")
+    try:
+        if op == "info":
+            print(json.dumps(INFO_RESPONSE))
+        elif op == "deploy":
+            print(json.dumps(op_deploy(request)))
+        else:
+            fail(f"op no soportado: {op!r}")
+    except subprocess.TimeoutExpired:
+        fail(f"el aprovisionamiento excedió {DEPLOY_TIMEOUT}s")
+    except (ValueError, RuntimeError, OSError) as error:
+        fail(str(error))
+
+
+if __name__ == "__main__":
+    main()
