@@ -53,6 +53,14 @@ export type AgentGraphEdge = {
   recent: AgentGraphMessageRef[];
 };
 
+/** One message visibly in flight along an edge (see AgentGraphView). */
+export type AgentGraphFlight = {
+  key: string;
+  from: string;
+  to: string;
+  snippet: string;
+};
+
 export type AgentGraphModel = {
   nodes: AgentGraphNode[];
   edges: AgentGraphEdge[];

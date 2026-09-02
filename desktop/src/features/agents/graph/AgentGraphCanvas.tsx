@@ -5,7 +5,11 @@ import { cn } from "@/shared/lib/cn";
 import { Spinner } from "@/shared/ui/spinner";
 
 import { curvedEdgeGeometry } from "./agentGraphEdgeGeometry";
-import type { AgentGraphEdge, AgentGraphNode } from "./agentGraphModel";
+import type {
+  AgentGraphEdge,
+  AgentGraphFlight,
+  AgentGraphNode,
+} from "./agentGraphModel";
 
 /**
  * Fixed-size circular stage: an SVG underlay draws the directed edges and an
@@ -64,6 +68,7 @@ export function AgentGraphCanvas({
   selectedPubkey,
   workingPubkeys,
   pulsingPubkeys,
+  flights,
   onSelectNode,
 }: {
   nodes: AgentGraphNode[];
@@ -72,6 +77,7 @@ export function AgentGraphCanvas({
   selectedPubkey: string | null;
   workingPubkeys: ReadonlySet<string>;
   pulsingPubkeys: ReadonlySet<string>;
+  flights: readonly AgentGraphFlight[];
   onSelectNode: (pubkey: string | null) => void;
 }) {
   const positions = React.useMemo(() => nodePositions(nodes), [nodes]);
@@ -191,6 +197,33 @@ export function AgentGraphCanvas({
           );
         })}
       </svg>
+
+      {/* Message balloons in flight: each rides its edge curve via CSS
+          offset-path, fading in at the sender and out at the receiver. */}
+      {flights.map((flight) => {
+        const from = positions.get(flight.from);
+        const to = positions.get(flight.to);
+        if (!from || !to) return null;
+        const geometry = curvedEdgeGeometry({
+          fromX: from.x,
+          fromY: from.y,
+          toX: to.x,
+          toY: to.y,
+          startTrim: NODE_RADIUS + 4,
+          endTrim: NODE_RADIUS + 4,
+          bow: CURVE_OFFSET,
+          arrowSize: 8,
+        });
+        return (
+          <span
+            className="buzz-graph-flight pointer-events-none absolute left-0 top-0 z-20 max-w-44 truncate rounded-full bg-popover/95 px-2.5 py-1 text-2xs text-foreground shadow-md ring-1 ring-border"
+            key={flight.key}
+            style={{ offsetPath: `path("${geometry.d}")` }}
+          >
+            {flight.snippet}
+          </span>
+        );
+      })}
 
       {nodes.map((node) => {
         const position = positions.get(node.pubkey);
