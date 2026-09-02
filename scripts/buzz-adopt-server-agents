@@ -1,0 +1,839 @@
+#!/usr/bin/env python3
+"""Adopta en este Mac los agentes que ya corren en el develop server.
+
+PROBLEMA QUE RESUELVE
+  Los agentes desplegados al develop server viven como unidades systemd
+  `buzz-agent-<slug>`, con sus credenciales en
+  /home/dropshipping/<slug>/agent.env (formato EnvironmentFile de systemd).
+  Ese archivo es la única copia de la identidad del agente que existe fuera
+  del Mac que lo creó: el record de gestión (`managed-agents.json`) y la clave
+  en el keychain se quedaron en esa instancia del Desktop.
+
+  Resultado: en un Mac nuevo el agente sigue vivo y contestando en el relay,
+  pero el Desktop no lo lista ni lo puede parar, reiniciar o redesplegar.
+
+  Este script reconstruye esos records: lee las claves del server por SSH,
+  deriva el pubkey de cada clave y upsertea el record en el store local.
+
+QUÉ NO HACE
+  - No toca el servidor: solo lee los agent.env (SSH de solo lectura).
+  - No crea ni republica eventos en el relay (kind:0, kind:30177, membresías).
+    El agente ya está publicado; adoptarlo es un acto puramente local.
+  - No importa el resto del entorno del agente (modelo, prompts, NEOMOKA_MCP,
+    credenciales de terceros). El plan imprime los NOMBRES de las variables no
+    mapeadas para que se sepa qué quedó fuera; un redeploy desde un record
+    recién adoptado mandaría un entorno más pobre que el que hoy tiene el
+    server. Editar el agente en el Desktop antes de redesplegar.
+
+USO
+    scripts/buzz-adopt-server-agents                 # dry-run: imprime el plan
+    scripts/buzz-adopt-server-agents --apply         # escribe el store
+    scripts/buzz-adopt-server-agents --agent jhoana --agent malcom
+    scripts/buzz-adopt-server-agents --instance ~/Library/.../xyz.block.buzz.app
+    scripts/buzz-adopt-server-agents --selftest      # tests sin red
+
+FLAGS
+  --instance DIR   Directorio de datos de la app. Por defecto se autodetecta el
+                   más reciente entre ~/Library/Application Support/
+                   xyz.block.buzz.app* que tenga agents/managed-agents.json.
+  --host USER@HOST Destino SSH (default root@134.122.118.128).
+  --identity PATH  Identidad SSH (default ~/workspace_skerna/.ssh/
+                   id_ed25519_moka_dev_ci).
+  --agent SLUG     Limita a estos agentes (repetible). Por defecto adopta todos
+                   los que el server tenga; los slugs se descubren por glob,
+                   nunca están hardcodeados.
+  --apply          Escribe. Sin él no se modifica nada.
+  --selftest       Corre los tests embebidos (sin red ni SSH) y sale.
+
+SEGURIDAD
+  Ninguna clave privada ni auth tag se imprime nunca: ni en el plan, ni en los
+  errores, ni con --apply. Los secretos solo viajan de agent.env al JSON local
+  (modo 0600). Los mensajes de error se refieren al agente por su slug.
+
+REQUISITOS
+  Solo python3 de la stdlib y `ssh` en el PATH. La derivación del pubkey se
+  hace con la implementación de secp256k1 incluida acá (ver DERIVACIÓN), así
+  que no hace falta compilar nada del repo.
+"""
+
+import argparse
+import glob
+import json
+import os
+import re
+import shutil
+import subprocess
+import sys
+import time
+from datetime import datetime, timezone
+
+DEFAULT_HOST = "root@134.122.118.128"
+DEFAULT_IDENTITY = "~/workspace_skerna/.ssh/id_ed25519_moka_dev_ci"
+DEFAULT_PROVIDER_ID = "neomoka"
+REMOTE_ROOT = "/home/dropshipping"
+SSH_CONNECT_TIMEOUT = 15
+SSH_TIMEOUT = 120
+
+SUPPORT_DIR = os.path.expanduser("~/Library/Application Support")
+INSTANCE_GLOB = "xyz.block.buzz.app*"
+STORE_RELPATH = os.path.join("agents", "managed-agents.json")
+
+# Delimitadores del volcado remoto: improbables en un agent.env real, y el de
+# fin se exige al parsear para que un SSH cortado falle en vez de adoptar un
+# agente con el archivo truncado.
+BLOCK_BEGIN = "===BUZZ-ADOPT-AGENT-ENV:"
+BLOCK_END = "===BUZZ-ADOPT-END==="
+
+# Claves del agent.env con material sensible. Se usan para construir el record
+# pero jamás para mostrar, loguear ni resumir.
+SECRET_ENV_KEYS = frozenset({"BUZZ_PRIVATE_KEY", "BUZZ_AUTH_TAG"})
+
+# Claves que este script mapea a campos de primera clase del record. El resto
+# se reporta por NOMBRE en el plan (nunca por valor) para que el operador sepa
+# qué configuración del server no viajó al record.
+MAPPED_ENV_KEYS = frozenset(
+    {
+        "BUZZ_PRIVATE_KEY",
+        "BUZZ_AUTH_TAG",
+        "BUZZ_RELAY_URL",
+        "BUZZ_ACP_AGENT_COMMAND",
+        "BUZZ_ACP_AGENT_ARGS",
+        "BUZZ_ACP_DISPLAY_NAME",
+        "BUZZ_ACP_RESPOND_TO",
+        "BUZZ_ACP_RESPOND_TO_ALLOWLIST",
+        "BUZZ_ACP_IDLE_TIMEOUT",
+        "BUZZ_ACP_MAX_TURN_DURATION",
+        "BUZZ_ACP_TURN_TIMEOUT",
+        "BUZZ_ACP_SYSTEM_PROMPT",
+        "BUZZ_ACP_MODEL",
+        "BUZZ_ACP_AGENTS",
+    }
+)
+
+
+class AdoptError(Exception):
+    """Error de operación. El mensaje NUNCA debe contener material secreto."""
+
+
+def info(message):
+    print(f"  {message}")
+
+
+def warn(message):
+    print(f"AVISO: {message}", file=sys.stderr)
+
+
+# --- parsing de agent.env -----------------------------------------------------
+# El escritor (scripts/buzz-backend-neomoka, env_file_lines) serializa cada
+# valor entre comillas dobles escapando primero `\` y después `"`. El auth tag
+# es JSON, así que llega SIEMPRE con comillas internas escapadas:
+#
+#   BUZZ_AUTH_TAG="[\"auth\", \"<owner>\", \"\", \"<sig>\"]"
+#
+# Un `sed 's/"//g'` (o cualquier desescape que borre las comillas en vez de
+# desescaparlas) deja `[\auth\, ...]`: JSON inválido. El agente se adopta igual
+# y queda sin atestación válida, sin ningún error a la vista.
+
+ENV_LINE_RE = re.compile(r'^([A-Za-z_][A-Za-z0-9_]*)="(.*)"$')
+
+
+def unescape_systemd(value):
+    r"""Invierte el escape de env_file_lines: `\\` → `\`, `\"` → `"`.
+
+    Se recorre carácter a carácter porque es el inverso exacto del escritor,
+    para cualquier valor y sin depender de en qué orden se apliquen reemplazos.
+    El test fija esa identidad como propiedad sobre todas las combinaciones de
+    barras y comillas hasta 4 caracteres.
+    """
+    out = []
+    escaped = False
+    for char in value:
+        if escaped:
+            # systemd solo genera `\\` y `\"`. Cualquier otra secuencia se deja
+            # literal (barra incluida) en vez de comérsela en silencio.
+            out.append(char if char in ('\\', '"') else "\\" + char)
+            escaped = False
+        elif char == "\\":
+            escaped = True
+        else:
+            out.append(char)
+    if escaped:
+        out.append("\\")  # barra final suelta: se preserva
+    return "".join(out)
+
+
+def parse_env_file(text):
+    """Parsea un agent.env (EnvironmentFile de systemd) a dict.
+
+    Ignora líneas vacías y comentarios. Una línea que no encaje es un error
+    explícito: preferimos fallar a adoptar un agente con las credenciales leídas
+    a medias.
+    """
+    env = {}
+    for lineno, raw in enumerate(text.splitlines(), start=1):
+        line = raw.strip()
+        if not line or line.startswith("#"):
+            continue
+        match = ENV_LINE_RE.match(line)
+        if not match:
+            # El mensaje solo lleva el número de línea: el contenido de una
+            # línea del agent.env puede ser una clave privada.
+            raise AdoptError(f'línea {lineno} del agent.env no tiene formato KEY="valor"')
+        env[match.group(1)] = unescape_systemd(match.group(2))
+    return env
+
+
+# --- DERIVACIÓN: secp256k1 y bech32 ------------------------------------------
+# El pubkey del agente solo se puede sacar de su clave privada: el auth tag
+# NIP-OA lleva el pubkey del OWNER, no el del agente (buzz-sdk/src/nip_oa.rs,
+# compute_auth_tag → ["auth", owner_pubkey, conditions, sig]). Como el pubkey
+# nostr es la coordenada X de d·G (x-only, BIP-340), derivarlo es aritmética
+# modular pura y cabe acá sin dependencias ni compilar nada del repo.
+
+_CURVE_P = 2**256 - 2**32 - 977
+_CURVE_N = 0xFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFEBAAEDCE6AF48A03BBFD25E8CD0364141
+_CURVE_G = (
+    0x79BE667EF9DCBBAC55A06295CE870B07029BFCDB2DCE28D959F2815B16F81798,
+    0x483ADA7726A3C4655DA4FBFC0E1108A8FD17B448A68554199C47D08FFB10D4B8,
+)
+
+
+def _point_add(p, q):
+    """Suma dos puntos afines de secp256k1. `None` es el punto al infinito."""
+    if p is None:
+        return q
+    if q is None:
+        return p
+    x1, y1 = p
+    x2, y2 = q
+    if x1 == x2:
+        if (y1 + y2) % _CURVE_P == 0:
+            return None  # P + (-P)
+        lam = (3 * x1 * x1) * pow(2 * y1, _CURVE_P - 2, _CURVE_P) % _CURVE_P
+    else:
+        lam = (y2 - y1) * pow(x2 - x1, _CURVE_P - 2, _CURVE_P) % _CURVE_P
+    x3 = (lam * lam - x1 - x2) % _CURVE_P
+    return (x3, (lam * (x1 - x3) - y1) % _CURVE_P)
+
+
+def _point_mul(scalar, point):
+    result = None
+    addend = point
+    while scalar:
+        if scalar & 1:
+            result = _point_add(result, addend)
+        addend = _point_add(addend, addend)
+        scalar >>= 1
+    return result
+
+
+_BECH32_CHARSET = "qpzry9x8gf2tvdw0s3jn54khce6mua7l"
+
+
+def _bech32_polymod(values):
+    generator = (0x3B6A57B2, 0x26508E6D, 0x1EA119FA, 0x3D4233DD, 0x2A1462B3)
+    chk = 1
+    for value in values:
+        top = chk >> 25
+        chk = ((chk & 0x1FFFFFF) << 5) ^ value
+        for i in range(5):
+            chk ^= generator[i] if ((top >> i) & 1) else 0
+    return chk
+
+
+def _convert_bits(values):
+    """Reagrupa grupos de 5 bits en bytes de 8 (sentido bech32 → binario)."""
+    acc = 0
+    bits = 0
+    out = bytearray()
+    for value in values:
+        acc = (acc << 5) | value
+        bits += 5
+        if bits >= 8:
+            bits -= 8
+            out.append((acc >> bits) & 0xFF)
+    if bits >= 5 or ((acc << (8 - bits)) & 0xFF):
+        raise AdoptError("bech32 con relleno inválido")
+    return bytes(out)
+
+
+def bech32_decode(text):
+    """Decodifica bech32 (BIP-173) y devuelve (hrp, bytes del payload).
+
+    Verifica el checksum: una nsec mal copiada falla acá y no más adelante como
+    un pubkey silenciosamente equivocado.
+    """
+    if text != text.lower() and text != text.upper():
+        raise AdoptError("bech32 con mayúsculas y minúsculas mezcladas")
+    text = text.lower()
+    pos = text.rfind("1")
+    if pos < 1 or pos + 7 > len(text):
+        raise AdoptError("bech32 mal formada")
+    hrp, data_part = text[:pos], text[pos + 1 :]
+    try:
+        data = [_BECH32_CHARSET.index(char) for char in data_part]
+    except ValueError:
+        raise AdoptError("bech32 con caracteres fuera del alfabeto") from None
+    expanded = [ord(c) >> 5 for c in hrp] + [0] + [ord(c) & 31 for c in hrp]
+    if _bech32_polymod(expanded + data) != 1:
+        raise AdoptError("bech32 con checksum inválido")
+    return hrp, _convert_bits(data[:-6])
+
+
+def secret_to_int(secret):
+    """Normaliza una clave privada (nsec bech32 o hex de 64) a entero.
+
+    El valor nunca aparece en los mensajes de error.
+    """
+    text = secret.strip()
+    if text.lower().startswith("nsec1"):
+        hrp, raw = bech32_decode(text)
+        if hrp != "nsec":
+            raise AdoptError("la clave bech32 no es una nsec")
+    elif re.fullmatch(r"[0-9a-fA-F]{64}", text):
+        raw = bytes.fromhex(text)
+    else:
+        raise AdoptError("clave privada en formato desconocido (ni nsec1… ni hex de 64)")
+    if len(raw) != 32:
+        raise AdoptError("clave privada con longitud inválida")
+    value = int.from_bytes(raw, "big")
+    if not 0 < value < _CURVE_N:
+        raise AdoptError("clave privada fuera del rango válido de secp256k1")
+    return value
+
+
+def derive_pubkey_hex(secret):
+    """Pubkey nostr (x-only, 64 hex en minúsculas) de una clave privada."""
+    point = _point_mul(secret_to_int(secret), _CURVE_G)
+    if point is None:
+        raise AdoptError("derivación de pubkey degenerada")
+    return format(point[0], "064x")
+
+
+# --- store local --------------------------------------------------------------
+
+
+def detect_instance(explicit=None, support_dir=SUPPORT_DIR):
+    """Elige el directorio de datos de la app.
+
+    Con --instance se respeta lo pedido (y se valida). Sin él se toma el
+    directorio xyz.block.buzz.app* cuyo managed-agents.json se modificó más
+    recientemente: en un Mac con varias instancias (release, dev, por worktree)
+    la más reciente es la que el usuario está usando.
+    """
+    if explicit:
+        path = os.path.abspath(os.path.expanduser(explicit))
+        if not os.path.isfile(os.path.join(path, STORE_RELPATH)):
+            raise AdoptError(f"la instancia no tiene {STORE_RELPATH}: {path}")
+        return path
+    candidates = []
+    for path in sorted(glob.glob(os.path.join(support_dir, INSTANCE_GLOB))):
+        store = os.path.join(path, STORE_RELPATH)
+        if os.path.isfile(store):
+            candidates.append((os.path.getmtime(store), path))
+    if not candidates:
+        raise AdoptError(
+            f"no se encontró ninguna instancia con {STORE_RELPATH} bajo {support_dir}"
+        )
+    candidates.sort()
+    return candidates[-1][1]
+
+
+def load_store(instance_dir):
+    path = os.path.join(instance_dir, STORE_RELPATH)
+    with open(path, encoding="utf-8") as handle:
+        records = json.load(handle)
+    if not isinstance(records, list):
+        raise AdoptError(f"{path} no es un array JSON de records")
+    return records
+
+
+def index_by_pubkey(records):
+    """Índice pubkey → record, ignorando los pubkeys vacíos.
+
+    Los records "sin clave" (definiciones aún no instanciadas) llevan
+    `pubkey: ""`. Si entraran al índice, el primero de ellos capturaría a
+    CUALQUIER agente cuya derivación devolviera vacío y lo haríamos pasar por
+    ya-adoptado. Se excluyen explícitamente.
+    """
+    return {r["pubkey"]: r for r in records if isinstance(r, dict) and r.get("pubkey")}
+
+
+def pick_template(records):
+    """Record existente que sirve de plantilla de esquema.
+
+    Se prefiere uno ya instanciado (con pubkey) para no heredar la forma de un
+    record sin clave. Solo aporta el CONJUNTO de campos y los valores
+    estructurales; todo lo identitario se neutraliza en build_record.
+    """
+    with_key = [r for r in records if isinstance(r, dict) and r.get("pubkey")]
+    return dict(with_key[0]) if with_key else None
+
+
+# Esquema mínimo por si el store está vacío y no hay plantilla. Cubre los campos
+# que ManagedAgentRecord exige sin `#[serde(default)]`
+# (desktop/src-tauri/src/managed_agents/types.rs): sin ellos la app no puede
+# deserializar el store y arrancaría con cero agentes.
+FALLBACK_TEMPLATE = {
+    "pubkey": "",
+    "name": "",
+    "persona_id": None,
+    "auth_tag": None,
+    "relay_url": "",
+    "avatar_url": None,
+    "acp_command": "buzz-acp",
+    "agent_command": "",
+    "agent_command_override": None,
+    "agent_args": [],
+    "mcp_command": "",
+    "turn_timeout_seconds": 320,
+    "idle_timeout_seconds": None,
+    "max_turn_duration_seconds": None,
+    "parallelism": 1,
+    "system_prompt": "",
+    "model": None,
+    "provider": None,
+    "persona_source_version": None,
+    "start_on_app_launch": False,
+    "auto_restart_on_config_change": True,
+    "runtime_pid": None,
+    "backend": {"type": "local"},
+    "backend_agent_id": None,
+    "provider_policy_pending": False,
+    "provider_binary_path": None,
+    "created_at": "",
+    "updated_at": "",
+    "last_started_at": None,
+    "last_stopped_at": None,
+    "last_exit_code": None,
+    "last_error": None,
+    "last_error_code": None,
+    "respond_to": "owner-only",
+    "respond_to_allowlist": [],
+    "is_builtin": False,
+    "is_active": True,
+}
+
+# Campos de la plantilla que describen a OTRO agente y no deben heredarse. Sin
+# esta limpieza el agente adoptado quedaría linkeado a la persona, el equipo, el
+# modelo y el avatar del agente que sirvió de molde.
+TEMPLATE_IDENTITY_FIELDS = (
+    "persona_id",
+    "team_id",
+    "persona_source_version",
+    "persona_team_dir",
+    "persona_name_in_team",
+    "avatar_url",
+    "display_name",
+    "slug",
+    "model",
+    "provider",
+    "runtime",
+    "name_pool",
+    "source_team",
+    "source_team_persona_slug",
+    "catalog_source",
+    "relay_mesh",
+    "effort_level",
+    "definition_respond_to",
+    "definition_respond_to_allowlist",
+    "definition_parallelism",
+    "env_vars",
+    "system_prompt",
+)
+
+VALID_RESPOND_TO = ("owner-only", "allowlist", "anyone")
+
+
+def _optional_int(env, key, slug):
+    raw = env.get(key)
+    if raw is None or raw == "":
+        return None
+    try:
+        return int(raw)
+    except ValueError:
+        warn(f"{slug}: {key} no es un entero, se ignora")
+        return None
+
+
+def _normalize_allowlist(raw):
+    """64 hex en minúsculas, deduplicado, en orden de aparición.
+
+    Mismas reglas que buzz-acp/src/config.rs::validate_allowlist y types.rs.
+    Una entrada malformada se descarta en vez de propagarse al record.
+    """
+    seen = []
+    for entry in raw.split(","):
+        entry = entry.strip().lower()
+        if re.fullmatch(r"[0-9a-f]{64}", entry) and entry not in seen:
+            seen.append(entry)
+    return seen
+
+
+def build_record(
+    slug, env, pubkey, template, host, identity, now, provider_id=DEFAULT_PROVIDER_ID
+):
+    """Construye el record del agente adoptado a partir de su agent.env.
+
+    Parte del conjunto completo de campos de la plantilla (así ningún campo
+    obligatorio del serde queda fuera), borra lo identitario del molde y rellena
+    lo que el agent.env sí sabe.
+    """
+    record = dict(template or FALLBACK_TEMPLATE)
+    for field in TEMPLATE_IDENTITY_FIELDS:
+        record.pop(field, None)
+
+    # Los campos obligatorios que acabamos de borrar vuelven a un valor neutro.
+    record["persona_id"] = None
+    record["avatar_url"] = None
+    record["system_prompt"] = env.get("BUZZ_ACP_SYSTEM_PROMPT", "")
+    # El modelo sí se recupera: el spawn lo emite como BUZZ_ACP_MODEL
+    # (runtime.rs:732), así que el agent.env del server lo trae tal cual.
+    record["model"] = env.get("BUZZ_ACP_MODEL") or None
+
+    record["pubkey"] = pubkey
+    record["name"] = env.get("BUZZ_ACP_DISPLAY_NAME") or slug
+    record["private_key_nsec"] = env["BUZZ_PRIVATE_KEY"]
+    record["auth_tag"] = env.get("BUZZ_AUTH_TAG") or None
+    record["relay_url"] = env.get("BUZZ_RELAY_URL", "")
+
+    record["agent_command"] = env.get("BUZZ_ACP_AGENT_COMMAND", "")
+    record["agent_command_override"] = None
+    record["agent_args"] = [a for a in env.get("BUZZ_ACP_AGENT_ARGS", "").split(",") if a]
+    record["acp_command"] = record.get("acp_command") or "buzz-acp"
+    record["mcp_command"] = ""
+
+    record["idle_timeout_seconds"] = _optional_int(env, "BUZZ_ACP_IDLE_TIMEOUT", slug)
+    record["max_turn_duration_seconds"] = _optional_int(
+        env, "BUZZ_ACP_MAX_TURN_DURATION", slug
+    )
+    turn = _optional_int(env, "BUZZ_ACP_TURN_TIMEOUT", slug)
+    if turn is not None:
+        record["turn_timeout_seconds"] = turn
+    record.setdefault("turn_timeout_seconds", FALLBACK_TEMPLATE["turn_timeout_seconds"])
+
+    respond_to = env.get("BUZZ_ACP_RESPOND_TO")
+    if respond_to in VALID_RESPOND_TO:
+        record["respond_to"] = respond_to
+    else:
+        if respond_to:
+            warn(
+                f"{slug}: BUZZ_ACP_RESPOND_TO={respond_to!r} no es un modo válido, "
+                "se usa owner-only"
+            )
+        record["respond_to"] = "owner-only"
+    record["respond_to_allowlist"] = _normalize_allowlist(
+        env.get("BUZZ_ACP_RESPOND_TO_ALLOWLIST", "")
+    )
+
+    # El agente vive en el server bajo systemd: arrancarlo al abrir la app no es
+    # lo que se quiere. `provider_binary_path` queda en null para que la app
+    # resuelva `buzz-backend-<id>` escaneando el PATH de ESTE Mac
+    # (backend.rs::resolve_provider_binary) en vez de una ruta del Mac viejo.
+    record["backend"] = {
+        "type": "provider",
+        "id": provider_id,
+        "config": {"host": host, "identity_file": identity},
+    }
+    record["backend_agent_id"] = slug
+    record["provider_binary_path"] = None
+    record["provider_policy_pending"] = False
+    record["start_on_app_launch"] = False
+    record["auto_restart_on_config_change"] = True
+    # BUZZ_ACP_AGENTS es el tamaño del pool con que se desplegó
+    # (parallelism.rs: stored = requested, effective = min(requested, tope del
+    # harness)). Recuperarlo es fiel salvo con el harness openclaw, cuyo tope
+    # de 5 haría que un pedido mayor vuelva como 5 — el comportamiento es el
+    # mismo, solo se pierde el número pedido. Mejor eso que caer a 1 y encoger
+    # el pool en el próximo redeploy.
+    pool = _optional_int(env, "BUZZ_ACP_AGENTS", slug)
+    record["parallelism"] = pool or record.get("parallelism") or 1
+    record["is_builtin"] = False
+    record["is_active"] = True
+
+    record["runtime_pid"] = None
+    record["created_at"] = now
+    record["updated_at"] = now
+    record["last_started_at"] = None
+    record["last_stopped_at"] = None
+    record["last_exit_code"] = None
+    record["last_error"] = None
+    record["last_error_code"] = None
+    return record
+
+
+def unmapped_env_keys(env):
+    """Nombres (nunca valores) de las variables del agent.env sin mapear."""
+    return sorted(key for key in env if key not in MAPPED_ENV_KEYS)
+
+
+# --- lado servidor ------------------------------------------------------------
+
+REMOTE_SCRIPT = f"""set -eu
+for envfile in {REMOTE_ROOT}/*/agent.env; do
+  [ -f "$envfile" ] || continue
+  slug=$(basename "$(dirname "$envfile")")
+  echo "{BLOCK_BEGIN}$slug==="
+  cat "$envfile"
+done
+echo "{BLOCK_END}"
+"""
+
+
+def _run_ssh(host, identity, script):
+    command = [
+        "ssh",
+        "-i", identity,
+        "-o", "BatchMode=yes",
+        "-o", f"ConnectTimeout={SSH_CONNECT_TIMEOUT}",
+        "-o", "StrictHostKeyChecking=accept-new",
+        host,
+        "bash -s",
+    ]
+    try:
+        proc = subprocess.run(
+            command, input=script.encode(), capture_output=True, timeout=SSH_TIMEOUT
+        )
+    except FileNotFoundError:
+        raise AdoptError("no se encontró `ssh` en el PATH") from None
+    except subprocess.TimeoutExpired:
+        raise AdoptError(f"la lectura por SSH excedió {SSH_TIMEOUT}s") from None
+    if proc.returncode != 0:
+        detail = proc.stderr.decode(errors="replace").strip()[-400:]
+        raise AdoptError(f"ssh falló (exit {proc.returncode}): {detail}")
+    return proc.stdout.decode(errors="replace")
+
+
+def split_remote_output(output):
+    """Trocea el volcado remoto en {slug: contenido del agent.env}.
+
+    Exige el marcador de fin: un SSH cortado a la mitad debe fallar, no adoptar
+    un agente con el agent.env truncado.
+    """
+    blocks = {}
+    current = None
+    lines = []
+    closed = False
+    for line in output.splitlines():
+        if line.startswith(BLOCK_BEGIN) and line.endswith("==="):
+            if current is not None:
+                blocks[current] = "\n".join(lines)
+            current = line[len(BLOCK_BEGIN) : -3]
+            lines = []
+        elif line == BLOCK_END:
+            if current is not None:
+                blocks[current] = "\n".join(lines)
+                current = None
+            closed = True
+        elif current is not None:
+            lines.append(line)
+    if not closed:
+        raise AdoptError("la salida del SSH quedó incompleta (falta el marcador de fin)")
+    return blocks
+
+
+def fetch_remote_envs(host, identity, ssh_runner=None):
+    """Lee por SSH todos los agent.env del server. Devuelve {slug: texto}."""
+    runner = ssh_runner or _run_ssh
+    return split_remote_output(runner(host, os.path.expanduser(identity), REMOTE_SCRIPT))
+
+
+# --- app corriendo ------------------------------------------------------------
+# Heurística: se busca cualquier proceso cuyo ejecutable se llame `ABY` o
+# `buzz-desktop` (los dos nombres con que se ha shipeado el binario del
+# Desktop). NO se intenta distinguir a qué instancia pertenece cada PID: no hay
+# forma barata y fiable de mapear un proceso a su directorio de datos, y la app
+# reescribe managed-agents.json ENTERO desde memoria al guardar, así que
+# cualquier instancia viva puede pisar los records recién adoptados. Por eso el
+# chequeo es conservador y bloquea con cualquier ABY abierta.
+#
+# Solo bloquea --apply: el dry-run no escribe, así que se limita a avisar.
+PROCESS_PATTERN = r"/(ABY|buzz-desktop)( |$)"
+
+
+def running_desktop_pids():
+    try:
+        proc = subprocess.run(
+            ["pgrep", "-f", PROCESS_PATTERN], capture_output=True, timeout=15
+        )
+    except (FileNotFoundError, subprocess.TimeoutExpired):
+        # Sin pgrep no se puede verificar; se devuelve un centinela para que
+        # --apply lo trate como bloqueo (fail closed).
+        return ["<no se pudo verificar: pgrep no disponible>"]
+    return [p for p in proc.stdout.decode().split() if p]
+
+
+# --- plan ---------------------------------------------------------------------
+
+
+def build_plan(remote_envs, existing_by_pubkey, only_slugs, host, identity, template, now):
+    """Calcula, sin escribir nada, qué se haría con cada agente del server."""
+    rows = []
+    for slug in sorted(remote_envs):
+        if only_slugs and slug not in only_slugs:
+            continue
+        row = {"slug": slug, "name": "-", "pubkey": "-", "action": "", "record": None, "extra": []}
+        try:
+            env = parse_env_file(remote_envs[slug])
+            if not env.get("BUZZ_PRIVATE_KEY"):
+                raise AdoptError("el agent.env no tiene BUZZ_PRIVATE_KEY")
+            pubkey = derive_pubkey_hex(env["BUZZ_PRIVATE_KEY"])
+        except AdoptError as error:
+            row["action"] = f"error: {error}"
+            rows.append(row)
+            continue
+        row["pubkey"] = pubkey
+        row["name"] = env.get("BUZZ_ACP_DISPLAY_NAME") or slug
+        row["extra"] = unmapped_env_keys(env)
+        if pubkey in existing_by_pubkey:
+            row["action"] = "ya existe (sin cambios)"
+        else:
+            row["action"] = "adoptar"
+            row["record"] = build_record(slug, env, pubkey, template, host, identity, now)
+        rows.append(row)
+    return rows
+
+
+def render_plan(rows):
+    """Tabla del plan: slug, pubkey truncado, nombre y acción.
+
+    Nunca imprime claves ni auth tags.
+    """
+    lines = [
+        f"  {'AGENTE':<14} {'PUBKEY':<18} {'NOMBRE':<20} ACCIÓN",
+        f"  {'-' * 14} {'-' * 18} {'-' * 20} {'-' * 24}",
+    ]
+    for row in rows:
+        short = row["pubkey"][:16] + "…" if len(row["pubkey"]) > 16 else row["pubkey"]
+        lines.append(f"  {row['slug']:<14} {short:<18} {row['name']:<20} {row['action']}")
+    return "\n".join(lines)
+
+
+# --- escritura ----------------------------------------------------------------
+
+
+def write_store(instance_dir, records):
+    """Backup con timestamp + escritura atómica del store (modo 0600).
+
+    Se escribe a un temporal en el mismo directorio y se renombra, así una
+    interrupción no deja el store a medias.
+    """
+    path = os.path.join(instance_dir, STORE_RELPATH)
+    backup = f"{path}.bak-{time.strftime('%Y%m%d-%H%M%S')}"
+    shutil.copy2(path, backup)
+    tmp = f"{path}.adopt-tmp"
+    old_umask = os.umask(0o077)
+    try:
+        with open(tmp, "w", encoding="utf-8") as handle:
+            json.dump(records, handle, indent=2, ensure_ascii=False)
+        os.chmod(tmp, 0o600)
+        os.replace(tmp, path)
+    finally:
+        os.umask(old_umask)
+        if os.path.exists(tmp):
+            os.unlink(tmp)
+    return backup
+
+
+# --- main ---------------------------------------------------------------------
+
+
+def run(args):
+    instance = detect_instance(args.instance)
+    print(f"[1/4] Instancia: {instance}")
+    records = load_store(instance)
+    existing = index_by_pubkey(records)
+    template = pick_template(records)
+    info(f"{len(records)} records en el store ({len(existing)} con pubkey)")
+    info(
+        "plantilla de esquema: "
+        + (template["name"] if template else "ninguna (esquema mínimo embebido)")
+    )
+
+    pids = running_desktop_pids()
+    if pids:
+        if args.apply:
+            raise AdoptError(
+                "hay una app ABY abierta (PIDs: " + ", ".join(pids) + "). "
+                "Cerrala y volvé a correr: al guardar reescribe el store entero y "
+                "pisaría los records adoptados."
+            )
+        warn("hay una app ABY abierta — el dry-run corre igual, pero --apply se va a rehusar.")
+
+    print(f"[2/4] Leyendo {REMOTE_ROOT}/*/agent.env en {args.host}")
+    remote = fetch_remote_envs(args.host, args.identity)
+    if not remote:
+        raise AdoptError(f"el server no tiene ningún agent.env bajo {REMOTE_ROOT}")
+    info(f"{len(remote)} agentes en el server: {', '.join(sorted(remote))}")
+    only = set(args.agent or [])
+    for slug in sorted(only - set(remote)):
+        warn(f"--agent {slug}: no existe en el server, se ignora")
+
+    now = datetime.now(timezone.utc).isoformat()
+    print("[3/4] Plan")
+    rows = build_plan(remote, existing, only, args.host, args.identity, template, now)
+    print(render_plan(rows))
+
+    extras = sorted({key for row in rows for key in row["extra"]})
+    if extras:
+        info("")
+        info("Variables del agent.env NO copiadas al record (solo nombres):")
+        info("  " + ", ".join(extras))
+        info("Un redeploy desde estos records no las incluiría.")
+
+    new_records = [row["record"] for row in rows if row["record"]]
+    errors = [row for row in rows if row["action"].startswith("error")]
+
+    print("[4/4] Resultado")
+    if errors:
+        warn(f"{len(errors)} agente(s) con error; no se adoptan.")
+    if not new_records:
+        info("Nada que adoptar.")
+        return 1 if errors else 0
+    if not args.apply:
+        info(f"{len(new_records)} agente(s) por adoptar. Dry-run: no se escribió nada.")
+        info("Volvé a correr con --apply para escribir el store.")
+        return 0
+
+    backup = write_store(instance, records + new_records)
+    info(f"backup: {backup}")
+    info(f"{len(new_records)} agente(s) adoptados en {os.path.join(instance, STORE_RELPATH)}")
+    print()
+    print("IMPORTANTE: la app debe reiniciarse para ver los agentes adoptados.")
+    print("Los records adoptados guardan la clave inline — la app puede migrarla")
+    print("a su keyring al primer uso.")
+    return 1 if errors else 0
+
+
+def main(argv=None):
+    parser = argparse.ArgumentParser(
+        description="Adopta en este Mac los agentes desplegados al develop server.",
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+    )
+    parser.add_argument("--instance", help="directorio de datos de la app (default: autodetectar)")
+    parser.add_argument("--host", default=DEFAULT_HOST, help=f"destino SSH (default {DEFAULT_HOST})")
+    parser.add_argument(
+        "--identity", default=DEFAULT_IDENTITY, help=f"identidad SSH (default {DEFAULT_IDENTITY})"
+    )
+    parser.add_argument("--agent", action="append", help="limitar a este slug (repetible)")
+    parser.add_argument("--apply", action="store_true", help="escribir (sin él: dry-run)")
+    parser.add_argument("--selftest", action="store_true", help="correr los tests embebidos")
+    args = parser.parse_args(argv)
+
+    if args.selftest:
+        here = os.path.dirname(os.path.abspath(__file__))
+        return subprocess.call(
+            [sys.executable, os.path.join(here, "test_buzz_adopt_server_agents.py")]
+        )
+
+    if not args.apply:
+        print("== DRY RUN — no se escribe nada (usá --apply) ==")
+    try:
+        return run(args)
+    except AdoptError as error:
+        print(f"ERROR: {error}", file=sys.stderr)
+        return 2
+
+
+if __name__ == "__main__":
+    sys.exit(main())
