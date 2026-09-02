@@ -61,10 +61,27 @@ export type AgentGraphFlight = {
   snippet: string;
 };
 
+/**
+ * A node message with no explicit target — sent "to the room". It creates no
+ * edge (recipients are unknowable), but the view flies it as balloons toward
+ * the channel's other speakers.
+ */
+export type AgentGraphBroadcast = {
+  id: string;
+  from: string;
+  channelId: string;
+  at: number;
+  snippet: string;
+};
+
 export type AgentGraphModel = {
   nodes: AgentGraphNode[];
   edges: AgentGraphEdge[];
   lastAt: number | null;
+  /** Newest first, capped. */
+  broadcasts: AgentGraphBroadcast[];
+  /** Node pubkeys that authored anything per channel, for broadcast fan-out. */
+  speakersByChannel: Map<string, Set<string>>;
 };
 
 type GraphEventLike = {
@@ -130,6 +147,19 @@ export function buildAgentGraphModel({
   const edgesByKey = new Map<string, AgentGraphEdge>();
   const seenEventIds = new Set<string>();
   let lastAt: number | null = null;
+  const broadcasts: AgentGraphBroadcast[] = [];
+  const speakersByChannel = new Map<string, Set<string>>();
+
+  // Replies resolve their targets through the referenced event's author, so
+  // answering inside someone's thread counts as a directed pass even without
+  // an explicit mention.
+  const authorByEventId = new Map<string, string>();
+  for (const event of events) {
+    const author = normalizePubkey(event.pubkey);
+    if (nodesByPubkey.has(author)) {
+      authorByEventId.set(event.id, author);
+    }
+  }
 
   for (const event of events) {
     if (seenEventIds.has(event.id)) continue;
@@ -143,15 +173,41 @@ export function buildAgentGraphModel({
       (tag) => tag[0] === "e" && typeof tag[1] === "string",
     );
     const channelId = firstTagValue(event.tags, "h");
+    if (channelId) {
+      let speakers = speakersByChannel.get(channelId);
+      if (!speakers) {
+        speakers = new Set();
+        speakersByChannel.set(channelId, speakers);
+      }
+      speakers.add(author);
+    }
     const targets = new Set<string>();
     for (const tag of event.tags) {
-      if (tag[0] !== "p" || typeof tag[1] !== "string") continue;
-      const target = normalizePubkey(tag[1]);
-      if (target !== author && nodesByPubkey.has(target)) {
-        targets.add(target);
+      if (tag[0] === "p" && typeof tag[1] === "string") {
+        const target = normalizePubkey(tag[1]);
+        if (target !== author && nodesByPubkey.has(target)) {
+          targets.add(target);
+        }
+      }
+      if (tag[0] === "e" && typeof tag[1] === "string") {
+        const repliedAuthor = authorByEventId.get(tag[1]);
+        if (repliedAuthor && repliedAuthor !== author) {
+          targets.add(repliedAuthor);
+        }
       }
     }
-    if (targets.size === 0) continue;
+    if (targets.size === 0) {
+      if (channelId) {
+        broadcasts.push({
+          id: event.id,
+          from: author,
+          channelId,
+          at: event.created_at,
+          snippet: snippetOf(event.content),
+        });
+      }
+      continue;
+    }
 
     const ref: AgentGraphMessageRef = {
       id: event.id,
@@ -208,8 +264,15 @@ export function buildAgentGraphModel({
   const edges = [...edgesByKey.values()].sort(
     (left, right) => right.lastAt - left.lastAt,
   );
+  broadcasts.sort((left, right) => right.at - left.at);
 
-  return { nodes, edges, lastAt };
+  return {
+    nodes,
+    edges,
+    lastAt,
+    broadcasts: broadcasts.slice(0, 12),
+    speakersByChannel,
+  };
 }
 
 /** Edges touching a node, newest traffic first. */

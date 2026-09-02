@@ -308,6 +308,7 @@ export function AgentGraphView({
   >(new Set());
   const [flights, setFlights] = React.useState<readonly AgentGraphFlight[]>([]);
   const edgeLastAtRef = React.useRef<Map<string, number> | null>(null);
+  const seenBroadcastsRef = React.useRef<Set<string> | null>(null);
   React.useEffect(() => {
     const previous = edgeLastAtRef.current;
     const next = new Map<string, number>();
@@ -330,6 +331,34 @@ export function AgentGraphView({
         }
       }
     }
+    // Target-less "to the room" messages (e.g. the viewer's plain channel
+    // message) fan out as balloons toward that channel's other speakers.
+    // Balloons only: recipients are a guess, so no edge, no pulse.
+    const previousBroadcasts = seenBroadcastsRef.current;
+    const seenBroadcasts = new Set(previousBroadcasts ?? []);
+    const visiblePubkeys = new Set(model.nodes.map((node) => node.pubkey));
+    for (const broadcast of model.broadcasts) {
+      if (seenBroadcasts.has(broadcast.id)) continue;
+      seenBroadcasts.add(broadcast.id);
+      if (!previousBroadcasts) continue;
+      if (!visiblePubkeys.has(broadcast.from)) continue;
+      const recipients = [
+        ...(model.speakersByChannel.get(broadcast.channelId) ?? []),
+      ]
+        .filter(
+          (pubkey) => pubkey !== broadcast.from && visiblePubkeys.has(pubkey),
+        )
+        .slice(0, 3);
+      for (const to of recipients) {
+        departures.push({
+          key: `${broadcast.id}:${to}`,
+          from: broadcast.from,
+          to,
+          snippet: broadcast.snippet,
+        });
+      }
+    }
+    seenBroadcastsRef.current = seenBroadcasts;
     edgeLastAtRef.current = next;
     if (arrivals.size === 0) return;
     setPulsingPubkeys((current) => new Set([...current, ...arrivals]));

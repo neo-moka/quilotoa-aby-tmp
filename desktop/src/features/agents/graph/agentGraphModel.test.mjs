@@ -170,3 +170,43 @@ test("optional humans render only when they take part in the flow", () => {
   const aby = model.nodes.find((node) => node.name === "Aby");
   assert.equal(aby.isHuman, false);
 });
+
+test("a reply resolves its target through the referenced event's author", () => {
+  const model = buildAgentGraphModel({
+    roster,
+    viewer,
+    events: [
+      msg("root1", A, [["p", B]], 100),
+      msg("2", VIEWER, [["e", "root1"]], 200, "de acuerdo"),
+    ],
+  });
+  const viewerToA = model.edges.find((e) => e.from === VIEWER && e.to === A);
+  assert.ok(viewerToA);
+  assert.equal(viewerToA.replyCount, 1);
+});
+
+test("target-less channel messages become broadcasts, not edges", () => {
+  const model = buildAgentGraphModel({
+    roster,
+    viewer,
+    events: [
+      msg(
+        "1",
+        A,
+        [
+          ["p", B],
+          ["h", "chan-1"],
+        ],
+        100,
+      ),
+      msg("2", VIEWER, [["h", "chan-1"]], 200, "hola chicos"),
+    ],
+  });
+  assert.equal(model.edges.length, 1);
+  assert.equal(model.broadcasts.length, 1);
+  assert.equal(model.broadcasts[0].from, VIEWER);
+  assert.equal(model.broadcasts[0].snippet, "hola chicos");
+  const speakers = model.speakersByChannel.get("chan-1");
+  assert.ok(speakers.has(A));
+  assert.ok(speakers.has(VIEWER));
+});
