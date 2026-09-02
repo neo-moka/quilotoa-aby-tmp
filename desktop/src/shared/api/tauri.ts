@@ -1049,6 +1049,52 @@ export async function probeBackendProvider(
   });
 }
 
+// ── MCP connection inspection ────────────────────────────────────────────────
+
+export type McpToolAnnotations = {
+  readOnlyHint: boolean | null;
+  destructiveHint: boolean | null;
+  idempotentHint: boolean | null;
+  openWorldHint: boolean | null;
+};
+
+export type McpToolInfo = {
+  name: string;
+  title: string | null;
+  description: string | null;
+  inputCount: number;
+  annotations: McpToolAnnotations;
+};
+
+export type McpToolsProbe = {
+  serverName: string | null;
+  serverVersion: string | null;
+  tools: McpToolInfo[];
+};
+
+/** Live `tools/list` against a remote MCP connection (desktop-side, no CORS). */
+export async function mcpProbeTools(
+  url: string,
+  auth: string | null,
+): Promise<McpToolsProbe> {
+  return invokeTauri<McpToolsProbe>("mcp_probe_tools", { url, auth });
+}
+
+/** Invoke one tool with raw JSON arguments; returns the raw MCP result. */
+export async function mcpCallTool(
+  url: string,
+  auth: string | null,
+  name: string,
+  args: unknown,
+): Promise<unknown> {
+  return invokeTauri<unknown>("mcp_call_tool", {
+    url,
+    auth,
+    name,
+    arguments: args,
+  });
+}
+
 // ── NIP-44 encrypt-to-self ───────────────────────────────────────────────────
 
 export async function nip44EncryptToSelf(plaintext: string): Promise<string> {

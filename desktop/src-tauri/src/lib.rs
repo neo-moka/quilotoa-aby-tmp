@@ -723,6 +723,8 @@ pub fn run() {
             update_managed_agent,
             discover_backend_providers,
             probe_backend_provider,
+            mcp_probe_tools,
+            mcp_call_tool,
             persona_catalog::fetch_persona_catalog,
             unread_catch_up::unread_catch_up,
             observed_unread::observed_unread_open_scope,

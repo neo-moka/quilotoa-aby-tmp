@@ -1,4 +1,4 @@
-import { Plug, Plus, Trash2 } from "lucide-react";
+import { Plug, Plus, Trash2, Wrench } from "lucide-react";
 import * as React from "react";
 
 import {
@@ -15,6 +15,7 @@ import { Button } from "@/shared/ui/button";
 import { Switch } from "@/shared/ui/switch";
 
 import { AddMcpConnectionDialog } from "./AddMcpConnectionDialog";
+import { McpToolsDialog } from "./McpToolsDialog";
 
 type ConnectionRow = McpConnectionDef & { builtin: boolean };
 
@@ -48,6 +49,7 @@ export function McpConnectionsSection({
   }, [envVars]);
 
   const [addOpen, setAddOpen] = React.useState(false);
+  const [toolsFor, setToolsFor] = React.useState<ConnectionRow | null>(null);
 
   const handleAdd = (def: McpConnectionDef, fleetDefault: boolean) => {
     let next = upsertMcpDef(envVars, def);
@@ -99,6 +101,18 @@ export function McpConnectionsSection({
                   }
                 />
               </label>
+              {row.url ? (
+                <Button
+                  aria-label={`View tools of ${row.name}`}
+                  data-testid={`mcp-view-tools-${row.name}`}
+                  onClick={() => setToolsFor(row)}
+                  size="icon"
+                  type="button"
+                  variant="ghost"
+                >
+                  <Wrench className="h-3.5 w-3.5" />
+                </Button>
+              ) : null}
               {row.builtin ? null : (
                 <Button
                   aria-label={`Remove ${row.name}`}
@@ -133,6 +147,18 @@ export function McpConnectionsSection({
         onOpenChange={setAddOpen}
         open={addOpen}
       />
+
+      {toolsFor?.url ? (
+        <McpToolsDialog
+          auth={toolsFor.auth ?? null}
+          connectionName={toolsFor.name}
+          onOpenChange={(nextOpen) => {
+            if (!nextOpen) setToolsFor(null);
+          }}
+          open
+          url={toolsFor.url}
+        />
+      ) : null}
     </div>
   );
 }
