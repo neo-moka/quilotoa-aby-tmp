@@ -1,4 +1,5 @@
 import * as React from "react";
+import { createPortal } from "react-dom";
 import { Maximize2, Minimize2, X } from "lucide-react";
 
 import { cn } from "@/shared/lib/cn";
@@ -154,7 +155,7 @@ export function AgentGraphFloatingPanel() {
 
   if (!isOpen) return null;
 
-  const style = isMaximized
+  const style: React.CSSProperties | undefined = isMaximized
     ? undefined
     : position
       ? {
@@ -172,7 +173,11 @@ export function AgentGraphFloatingPanel() {
           }
         : undefined;
 
-  return (
+  // Portaled to <body>: the panel mounts inside the content shell, whose
+  // ancestors (sidebar chrome, motion transforms) open stacking contexts
+  // that would trap a fixed z-50 below them — screen level means escaping
+  // the tree entirely.
+  return createPortal(
     <div
       className={cn(
         // Inline elevation on purpose: a ring hairline the dark theme can
@@ -243,6 +248,7 @@ export function AgentGraphFloatingPanel() {
           </svg>
         </button>
       )}
-    </div>
+    </div>,
+    document.body,
   );
 }
