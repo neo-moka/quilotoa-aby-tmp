@@ -271,19 +271,16 @@ export function AgentGraph3DCanvas({
                 opacity={0.95}
                 points={geometry.arrowPoints}
               />
-              {active ? (
+              {active && isRecent ? (
                 <path
-                  className={cn(
-                    "text-primary",
-                    isRecent ? "buzz-graph-flow" : "buzz-graph-flow-slow",
-                  )}
+                  className="buzz-graph-flow text-primary"
                   d={geometry.d}
                   fill="none"
-                  opacity={isRecent ? 0.95 : 0.45}
+                  opacity={0.95}
                   stroke="currentColor"
                   strokeDasharray="3 19"
                   strokeLinecap="round"
-                  strokeWidth={(isRecent ? 2.5 : 2) * depth}
+                  strokeWidth={2.5 * depth}
                 />
               ) : null}
             </g>

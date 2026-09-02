@@ -19,6 +19,7 @@ import {
 } from "./agentGraphPanelStore";
 import { useChannelsQuery } from "@/features/channels/hooks";
 import { cn } from "@/shared/lib/cn";
+import { useNow } from "@/shared/lib/useNow";
 import { Button } from "@/shared/ui/button";
 import { Spinner } from "@/shared/ui/spinner";
 
@@ -143,7 +144,10 @@ export function AgentGraphView({
   const [selectedPubkey, setSelectedPubkey] = React.useState<string | null>(
     null,
   );
-  const nowSeconds = Math.floor(Date.now() / 1_000);
+  // Ticking clock so edge recency decays on its own: without it, a graph
+  // left open with no new traffic never re-renders and "hot" edges stay
+  // accented past the 10-minute window.
+  const nowSeconds = Math.floor(useNow(30_000) / 1_000);
 
   const [zoom, setZoom] = React.useState(1);
   const [pan, setPan] = React.useState({ x: 0, y: 0 });

@@ -84,12 +84,6 @@
   animation: buzz-graph-flow 900ms linear infinite;
 }
 
-/* Same packet flow, ambient tempo — edges whose traffic is older keep a
-   quiet drift so the whole graph reads as live, not frozen. */
-.buzz-graph-flow-slow {
-  animation: buzz-graph-flow 2400ms linear infinite;
-}
-
 /* Delivery pulse: an expanding, fading ring around a node that just
    received a message. */
 @keyframes buzz-graph-pulse {
@@ -138,7 +132,6 @@
 
 @media (prefers-reduced-motion: reduce) {
   .buzz-graph-flow,
-  .buzz-graph-flow-slow,
   .buzz-graph-pulse,
   .buzz-graph-flight {
     animation: none;
