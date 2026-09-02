@@ -34,7 +34,15 @@ import shlex
 import subprocess
 import sys
 
-VERSION = "0.1.0"
+VERSION = "0.2.0"
+
+# MCPs gestionables por agente vía la env var NEOMOKA_MCP (lista separada por
+# comas, p. ej. "dropi"; se define en Environment variables del diálogo del
+# Desktop y aplica en el siguiente Start/redeploy). Cada entrada declara el
+# grupo Unix que da acceso a sus credenciales compartidas en el server.
+# Si la var está PRESENTE, el set se aplica exactamente (lo no listado se
+# desactiva); si está AUSENTE, el server no se toca (compatibilidad).
+KNOWN_MCPS = {"dropi": {"group": "mcpdropi"}}
 DEFAULT_HOST = "root@134.122.118.128"
 DEFAULT_IDENTITY = "~/workspace_skerna/.ssh/id_ed25519_moka_dev_ci"
 SSH_CONNECT_TIMEOUT = 15
@@ -190,6 +198,49 @@ def divert_multiline(env: dict, slug: str) -> tuple:
     return env, files
 
 
+def mcp_management_block(slug: str, env: dict) -> str:
+    """Bloque bash que aplica NEOMOKA_MCP: grupos Unix + enabled en config.yaml.
+
+    Solo se emite cuando la variable viene en el env del agente. El set se
+    aplica exacto: los MCP listados se habilitan (grupo + enabled true) y los
+    conocidos no listados se deshabilitan (fuera del grupo + enabled false).
+    El config.yaml solo se toca si existe (agentes hermes); en su ausencia el
+    grupo sigue siendo el interruptor real (el wrapper no puede leer el token).
+    """
+    raw = env.get("NEOMOKA_MCP")
+    if raw is None:
+        return ""
+    wanted = {name.strip() for name in str(raw).split(",") if name.strip()}
+    for name in sorted(wanted - set(KNOWN_MCPS)):
+        print(f"NEOMOKA_MCP: mcp desconocido {name!r}, ignorado", file=sys.stderr)
+    q_slug = shlex.quote(slug)
+    lines = ["\n# --- MCP por agente (NEOMOKA_MCP) ---"]
+    for name, spec in KNOWN_MCPS.items():
+        group = spec["group"]
+        if name in wanted:
+            lines.append(
+                f"getent group {group} >/dev/null && usermod -aG {group} {q_slug}"
+            )
+        else:
+            lines.append(f"gpasswd -d {q_slug} {group} >/dev/null 2>&1 || true")
+        enabled = "true" if name in wanted else "false"
+        lines.append(
+            f"""python3 - <<'PYMCP'
+import re
+path = "/home/{slug}/.hermes/config.yaml"
+try:
+    text = open(path).read()
+except FileNotFoundError:
+    raise SystemExit(0)
+pattern = re.compile(r"(  {name}:\\n    command: [^\\n]*\\n    enabled: )(true|false)")
+updated = pattern.sub(lambda m: m.group(1) + "{enabled}", text, count=1)
+if updated != text:
+    open(path, "w").write(updated)
+PYMCP"""
+        )
+    return "\n".join(lines) + "\n"
+
+
 def remote_script(slug: str, display_name: str, env: dict) -> str:
     """Script bash que corre en el servidor. Los secretos viajan por stdin del
     ssh (nunca argv) y aterrizan solo en archivos 0600/0400."""
@@ -205,6 +256,7 @@ def remote_script(slug: str, display_name: str, env: dict) -> str:
         )
     agent_command = env["BUZZ_ACP_AGENT_COMMAND"]
     is_hermes = "hermes" in os.path.basename(agent_command)
+    mcp_block = mcp_management_block(slug, env)
     q_slug = shlex.quote(slug)
     # Va dentro de un heredoc sin comillas: solo texto plano inofensivo.
     safe_name = re.sub(r"[^A-Za-z0-9 ._-]", "", display_name).strip() or slug
@@ -252,6 +304,7 @@ printf '%s' {shlex.quote(env_b64)} | base64 -d > /home/dropshipping/{q_slug}/age
 chmod 0600 /home/dropshipping/{q_slug}/agent.env
 {sidecar_block}
 {hermes_block}
+{mcp_block}
 # --- unit systemd ---
 cat > /etc/systemd/system/buzz-agent-{q_slug}.service <<UNIT
 [Unit]
